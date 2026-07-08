@@ -48,6 +48,7 @@ Font stack: Bangers / Action Man Bold / Walter Turncoat / Luckiest Guy / Permane
 ├── availability.php    AJAX slot availability endpoint
 ├── style.css           Full stylesheet
 ├── script.js           Client-side validation
+├── datepicker.js       Custom themed date picker
 ├── sql/
 │   ├── schema.sql
 │   └── seed.sql

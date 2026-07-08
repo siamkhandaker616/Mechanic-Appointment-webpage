@@ -173,29 +173,50 @@ function advanceAppointmentStatuses(): void {
 
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'scheduled' AND appointment_date <= ?");
-    $stmt->execute([$today]);
+    // Revert over-advanced: completed → in_progress if slot hasn't ended
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'completed'");
     foreach ($stmt->fetchAll() as $a) {
-        if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] < $currentSlot)) {
-            $upd = $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'scheduled'");
-            $upd->execute([$a['id']]);
+        if ($a['appointment_date'] > $today) {
+            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+        } elseif ($a['appointment_date'] === $today) {
+            $slotEnd = ((int)$a['slot_index'] + 4) * 2 + 2;
+            if ($currentHour < $slotEnd) {
+                $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+            }
         }
     }
 
+    // Revert over-advanced: in_progress → scheduled if slot hasn't started
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress'");
+    foreach ($stmt->fetchAll() as $a) {
+        if ($a['appointment_date'] > $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] > $currentSlot)) {
+            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
+        }
+    }
+
+    // Forward: scheduled → in_progress
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'scheduled' AND appointment_date <= ?");
+    $stmt->execute([$today]);
+    foreach ($stmt->fetchAll() as $a) {
+        if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] <= $currentSlot)) {
+            $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'scheduled'")->execute([$a['id']]);
+        }
+    }
+
+    // Forward: in_progress → completed
     $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
         $slotEndHour = ((int)$a['slot_index'] + 4) * 2;
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotEndHour + 2)) {
-            $upd = $db->prepare("UPDATE appointments SET status = 'completed' WHERE id = ? AND status = 'in_progress'");
-            $upd->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = 'completed' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
         }
     }
 }
 
 function getAppointments(?string $status = null): array {
     $db = getDB();
-    $sql = "SELECT a.id, a.appointment_date, a.slot_index, a.status, a.created_at,
+    $sql = "SELECT a.id, a.mechanic_id, a.appointment_date, a.slot_index, a.status, a.created_at,
                    c.name AS client_name, c.phone, c.address,
                    car.license_no, car.engine_no, car.model,
                    m.name AS mechanic_name, m.nickname AS mechanic_nickname

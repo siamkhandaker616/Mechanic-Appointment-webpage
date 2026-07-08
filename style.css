@@ -460,6 +460,10 @@ textarea {
     font-size: 0.9rem;
 }
 
+.btn-plain::after {
+    content: none;
+}
+
 .btn::after {
     content: "►";
     margin-left: 8px;
@@ -704,7 +708,7 @@ th {
 }
 
 td {
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--ink);
     background: var(--cyan-light);
 }
@@ -730,7 +734,13 @@ tr:last-child td {
 
 .status-scheduled { background: var(--teal-light); color: var(--gold); }
 .status-in_progress { background: var(--pink); color: var(--gold); }
-.status-completed { background: var(--navy); color: var(--gold); }
+.status-completed {
+    font-family: var(--font-marker);
+    color: var(--pink);
+    background: var(--gold);
+    border: 2px solid var(--ink);
+    transform: rotate(-1deg);
+}
 .status-cancelled { background: #888; color: var(--gold); }
 
 /* === SIM BAR === */
@@ -812,13 +822,18 @@ tr:last-child td {
 
 .edit-row {
     display: none;
-    margin-top: 8px;
 }
 
 .edit-row.show {
+    display: table-row;
+}
+
+.edit-inner {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     flex-wrap: wrap;
+    align-items: center;
+    padding: 4px 0;
 }
 
 /* === ADMIN NAV === */
@@ -925,6 +940,22 @@ tr:last-child td {
     max-width: 480px;
     position: relative;
     transform: rotate(-0.5deg);
+}
+
+.modal-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    font-family: Bangers, sans-serif;
+    color: var(--pink);
+    cursor: pointer;
+    line-height: 1;
+}
+.modal-close:hover {
+    color: var(--ink);
 }
 
 .field-error {

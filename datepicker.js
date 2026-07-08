@@ -2,6 +2,7 @@ class DatePicker {
     constructor(input) {
         this.input = input;
         this.isDateTime = input.type === 'datetime-local';
+        this.confirm = input.dataset.confirm === '' || input.dataset.confirm === 'true';
         this.date = null;
         this.viewDate = new Date();
         this.popup = null;
@@ -59,9 +60,9 @@ class DatePicker {
         var html = '';
 
         html += '<div class="dp-header">';
-        html += '<button class="dp-nav" data-action="prev">◀</button>';
+        html += '<button type="button" class="dp-nav" data-action="prev">◀</button>';
         html += '<span class="dp-title">' + months[month] + ' ' + year + '</span>';
-        html += '<button class="dp-nav" data-action="next">▶</button>';
+        html += '<button type="button" class="dp-nav" data-action="next">▶</button>';
         html += '</div>';
 
         html += '<div class="dp-days-header">';
@@ -96,7 +97,14 @@ class DatePicker {
         }
 
         html += '<div class="dp-footer">';
-        html += '<button class="btn btn-sm" data-action="today">Today</button>';
+        if (this.confirm || this.isDateTime) {
+            html += '<button class="btn btn-sm" data-action="ok">OK</button>';
+            if (!this.isDateTime) {
+                html += '<button class="btn btn-sm" data-action="today">Today</button>';
+            }
+        } else {
+            html += '<button class="btn btn-sm" data-action="today">Today</button>';
+        }
         html += '<button class="btn btn-sm btn-pink" data-action="close">Close</button>';
         html += '</div>';
 
@@ -106,9 +114,16 @@ class DatePicker {
     positionPopup() {
         var rect = this.display.getBoundingClientRect();
         var popupW = 300;
-        var left = rect.left;
-        var top = rect.bottom + 6;
+        var popupH = this.popup.offsetHeight;
+        var top;
 
+        if (rect.top > popupH + 10) {
+            top = rect.top - popupH - 6;
+        } else {
+            top = rect.bottom + 6;
+        }
+
+        var left = rect.left;
         if (left + popupW > window.innerWidth) {
             left = window.innerWidth - popupW - 10;
         }
@@ -138,6 +153,7 @@ class DatePicker {
         });
 
         this.popup.addEventListener('click', function (e) {
+            e.stopPropagation();
             var target = e.target;
 
             if (target.dataset.action === 'prev') {
@@ -146,26 +162,44 @@ class DatePicker {
             } else if (target.dataset.action === 'next') {
                 self.viewDate.setMonth(self.viewDate.getMonth() + 1);
                 self.render();
+            } else if (target.dataset.action === 'ok') {
+                self.updateValue();
+                self.close();
             } else if (target.dataset.action === 'today') {
                 self.viewDate = new Date();
                 self.date = new Date();
                 self.render();
-                self.updateValue();
-                self.close();
+                if (!self.confirm) {
+                    self.updateValue();
+                    self.close();
+                }
             } else if (target.dataset.action === 'close') {
                 self.close();
             } else if (target.classList.contains('dp-day') && !target.classList.contains('dp-empty')) {
                 var day = parseInt(target.dataset.day);
-                self.date = new Date(self.viewDate.getFullYear(), self.viewDate.getMonth(), day);
-                self.render();
-                self.updateValue();
-                self.close();
+                if (self.isDateTime || self.confirm) {
+                    var h = self.popup.querySelector('.dp-hour');
+                    var currH = h ? parseInt(h.value) : 0;
+                    var currM = self.popup.querySelector('.dp-min');
+                    var currMv = currM ? parseInt(currM.value) : 0;
+                    self.date = new Date(self.viewDate.getFullYear(), self.viewDate.getMonth(), day, currH || 0, currMv || 0);
+                    self.render();
+                } else {
+                    self.date = new Date(self.viewDate.getFullYear(), self.viewDate.getMonth(), day);
+                    self.render();
+                    self.updateValue();
+                    self.close();
+                }
             }
         });
 
         this.popup.addEventListener('change', function (e) {
             if (e.target.classList.contains('dp-hour') || e.target.classList.contains('dp-min')) {
-                self.updateValue();
+                if (self.date) {
+                    var h = parseInt(self.popup.querySelector('.dp-hour').value) || 0;
+                    var m = parseInt(self.popup.querySelector('.dp-min').value) || 0;
+                    self.date.setHours(h, m, 0, 0);
+                }
             }
         });
 
@@ -193,8 +227,8 @@ class DatePicker {
         }
         this.viewDate = this.date ? new Date(this.date) : new Date();
         this.render();
-        this.positionPopup();
         this.popup.classList.remove('hidden');
+        this.positionPopup();
     }
 
     close() {

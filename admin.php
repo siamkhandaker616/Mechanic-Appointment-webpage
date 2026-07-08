@@ -1,10 +1,9 @@
 <?php
 require_once __DIR__ . '/functions.php';
 
-advanceAppointmentStatuses();
-
 $msg = '';
 $msgType = '';
+$conflictList = [];
 
 if (isset($_GET['cancel'])) {
     $id = (int)$_GET['cancel'];
@@ -43,18 +42,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if (isset($_POST['toggle_sim'])) {
+    if (isset($_POST['sim_toggle']) && !isset($_POST['toggle_sim'])) {
         $db = getDB();
         $useSim = (int)(isset($_POST['use_sim']));
+        $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
+        $stmt->execute([$useSim]);
+        $msg = $useSim ? 'Simulated time activated.' : 'Real time restored.';
+        $msgType = 'success';
+    }
+
+    if (isset($_POST['toggle_sim'])) {
+        $db = getDB();
         $simDt = $_POST['sim_datetime'] ?? null;
         if ($simDt) {
-            $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ?, simulated_datetime = ? WHERE id = 1");
-            $stmt->execute([$useSim, $simDt]);
-        } else {
-            $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
-            $stmt->execute([$useSim]);
+            $ts = strtotime($simDt);
+            if ($ts) {
+                $simDt = date('Y-m-d H:i:s', $ts);
+            }
+            $stmt = $db->prepare("UPDATE sim_config SET simulated_datetime = ? WHERE id = 1");
+            $stmt->execute([$simDt]);
         }
-        $msg = $useSim ? 'Simulated time activated.' : 'Real time restored.';
+        $msg = 'Simulated time updated.';
         $msgType = 'success';
     }
 
@@ -121,18 +129,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $date = $_POST['override_date'];
         $slots = $_POST['slots'] ?? [];
         $reason = trim($_POST['reason'] ?? '');
-        $slotFlags = [];
-        for ($i = 0; $i < SLOT_COUNT; $i++) {
-            $slotFlags['slot_' . ($i + 1)] = in_array($i, $slots) ? 1 : 0;
+
+        $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('cancelled','completed')");
+        $stmt->execute([$mechId, $date]);
+        $conflicts = [];
+        foreach ($stmt->fetchAll() as $a) {
+            if (in_array((int)$a['slot_index'], $slots)) {
+                $conflicts[] = $a;
+            }
         }
-        $stmt = $db->prepare("INSERT INTO mechanic_overrides (mechanic_id, override_date, slot_1, slot_2, slot_3, slot_4, reason)
-                              VALUES (?, ?, ?, ?, ?, ?, ?)
-                              ON DUPLICATE KEY UPDATE slot_1=VALUES(slot_1), slot_2=VALUES(slot_2), slot_3=VALUES(slot_3), slot_4=VALUES(slot_4), reason=VALUES(reason)");
-        $stmt->execute([$mechId, $date, $slotFlags['slot_1'], $slotFlags['slot_2'], $slotFlags['slot_3'], $slotFlags['slot_4'], $reason]);
-        $msg = 'Schedule override saved.';
-        $msgType = 'success';
+
+        if (!empty($conflicts)) {
+            $conflictList = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (slot ' . ((int)$c['slot_index'] + 1) . ')', $conflicts);
+        } else {
+            $slotFlags = [];
+            for ($i = 0; $i < SLOT_COUNT; $i++) {
+                $slotFlags['slot_' . ($i + 1)] = in_array($i, $slots) ? 1 : 0;
+            }
+            $stmt = $db->prepare("INSERT INTO mechanic_overrides (mechanic_id, override_date, slot_1, slot_2, slot_3, slot_4, reason)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?)
+                                  ON DUPLICATE KEY UPDATE slot_1=VALUES(slot_1), slot_2=VALUES(slot_2), slot_3=VALUES(slot_3), slot_4=VALUES(slot_4), reason=VALUES(reason)");
+            $stmt->execute([$mechId, $date, $slotFlags['slot_1'], $slotFlags['slot_2'], $slotFlags['slot_3'], $slotFlags['slot_4'], $reason]);
+            $msg = 'Schedule override saved.';
+            $msgType = 'success';
+        }
     }
 }
+
+advanceAppointmentStatuses();
 
 $appointments = getAppointments();
 $mechanics = getMechanics();
@@ -191,6 +215,7 @@ $effectiveTime = getEffectiveTime();
         </span>
         <form method="post" class="inline-form">
             <input type="checkbox" name="use_sim" value="1" id="use-sim" <?= $useSim ? 'checked' : '' ?> onchange="this.form.submit()">
+            <input type="hidden" name="sim_toggle" value="1">
             <label for="use-sim">Use simulated time</label>
             <input type="datetime-local" name="sim_datetime" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
             <button type="submit" name="toggle_sim" value="1" class="btn btn-sm">Set</button>
@@ -230,10 +255,16 @@ $effectiveTime = getEffectiveTime();
                 <td><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
                 <td>
                     <?php if ($a['status'] === 'scheduled'): ?>
-                    <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
-                    <a href="?cancel=<?= $a['id'] ?>" class="btn btn-sm btn-rust" onclick="return confirm('Cancel this appointment?')">Cancel</a>
-
-                    <div class="edit-row" id="edit-<?= $a['id'] ?>">
+                    <button class="btn btn-sm btn-outline btn-plain" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
+                    <a href="?cancel=<?= $a['id'] ?>" class="btn btn-sm btn-rust btn-plain" onclick="return confirm('Cancel this appointment?')">Cancel</a>
+                    <?php else: ?>
+                    <span style="font-size:0.8rem;color:#888;">—</span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <tr class="edit-row" id="edit-<?= $a['id'] ?>">
+                <td colspan="8">
+                    <div class="edit-inner">
                         <form method="post" class="inline-form">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
                             <input type="date" name="new_date" value="<?= $a['appointment_date'] ?>" min="<?= date('Y-m-d') ?>">
@@ -254,9 +285,6 @@ $effectiveTime = getEffectiveTime();
                             <button type="submit" name="update_mechanic" class="btn btn-sm">Change Mechanic</button>
                         </form>
                     </div>
-                    <?php else: ?>
-                    <span style="font-size:0.8rem;color:#888;">—</span>
-                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -434,6 +462,26 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
+<?php if (!empty($conflictList)): ?>
+<div class="modal-overlay" id="conflict-modal" onclick="closeConflictModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:480px;">
+        <button type="button" class="modal-close" onclick="document.getElementById('conflict-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-right" style="background:var(--pink);">BLOCKED!</div>
+        <h2>Cancel These First</h2>
+        <p>The following appointments occupy slots you tried to override:</p>
+        <ul style="margin:16px 0;padding-left:20px;">
+            <?php foreach ($conflictList as $name): ?>
+            <li style="margin-bottom:6px;"><?= $name ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <p style="font-size:0.85rem;color:var(--pink);">Cancel them from the table below, then try again.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('conflict-modal').classList.add('hidden')">Got it</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 var SCHEDULE_DATA = <?= json_encode($scheduleData) ?>;
 
@@ -481,6 +529,12 @@ function openScheduleModal(id, name) {
 function closeScheduleModal(event) {
     if (event.target === event.currentTarget) {
         document.getElementById('schedule-modal').classList.add('hidden');
+    }
+}
+
+function closeConflictModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('conflict-modal').classList.add('hidden');
     }
 }
 </script>
