@@ -1,4 +1,4 @@
-# Mystery Motors
+# Mayhem Mobility
 
 Car workshop appointment system with a retro comic strip aesthetic. Built for CSE 391 Assignment 3.
 

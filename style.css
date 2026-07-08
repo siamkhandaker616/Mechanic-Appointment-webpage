@@ -28,6 +28,7 @@
     --pink-glow: rgba(214, 51, 132, 0.3);
     --gold: #f5c518;
     --burst: #e524e2;
+    --pop: #25a9f0;
     --cyan-light: #d8ecec;
     --dot-teal: rgba(26, 26, 46, 0.15);
     --dot-pink: rgba(214, 51, 132, 0.15);
@@ -62,6 +63,16 @@ body {
 }
 
 h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
+
+.tagline {
+    position: absolute;
+    opacity: 0.85;
+    z-index: 10;
+    width: 130px;
+    height: auto;
+    transform: rotate(17deg);
+    animation: whamFlash 3s infinite;
+}
 
 h1 {
     font-family: var(--font-display);
@@ -189,7 +200,6 @@ header::after {
     position: absolute;
     width: 90px;
     height: 90px;
-    background: var(--burst);
     clip-path: polygon(
         50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%,
         50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%
@@ -203,6 +213,7 @@ header::after {
     transform: rotate(-15deg);
     z-index: 2;
     pointer-events: none;
+    animation: burst-pop 1.5s infinite;
 }
 
 .burst-right {
@@ -862,6 +873,11 @@ tr:last-child td {
     100% { transform: scale(1); opacity: 1; }
 }
 
+@keyframes burst-pop {
+    0%, 49.99% { background: var(--burst); }
+    50%, 100% { background: var(--pop); }
+}
+
 .panel {
     animation: popIn 0.3s ease-out;
 }
@@ -869,6 +885,11 @@ tr:last-child td {
 @keyframes float {
     0%, 100% { transform: translateY(0px) rotate(-8deg); }
     50% { transform: translateY(-8px) rotate(-6deg); }
+}
+
+@keyframes whamFlash {
+    0%, 49.99% { top: 5px; right: 570px; }
+    50%, 100% { top: 60px; right: calc(100% - 570px - 130px); }
 }
 
 .omg {
@@ -1135,3 +1156,4 @@ tr:last-child td {
     padding: 6px 14px;
     font-size: 0.8rem;
 }
+

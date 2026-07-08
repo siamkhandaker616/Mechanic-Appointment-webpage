@@ -43,7 +43,7 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mystery Motors — Book Your Appointment</title>
+<title>Mayhem Mobility — Book Your Appointment</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -53,7 +53,8 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 <div class="omg omg-bot">CLICK</div>
 
 <header>
-    <h1>Mystery Motors</h1>
+    <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline">
+    <h1>Mayhem Mobility</h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
 </header>
 

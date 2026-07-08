@@ -211,7 +211,7 @@ $effectiveTime = getEffectiveTime();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mystery Motors — Admin Panel</title>
+<title>Mayhem Mobility — Admin Panel</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -221,7 +221,8 @@ $effectiveTime = getEffectiveTime();
 <div class="omg omg-bot">BAM</div>
 
 <header>
-    <h1>Mystery Motors</h1>
+    <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline">
+    <h1>Mayhem Mobility</h1>
     <p class="subtitle">Admin Panel</p>
     <div class="admin-nav">
         <a href="index.php" class="btn btn-sm btn-outline">Booking Page</a>
