@@ -1,20 +1,43 @@
 <?php
+session_start();
 require_once __DIR__ . '/functions.php';
 
 $msg = '';
 $msgType = '';
 $conflictList = [];
 
+// --- GET action handlers (redirect after) ---
+
 if (isset($_GET['cancel'])) {
     $id = (int)$_GET['cancel'];
     if (cancelAppointment($id)) {
-        $msg = 'Appointment cancelled.';
-        $msgType = 'success';
+        $_SESSION['flash_msg'] = 'Appointment cancelled.';
+        $_SESSION['flash_type'] = 'success';
     } else {
-        $msg = 'Could not cancel — appointment may already be in progress or completed.';
-        $msgType = 'error';
+        $_SESSION['flash_msg'] = 'Could not cancel — appointment may already be in progress or completed.';
+        $_SESSION['flash_type'] = 'error';
     }
+    header('Location: admin.php');
+    exit;
 }
+
+if (isset($_GET['fire'])) {
+    fireMechanic((int)$_GET['fire']);
+    $_SESSION['flash_msg'] = 'Mechanic deactivated.';
+    $_SESSION['flash_type'] = 'success';
+    header('Location: admin.php');
+    exit;
+}
+
+if (isset($_GET['restore'])) {
+    restoreMechanic((int)$_GET['restore']);
+    $_SESSION['flash_msg'] = 'Mechanic restored.';
+    $_SESSION['flash_type'] = 'success';
+    header('Location: admin.php');
+    exit;
+}
+
+// --- POST action handlers (redirect after) ---
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_date']) && isset($_POST['appointment_id'])) {
@@ -22,24 +45,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newDate = $_POST['new_date'] ?? '';
         $newSlot = (int)($_POST['new_slot'] ?? 0);
         if (updateAppointmentDate($id, $newDate, $newSlot)) {
-            $msg = 'Appointment date updated.';
-            $msgType = 'success';
+            $_SESSION['flash_msg'] = 'Appointment date updated.';
+            $_SESSION['flash_type'] = 'success';
         } else {
-            $msg = 'Could not update date — slot may no longer be available.';
-            $msgType = 'error';
+            $_SESSION['flash_msg'] = 'Could not update date — slot may no longer be available.';
+            $_SESSION['flash_type'] = 'error';
         }
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['update_mechanic']) && isset($_POST['appointment_id'])) {
         $id = (int)$_POST['appointment_id'];
         $newMech = (int)$_POST['new_mechanic'];
         if (updateAppointmentMechanic($id, $newMech)) {
-            $msg = 'Appointment mechanic updated.';
-            $msgType = 'success';
+            $_SESSION['flash_msg'] = 'Appointment mechanic updated.';
+            $_SESSION['flash_type'] = 'success';
         } else {
-            $msg = 'Could not update mechanic — they may be fully booked.';
-            $msgType = 'error';
+            $_SESSION['flash_msg'] = 'Could not update mechanic — they may be fully booked.';
+            $_SESSION['flash_type'] = 'error';
         }
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['sim_toggle']) && !isset($_POST['toggle_sim'])) {
@@ -47,8 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $useSim = (int)(isset($_POST['use_sim']));
         $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
         $stmt->execute([$useSim]);
-        $msg = $useSim ? 'Simulated time activated.' : 'Real time restored.';
-        $msgType = 'success';
+        $_SESSION['flash_msg'] = $useSim ? 'Simulated time activated.' : 'Real time restored.';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['toggle_sim'])) {
@@ -62,8 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("UPDATE sim_config SET simulated_datetime = ? WHERE id = 1");
             $stmt->execute([$simDt]);
         }
-        $msg = 'Simulated time updated.';
-        $msgType = 'success';
+        $_SESSION['flash_msg'] = 'Simulated time updated.';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['add_mechanic'])) {
@@ -73,9 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name) {
             addMechanic($name, $nickname, $specialties, $years);
-            $msg = 'Mechanic added.';
-            $msgType = 'success';
+            $_SESSION['flash_msg'] = 'Mechanic added.';
+            $_SESSION['flash_type'] = 'success';
         }
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['update_mechanic_info'])) {
@@ -86,9 +119,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name && $id) {
             updateMechanic($id, $name, $nickname, $specialties, $years);
-            $msg = 'Mechanic updated.';
-            $msgType = 'success';
+            $_SESSION['flash_msg'] = 'Mechanic updated.';
+            $_SESSION['flash_type'] = 'success';
         }
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['update_schedule']) && isset($_POST['mech_id'])) {
@@ -107,20 +142,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         updateMechanicSchedule($mechId, $schedule);
-        $msg = 'Schedule updated.';
-        $msgType = 'success';
-    }
-
-    if (isset($_GET['fire'])) {
-        fireMechanic((int)$_GET['fire']);
-        $msg = 'Mechanic deactivated.';
-        $msgType = 'success';
-    }
-
-    if (isset($_GET['restore'])) {
-        restoreMechanic((int)$_GET['restore']);
-        $msg = 'Mechanic restored.';
-        $msgType = 'success';
+        $_SESSION['flash_msg'] = 'Schedule updated.';
+        $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
     }
 
     if (isset($_POST['override_slot'])) {
@@ -140,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!empty($conflicts)) {
-            $conflictList = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (slot ' . ((int)$c['slot_index'] + 1) . ')', $conflicts);
+            $_SESSION['flash_conflicts'] = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (slot ' . ((int)$c['slot_index'] + 1) . ')', $conflicts);
         } else {
             $slotFlags = [];
             for ($i = 0; $i < SLOT_COUNT; $i++) {
@@ -150,11 +175,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                   VALUES (?, ?, ?, ?, ?, ?, ?)
                                   ON DUPLICATE KEY UPDATE slot_1=VALUES(slot_1), slot_2=VALUES(slot_2), slot_3=VALUES(slot_3), slot_4=VALUES(slot_4), reason=VALUES(reason)");
             $stmt->execute([$mechId, $date, $slotFlags['slot_1'], $slotFlags['slot_2'], $slotFlags['slot_3'], $slotFlags['slot_4'], $reason]);
-            $msg = 'Schedule override saved.';
-            $msgType = 'success';
+            $_SESSION['flash_msg'] = 'Schedule override saved.';
+            $_SESSION['flash_type'] = 'success';
         }
+        header('Location: admin.php');
+        exit;
     }
 }
+
+// --- Read flash messages for display (only reached on GET) ---
+$msg = $_SESSION['flash_msg'] ?? '';
+$msgType = $_SESSION['flash_type'] ?? '';
+$conflictList = $_SESSION['flash_conflicts'] ?? [];
+unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_conflicts']);
 
 advanceAppointmentStatuses();
 
@@ -197,10 +230,6 @@ $effectiveTime = getEffectiveTime();
 </header>
 
 <div class="container">
-
-<?php if ($msg): ?>
-<div class="flash-msg <?= $msgType ?>"><?= htmlspecialchars($msg) ?></div>
-<?php endif; ?>
 
 <div class="panel">
     <div class="burst burst-right">TIME!</div>
@@ -482,6 +511,18 @@ $effectiveTime = getEffectiveTime();
 </div>
 <?php endif; ?>
 
+<?php if ($msg): ?>
+<div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
+    <div class="modal-box msg-box msg-<?= $msgType ?>">
+        <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
+        <div class="msg-content"><?= htmlspecialchars($msg) ?></div>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 var SCHEDULE_DATA = <?= json_encode($scheduleData) ?>;
 
@@ -535,6 +576,12 @@ function closeScheduleModal(event) {
 function closeConflictModal(event) {
     if (event.target === event.currentTarget) {
         document.getElementById('conflict-modal').classList.add('hidden');
+    }
+}
+
+function closeMsgModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('msg-modal').classList.add('hidden');
     }
 }
 </script>
