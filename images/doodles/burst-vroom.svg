@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <clipPath id="star">
+      <polygon points="60,2 73,42 115,42 80,67 91,110 60,85 29,110 40,67 5,42 47,42"/>
+    </clipPath>
+  </defs>
+  <polygon points="60,2 73,42 115,42 80,67 91,110 60,85 29,110 40,67 5,42 47,42"
+    fill="#f5c518" stroke="#1a1a2e" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="60" cy="60" r="18" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+</svg>
