@@ -415,6 +415,7 @@ textarea {
     box-shadow: 5px 5px 0 var(--ink);
     transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
     position: relative;
+    white-space: nowrap;
 }
 
 .btn:hover {
@@ -458,10 +459,6 @@ textarea {
 .btn-sm {
     padding: 8px 18px;
     font-size: 0.9rem;
-}
-
-.btn-plain::after {
-    content: none;
 }
 
 .btn::after {

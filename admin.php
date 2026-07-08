@@ -255,8 +255,8 @@ $effectiveTime = getEffectiveTime();
                 <td><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
                 <td>
                     <?php if ($a['status'] === 'scheduled'): ?>
-                    <button class="btn btn-sm btn-outline btn-plain" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
-                    <a href="?cancel=<?= $a['id'] ?>" class="btn btn-sm btn-rust btn-plain" onclick="return confirm('Cancel this appointment?')">Cancel</a>
+                    <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
+                    <a href="?cancel=<?= $a['id'] ?>" class="btn btn-sm btn-rust" onclick="return confirm('Cancel this appointment?')">Cancel</a>
                     <?php else: ?>
                     <span style="font-size:0.8rem;color:#888;">—</span>
                     <?php endif; ?>
