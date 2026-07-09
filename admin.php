@@ -37,11 +37,11 @@ if (isset($_GET['restore'])) {
     exit;
 }
 
-if (isset($_GET['remove'])) {
-    $id = (int)$_GET['remove'];
-    $stmt = getDB()->prepare("DELETE FROM appointments WHERE id = ? AND status = 'cancelled'");
-    $stmt->execute([$id]);
-    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Appointment removed.' : 'Could not remove — appointment may have been modified.';
+if (isset($_GET['unblock'])) {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
+    $stmt->execute([(int)$_GET['unblock']]);
+    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Override removed.' : 'Override not found.';
     $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
     header('Location: admin.php');
     exit;
@@ -157,6 +157,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $slots = $_POST['slots'] ?? [];
         $reason = trim($_POST['reason'] ?? '');
 
+        $dow = (int)date('w', strtotime($date));
+        $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+        $stmt->execute([$mechId]);
+        $mech = $stmt->fetch();
+        $mechName = $mech ? $mech['name'] : "Mechanic #{$mechId}";
+
+        $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
+        $stmt->execute([$mechId, $dow]);
+        $schedule = $stmt->fetch();
+
+        if (!$schedule) {
+            $_SESSION['flash_msg'] = "{$mechName} does not work on {$dayNames[$dow]} — no override needed.";
+            $_SESSION['flash_type'] = 'error';
+            header('Location: admin.php');
+            exit;
+        }
+
+        $invalidSlots = [];
+        foreach ($slots as $s) {
+            $slotKey = 'slot_' . ((int)$s + 1);
+            if (!$schedule[$slotKey]) {
+                $invalidSlots[] = (int)$s + 1;
+            }
+        }
+        if (!empty($invalidSlots)) {
+            $_SESSION['flash_msg'] = "{$mechName} is not scheduled for slot(s) " . implode(', ', $invalidSlots) . " on {$dayNames[$dow]} — cannot block them.";
+            $_SESSION['flash_type'] = 'error';
+            header('Location: admin.php');
+            exit;
+        }
+
         $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('cancelled','completed')");
         $stmt->execute([$mechId, $date]);
         $conflicts = [];
@@ -171,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $slotFlags = [];
             for ($i = 0; $i < SLOT_COUNT; $i++) {
-                $slotFlags['slot_' . ($i + 1)] = in_array($i, $slots) ? 1 : 0;
+                $slotFlags['slot_' . ($i + 1)] = in_array($i, $slots) ? 0 : 1;
             }
             $stmt = $db->prepare("INSERT INTO mechanic_overrides (mechanic_id, override_date, slot_1, slot_2, slot_3, slot_4, reason)
                                   VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -180,6 +213,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['flash_msg'] = 'Schedule override saved.';
             $_SESSION['flash_type'] = 'success';
         }
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_GET['unblock'])) {
+        $db = getDB();
+        $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
+        $stmt->execute([(int)$_GET['unblock']]);
+        $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Override removed.' : 'Override not found.';
+        $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
         header('Location: admin.php');
         exit;
     }
@@ -201,6 +244,13 @@ $scheduleData = [];
 foreach ($allMechanics as $m) {
     $scheduleData[$m['id']] = getMechanicSchedule((int)$m['id']);
 }
+
+$overrides = getDB()->query(
+    "SELECT mo.id, mo.mechanic_id, mo.override_date, mo.slot_1, mo.slot_2, mo.slot_3, mo.slot_4, mo.reason, m.name AS mechanic_name
+     FROM mechanic_overrides mo
+     JOIN mechanics m ON m.id = mo.mechanic_id
+     ORDER BY mo.override_date DESC, m.name ASC"
+)->fetchAll();
 
 $stmt = getDB()->query("SELECT use_simulated_time, simulated_datetime FROM sim_config WHERE id = 1");
 $simConfig = $stmt->fetch();
@@ -350,7 +400,7 @@ $effectiveTime = getEffectiveTime();
             <div style="display:flex;gap:6px;">
                 <?php for ($i = 0; $i < SLOT_COUNT; $i++): ?>
                 <label style="font-size:0.75rem;border:2px solid var(--ink);padding:6px;cursor:pointer;">
-                    <input type="checkbox" name="slots[]" value="<?= $i ?>"> <?= $i + 1 ?>
+                    <input type="checkbox" name="slots[]" value="<?= $i ?>"> <?= htmlspecialchars($SLOT_LABELS[$i] ?? ($i + 1)) ?>
                 </label>
                 <?php endfor; ?>
             </div>
@@ -359,9 +409,55 @@ $effectiveTime = getEffectiveTime();
             <label>Reason (optional)</label>
             <input type="text" name="reason" placeholder="e.g. sick day">
         </div>
-        <button type="submit" name="override_slot" class="btn btn-sm btn-rust">Save Override</button>
+        <div style="display:flex;gap:12px;justify-content:space-between;width:100%;flex-wrap:wrap;">
+            <button type="submit" name="override_slot" class="btn btn-sm btn-rust">Save Override</button>
+            <?php if (!empty($overrides)): ?>
+            <button type="button" class="btn btn-sm btn-outline" onclick="toggleOverrides()" id="overrides-toggle">Show All Blocks</button>
+            <?php endif; ?>
+        </div>
     </form>
 </div>
+
+<?php if (!empty($overrides)): ?>
+<div class="panel" id="overrides-panel" style="display:none;">
+    <div class="burst burst-right" style="background:var(--rust);">HELD!</div>
+    <h2>Active Overrides</h2>
+    <div style="overflow-x:auto;">
+    <table>
+        <thead>
+            <tr>
+                <th>Mechanic</th>
+                <th>Date</th>
+                <th>Blocked Slots</th>
+                <th>Reason</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($overrides as $o):
+                $blocked = [];
+                for ($i = 0; $i < SLOT_COUNT; $i++) {
+                    $key = 'slot_' . ($i + 1);
+                    if (!$o[$key]) {
+                        $blocked[] = htmlspecialchars($SLOT_LABELS[$i] ?? "Slot " . ($i + 1));
+                    }
+                }
+            ?>
+            <tr>
+                <td><strong><?= htmlspecialchars($o['mechanic_name']) ?></strong></td>
+                <td><?= htmlspecialchars($o['override_date']) ?></td>
+                <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
+                <td><?= htmlspecialchars($o['reason'] ?? '—') ?></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showUnblockModal(<?= (int)$o['id'] ?>, '<?= htmlspecialchars($o['mechanic_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($o['override_date']) ?>')">Unblock</button>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="panel">
     <div class="burst burst-right">HIRE!</div>
@@ -554,6 +650,19 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
+<div class="modal-overlay hidden" id="unblock-modal" onclick="closeUnblockModal(event)">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="document.getElementById('unblock-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">FREE!</div>
+        <h2 style="margin-top:30px; margin-left: 5px;">Remove Override?</h2>
+        <p style="margin:16px 0;" id="unblock-msg">This will unblock the slots for this date.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <a href="#" id="unblock-confirm-link" class="btn btn-sm btn-rust">Yes, Unblock</a>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
 <?php if ($msg): ?>
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
     <div class="modal-box msg-box msg-<?= $msgType ?>">
@@ -572,6 +681,14 @@ var SCHEDULE_DATA = <?= json_encode($scheduleData) ?>;
 function toggleEdit(id) {
     var row = document.getElementById('edit-' + id);
     row.classList.toggle('show');
+}
+
+function toggleOverrides() {
+    var panel = document.getElementById('overrides-panel');
+    var btn = document.getElementById('overrides-toggle');
+    var open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
 }
 
 function openMechModal(id, name, nickname, specialties, years) {
@@ -653,6 +770,16 @@ function showRemoveModal(id) {
 function closeRemoveModal(event) {
     if (event.target === event.currentTarget) {
         document.getElementById('remove-modal').classList.add('hidden');
+    }
+}
+function showUnblockModal(id, name, date) {
+    document.getElementById('unblock-confirm-link').href = '?unblock=' + id;
+    document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
+    document.getElementById('unblock-modal').classList.remove('hidden');
+}
+function closeUnblockModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('unblock-modal').classList.add('hidden');
     }
 }
 
