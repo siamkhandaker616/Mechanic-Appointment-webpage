@@ -50,17 +50,21 @@ Font stack: Bangers / Action Man Bold / Walter Turncoat / Luckiest Guy / Permane
 ## File Structure
 
 ```
-├── index.php           Booking page
-├── admin.php           Admin panel
-├── config.php          DB connection + constants
-├── functions.php       All business logic
-├── availability.php    AJAX slot availability endpoint
-├── style.css           Full stylesheet
-├── script.js           Client-side validation
-├── datepicker.js       Custom themed date picker
+├── index.php               Booking page
+├── admin.php               Admin panel
+├── availability.php        AJAX slot availability endpoint
+├── config.php              DB connection + constants
+├── functions.php           All business logic
+├── script.js               Client-side validation
+├── datepicker.js           Custom themed date picker
+├── style.css               Full stylesheet
 ├── sql/
 │   ├── schema.sql
 │   └── seed.sql
-├── images/doodles/     SVG placeholders (WIP)
-└── docs/planning.md    Spec reference
+├── fonts/                  Self-hosted woff2/ttf
+├── docs/                   Documentation and AI Declaration
+├── images
+│   ├── icons               PNG Icons
+│   └── doodles             SVGs
+
 ```
