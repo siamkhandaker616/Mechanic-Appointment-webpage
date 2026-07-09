@@ -41,6 +41,8 @@ function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     $stmt->execute([$mechanicId, $date, $slotIndex]);
     if ($stmt->fetchColumn() > 0) return false;
 
+    if (isMechanicOnVacation($mechanicId, $date)) return false;
+
     return true;
 }
 
@@ -398,4 +400,26 @@ function updateMechanicSchedule(int $id, array $schedule): void {
     foreach ($schedule as $dow => $slots) {
         $insert->execute([$id, $dow, $slots[0] ? 1 : 0, $slots[1] ? 1 : 0, $slots[2] ? 1 : 0, $slots[3] ? 1 : 0]);
     }
+}
+
+function getMechanicVacations(int $mechanicId): array {
+    $stmt = getDB()->prepare("SELECT id, start_date, end_date, reason FROM mechanic_vacations WHERE mechanic_id = ? ORDER BY start_date ASC");
+    $stmt->execute([$mechanicId]);
+    return $stmt->fetchAll();
+}
+
+function addMechanicVacation(int $mechanicId, string $startDate, string $endDate, ?string $reason): void {
+    $stmt = getDB()->prepare("INSERT INTO mechanic_vacations (mechanic_id, start_date, end_date, reason) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$mechanicId, $startDate, $endDate, $reason]);
+}
+
+function removeMechanicVacation(int $id): void {
+    $stmt = getDB()->prepare("DELETE FROM mechanic_vacations WHERE id = ?");
+    $stmt->execute([$id]);
+}
+
+function isMechanicOnVacation(int $mechanicId, string $date): bool {
+    $stmt = getDB()->prepare("SELECT COUNT(*) FROM mechanic_vacations WHERE mechanic_id = ? AND start_date <= ? AND end_date >= ?");
+    $stmt->execute([$mechanicId, $date, $date]);
+    return $stmt->fetchColumn() > 0;
 }

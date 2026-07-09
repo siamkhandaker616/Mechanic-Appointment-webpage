@@ -22,16 +22,24 @@ if (isset($_GET['cancel'])) {
 }
 
 if (isset($_GET['fire'])) {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['fire']]);
+    $m = $stmt->fetch();
     fireMechanic((int)$_GET['fire']);
-    $_SESSION['flash_msg'] = 'Mechanic deactivated.';
+    $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been fired!';
     $_SESSION['flash_type'] = 'success';
     header('Location: admin.php');
     exit;
 }
 
 if (isset($_GET['restore'])) {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['restore']]);
+    $m = $stmt->fetch();
     restoreMechanic((int)$_GET['restore']);
-    $_SESSION['flash_msg'] = 'Mechanic restored.';
+    $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!';
     $_SESSION['flash_type'] = 'success';
     header('Location: admin.php');
     exit;
@@ -43,6 +51,14 @@ if (isset($_GET['unblock'])) {
     $stmt->execute([(int)$_GET['unblock']]);
     $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Override removed.' : 'Override not found.';
     $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
+    header('Location: admin.php');
+    exit;
+}
+
+if (isset($_GET['remove_vacation'])) {
+    removeMechanicVacation((int)$_GET['remove_vacation']);
+    $_SESSION['flash_msg'] = 'Vacation removed.';
+    $_SESSION['flash_type'] = 'success';
     header('Location: admin.php');
     exit;
 }
@@ -106,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name) {
             addMechanic($name, $nickname, $specialties, $years);
-            $_SESSION['flash_msg'] = 'Mechanic added.';
+            $_SESSION['flash_msg'] = htmlspecialchars($name) . ' has been hired!';
             $_SESSION['flash_type'] = 'success';
         }
         header('Location: admin.php');
@@ -146,6 +162,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         updateMechanicSchedule($mechId, $schedule);
         $_SESSION['flash_msg'] = 'Schedule updated.';
         $_SESSION['flash_type'] = 'success';
+        header('Location: admin.php');
+        exit;
+    }
+
+    if (isset($_POST['add_vacation'])) {
+        $mechId = (int)$_POST['vac_mech_id'];
+        $start = $_POST['vac_start'] ?? '';
+        $end = $_POST['vac_end'] ?? '';
+        $reason = trim($_POST['vac_reason'] ?? '') ?: null;
+        if ($mechId && $start && $end && $start <= $end) {
+            addMechanicVacation($mechId, $start, $end, $reason);
+            $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
+            $stmt->execute([$mechId]);
+            $m = $stmt->fetch();
+            $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . $start . ' to ' . $end . '.';
+            $_SESSION['flash_type'] = 'success';
+        } else {
+            $_SESSION['flash_msg'] = 'Invalid vacation dates.';
+            $_SESSION['flash_type'] = 'error';
+        }
         header('Location: admin.php');
         exit;
     }
@@ -243,6 +279,10 @@ $allMechanics = getAllMechanics();
 $scheduleData = [];
 foreach ($allMechanics as $m) {
     $scheduleData[$m['id']] = getMechanicSchedule((int)$m['id']);
+}
+$vacationData = [];
+foreach ($allMechanics as $m) {
+    $vacationData[$m['id']] = getMechanicVacations((int)$m['id']);
 }
 
 $overrides = getDB()->query(
@@ -480,12 +520,19 @@ $effectiveTime = getEffectiveTime();
         </thead>
         <tbody>
             <?php foreach ($allMechanics as $m): ?>
+            <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], date('Y-m-d')); ?>
             <tr>
                 <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($m['specialties'] ?? '—') ?></td>
                 <td><?= (int)$m['years_experience'] ?></td>
-                <td><span class="status-badge <?= $m['is_active'] ? 'status-scheduled' : 'status-cancelled' ?>"><?= $m['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                <td>
+                    <?php if ($onLeave): ?>
+                    <span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>
+                    <?php else: ?>
+                    <span class="status-badge <?= $m['is_active'] ? 'status-scheduled' : 'status-cancelled' ?>"><?= $m['is_active'] ? 'Active' : 'Inactive' ?></span>
+                    <?php endif; ?>
+                </td>
                 <td style="white-space:nowrap;">
                     <button class="btn btn-sm btn-outline" onclick="openMechModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>', <?= (int)$m['years_experience'] ?>)">Edit</button>
                     <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
@@ -528,7 +575,7 @@ $effectiveTime = getEffectiveTime();
 </div>
 
 <div class="modal-overlay hidden" id="mech-modal" onclick="closeMechModal(event)">
-    <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px;">
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Mechanic</h2>
         <form method="post" id="mech-modal-form">
@@ -554,6 +601,25 @@ $effectiveTime = getEffectiveTime();
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('mech-modal').classList.add('hidden')">Cancel</button>
             </div>
         </form>
+        <div style="margin-top:18px;border-top:2px dashed var(--ink);padding-top:14px;">
+            <h3 style="font-family:var(--font-sub);font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;">Vacations</h3>
+            <div id="vacation-list" style="margin-bottom:10px;"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                <div>
+                    <label style="font-size:0.75rem;">Start</label>
+                    <input type="date" id="vac-start" style="width:auto;font-size:0.8rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem;">End</label>
+                    <input type="date" id="vac-end" style="width:auto;font-size:0.8rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem;">Reason</label>
+                    <input type="text" id="vac-reason" placeholder="Optional" style="width:auto;font-size:0.8rem;">
+                </div>
+                <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;">Send On Vacation</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -681,6 +747,7 @@ $effectiveTime = getEffectiveTime();
 
 <script>
 var SCHEDULE_DATA = <?= json_encode($scheduleData) ?>;
+var VACATION_DATA = <?= json_encode($vacationData) ?>;
 
 function toggleEdit(id) {
     var row = document.getElementById('edit-' + id);
@@ -701,6 +768,7 @@ function openMechModal(id, name, nickname, specialties, years) {
     document.getElementById('modal-mech-nickname').value = nickname;
     document.getElementById('modal-mech-specialties').value = specialties;
     document.getElementById('modal-mech-years').value = years;
+    renderVacations(id);
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 
@@ -785,6 +853,45 @@ function closeUnblockModal(event) {
     if (event.target === event.currentTarget) {
         document.getElementById('unblock-modal').classList.add('hidden');
     }
+}
+
+function renderVacations(id) {
+    var list = document.getElementById('vacation-list');
+    list.innerHTML = '';
+    var vacs = VACATION_DATA[id] || [];
+    if (vacs.length === 0) {
+        list.innerHTML = '<p style="font-size:0.85rem;opacity:0.7;">No vacations scheduled.</p>';
+    } else {
+        var html = '';
+        vacs.forEach(function(v) {
+            var label = v.start_date + ' to ' + v.end_date;
+            if (v.reason) label += ' (' + v.reason + ')';
+            html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan-light);border:2px solid var(--ink);font-size:0.8rem;">';
+            html += '<span style="flex:1;">' + label + '</span>';
+            html += '<a href="?remove_vacation=' + v.id + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+    }
+}
+
+function addVacation() {
+    var id = document.getElementById('modal-mech-id').value;
+    var start = document.getElementById('vac-start').value;
+    var end = document.getElementById('vac-end').value;
+    if (!id || !start || !end) return;
+    if (start > end) { alert('Start date must be before end date.'); return; }
+    var reason = document.getElementById('vac-reason').value;
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.style.display = 'none';
+    f.innerHTML = '<input name="add_vacation" value="1">'
+        + '<input name="vac_mech_id" value="' + id + '">'
+        + '<input name="vac_start" value="' + start + '">'
+        + '<input name="vac_end" value="' + end + '">'
+        + '<input name="vac_reason" value="' + reason.replace(/"/g,'&quot;') + '">';
+    document.body.appendChild(f);
+    f.submit();
 }
 
 function closeConflictModal(event) {

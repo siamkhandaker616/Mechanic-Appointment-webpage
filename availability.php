@@ -31,4 +31,5 @@ echo json_encode([
     'mechanic_id' => $mechanicId,
     'date' => $date,
     'slots' => $slots,
+    'on_vacation' => isMechanicOnVacation($mechanicId, $date),
 ]);

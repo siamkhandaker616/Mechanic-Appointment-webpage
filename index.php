@@ -136,9 +136,13 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="date">Appointment Date</label>
-            <input type="date" id="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" min="<?= date('Y-m-d') ?>" required onchange="fetchAvailability()">
+        <div class="row">
+            <div class="col" style="max-width:320px;">
+                <div class="form-group">
+                    <label for="date">Appointment Date</label>
+                    <input type="date" id="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" min="<?= date('Y-m-d') ?>" required onchange="fetchAvailability()">
+                </div>
+            </div>
         </div>
 
         <div class="form-group">
@@ -147,10 +151,12 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
                 <?php $dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; ?>
                 <?php foreach ($mechanics as $m): ?>
                 <?php $sched = $mechSchedules[$m['id']] ?? []; ?>
+                <?php $onVacation = $selectedDate && isMechanicOnVacation((int)$m['id'], $selectedDate); ?>
                 <div class="mechanic-card <?= $selectedMechId === (int)$m['id'] ? 'selected' : '' ?>" onclick="selectMechanic(<?= $m['id'] ?>)">
                     <input type="radio" name="mechanic_id" value="<?= $m['id'] ?>" <?= $selectedMechId === (int)$m['id'] ? 'checked' : '' ?> style="display:none;">
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
+                    <?php if ($onVacation): ?><span class="status-badge status-cancelled" style="margin-left:6px;font-size:0.65rem;">ON VACATION</span><?php endif; ?>
                     <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= $m['years_experience'] ?> yrs</div>
                     <div class="work-days">
                         <?php for ($d = 0; $d <= 6; $d++): ?>
