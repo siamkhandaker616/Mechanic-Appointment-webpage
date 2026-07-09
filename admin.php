@@ -323,6 +323,7 @@ $effectiveTime = getEffectiveTime();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="images/icons/favicon.ico">
 <title>Mayhem Mobility — Admin Panel</title>
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
