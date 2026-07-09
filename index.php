@@ -53,8 +53,7 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 <div class="omg omg-bot">CLICK</div>
 
 <header>
-    <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline">
-    <h1>Mayhem Mobility</h1>
+    <h1>Mayhem Mobility <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
 </header>
 

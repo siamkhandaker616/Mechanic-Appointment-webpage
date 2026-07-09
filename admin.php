@@ -37,6 +37,16 @@ if (isset($_GET['restore'])) {
     exit;
 }
 
+if (isset($_GET['remove'])) {
+    $id = (int)$_GET['remove'];
+    $stmt = getDB()->prepare("DELETE FROM appointments WHERE id = ? AND status = 'cancelled'");
+    $stmt->execute([$id]);
+    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Appointment removed.' : 'Could not remove — appointment may have been modified.';
+    $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
+    header('Location: admin.php');
+    exit;
+}
+
 // --- POST action handlers (redirect after) ---
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -44,13 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)$_POST['appointment_id'];
         $newDate = $_POST['new_date'] ?? '';
         $newSlot = (int)($_POST['new_slot'] ?? 0);
-        if (updateAppointmentDate($id, $newDate, $newSlot)) {
-            $_SESSION['flash_msg'] = 'Appointment date updated.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_msg'] = 'Could not update date — slot may no longer be available.';
-            $_SESSION['flash_type'] = 'error';
-        }
+        $result = updateAppointmentDate($id, $newDate, $newSlot);
+        $_SESSION['flash_msg'] = $result['message'];
+        $_SESSION['flash_type'] = $result['success'] ? 'success' : 'error';
         header('Location: admin.php');
         exit;
     }
@@ -58,13 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_mechanic']) && isset($_POST['appointment_id'])) {
         $id = (int)$_POST['appointment_id'];
         $newMech = (int)$_POST['new_mechanic'];
-        if (updateAppointmentMechanic($id, $newMech)) {
-            $_SESSION['flash_msg'] = 'Appointment mechanic updated.';
-            $_SESSION['flash_type'] = 'success';
-        } else {
-            $_SESSION['flash_msg'] = 'Could not update mechanic — they may be fully booked.';
-            $_SESSION['flash_type'] = 'error';
-        }
+        $result = updateAppointmentMechanic($id, $newMech);
+        $_SESSION['flash_msg'] = $result['message'];
+        $_SESSION['flash_type'] = $result['success'] ? 'success' : 'error';
         header('Location: admin.php');
         exit;
     }
@@ -221,8 +223,7 @@ $effectiveTime = getEffectiveTime();
 <div class="omg omg-bot">BAM</div>
 
 <header>
-    <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline">
-    <h1>Mayhem Mobility</h1>
+    <h1>Mayhem Mobility <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Admin Panel</p>
     <div class="admin-nav">
         <a href="index.php" class="btn btn-sm btn-outline">Booking Page</a>
@@ -286,7 +287,9 @@ $effectiveTime = getEffectiveTime();
                 <td>
                     <?php if ($a['status'] === 'scheduled'): ?>
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
-                    <a href="?cancel=<?= $a['id'] ?>" class="btn btn-sm btn-rust" onclick="return confirm('Cancel this appointment?')">Cancel</a>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
+                    <?php elseif ($a['status'] === 'cancelled'): ?>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(<?= $a['id'] ?>)">Remove</button>
                     <?php else: ?>
                     <span style="font-size:0.8rem;color:#888;">—</span>
                     <?php endif; ?>
@@ -307,7 +310,7 @@ $effectiveTime = getEffectiveTime();
                         </form>
                         <form method="post" class="inline-form">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
-                            <select name="new_mechanic">
+                            <select name="new_mechanic" data-current="<?= (int)$a['mechanic_id'] ?>" onchange="toggleMechSwapBtn(this)">
                                 <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
                                 <option value="<?= $mid ?>" <?= $mid === (int)$a['mechanic_id'] ? 'selected' : '' ?>><?= htmlspecialchars($mname) ?></option>
                                 <?php endforeach; ?>
@@ -387,7 +390,7 @@ $effectiveTime = getEffectiveTime();
                     <button class="btn btn-sm btn-outline" onclick="openMechModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>', <?= (int)$m['years_experience'] ?>)">Edit</button>
                     <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <?php if ($m['is_active']): ?>
-                    <a href="?fire=<?= $m['id'] ?>" class="btn btn-sm btn-rust" onclick="return confirm('Fire <?= htmlspecialchars($m['name']) ?>?')">Fire</a>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
                     <?php else: ?>
                     <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Restore</a>
                     <?php endif; ?>
@@ -512,6 +515,45 @@ $effectiveTime = getEffectiveTime();
 </div>
 <?php endif; ?>
 
+<div class="modal-overlay hidden" id="cancel-modal" onclick="closeCancelModal(event)">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="document.getElementById('cancel-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">WHOA!</div>
+        <h2 style="margin-top:30px; margin-left: 5px;">Cancel Appointment ?</h2>
+        <p style="margin:16px 0;">This can't be undone. Are you sure?</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <a href="#" id="cancel-confirm-link" class="btn btn-sm btn-rust">Yes, Cancel</a>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="fire-modal" onclick="closeFireModal(event)">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="document.getElementById('fire-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">FIRED!</div>
+        <h2 style="margin-top:30px; margin-left: 5px;" id="fire-modal-title">Fire Mechanic?</h2>
+        <p style="margin:16px 0;" id="fire-modal-msg">They'll be deactivated and won't appear for new bookings.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <a href="#" id="fire-confirm-link" class="btn btn-sm btn-rust">Yes, Fire</a>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="remove-modal" onclick="closeRemoveModal(event)">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="document.getElementById('remove-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">GONE!</div>
+        <h2 style="margin-top:30px; margin-left: 5px;">Remove Appointment?</h2>
+        <p style="margin:16px 0; ">This permanently deletes the record. Are you sure?</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <a href="#" id="remove-confirm-link" class="btn btn-sm btn-rust">Yes, Remove</a>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('remove-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
 <?php if ($msg): ?>
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
     <div class="modal-box msg-box msg-<?= $msgType ?>">
@@ -568,9 +610,49 @@ function openScheduleModal(id, name) {
     document.getElementById('schedule-modal').classList.remove('hidden');
 }
 
+function toggleMechSwapBtn(sel) {
+    var btn = sel.closest('form').querySelector('[name="update_mechanic"]');
+    if (parseInt(sel.value) === parseInt(sel.dataset.current)) {
+        btn.disabled = true;
+        btn.classList.add('disabled');
+    } else {
+        btn.disabled = false;
+        btn.classList.remove('disabled');
+    }
+}
+
 function closeScheduleModal(event) {
     if (event.target === event.currentTarget) {
         document.getElementById('schedule-modal').classList.add('hidden');
+    }
+}
+
+function showCancelModal(id) {
+    document.getElementById('cancel-confirm-link').href = '?cancel=' + id;
+    document.getElementById('cancel-modal').classList.remove('hidden');
+}
+function closeCancelModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('cancel-modal').classList.add('hidden');
+    }
+}
+function showFireModal(id, name) {
+    document.getElementById('fire-confirm-link').href = '?fire=' + id;
+    document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?';
+    document.getElementById('fire-modal').classList.remove('hidden');
+}
+function closeFireModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('fire-modal').classList.add('hidden');
+    }
+}
+function showRemoveModal(id) {
+    document.getElementById('remove-confirm-link').href = '?remove=' + id;
+    document.getElementById('remove-modal').classList.remove('hidden');
+}
+function closeRemoveModal(event) {
+    if (event.target === event.currentTarget) {
+        document.getElementById('remove-modal').classList.add('hidden');
     }
 }
 

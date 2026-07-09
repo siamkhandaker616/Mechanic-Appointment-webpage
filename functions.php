@@ -235,32 +235,83 @@ function getAppointments(?string $status = null): array {
     return $stmt->fetchAll();
 }
 
-function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot): bool {
+function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot): array {
     $db = getDB();
     $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
-    if (!$appt) return false;
+    if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
 
-    if (!isSlotAvailable((int)$appt['mechanic_id'], $newDate, $newSlot)) return false;
+    if (!isSlotAvailable((int)$appt['mechanic_id'], $newDate, $newSlot)) {
+        $newMechId = (int)$appt['mechanic_id'];
+        $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+        $stmt->execute([$newMechId]);
+        $m = $stmt->fetch();
+        $mechName = $m ? $m['name'] : "Mechanic #{$newMechId}";
+
+        $dow = (int)date('w', strtotime($newDate));
+        $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+        $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
+        $stmt->execute([$newMechId, $dow]);
+        $schedule = $stmt->fetch();
+
+        if (!$schedule) return ['success' => false, 'message' => "{$mechName} does not work on {$dayNames[$dow]}."];
+
+        $slotKey = 'slot_' . ($newSlot + 1);
+        if (!$schedule[$slotKey]) return ['success' => false, 'message' => "{$mechName} is not scheduled for that time slot."];
+
+        $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_overrides WHERE mechanic_id = ? AND override_date = ?");
+        $stmt->execute([$newMechId, $newDate]);
+        $override = $stmt->fetch();
+        if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$mechName} has a schedule override blocking that slot."];
+
+        return ['success' => false, 'message' => "{$mechName} already has an appointment at that date and time."];
+    }
 
     $stmt = $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ? WHERE id = ?");
     $stmt->execute([$newDate, $newSlot, $appointmentId]);
-    return true;
+    return ['success' => true, 'message' => 'Appointment date updated.'];
 }
 
-function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): bool {
+function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): array {
     $db = getDB();
-    $stmt = $db->prepare("SELECT appointment_date, slot_index FROM appointments WHERE id = ? AND status = 'scheduled'");
+
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([$newMechanicId]);
+    $mech = $stmt->fetch();
+    $name = $mech ? $mech['name'] : "Mechanic #{$newMechanicId}";
+
+    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
-    if (!$appt) return false;
+    if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
 
-    if (!isSlotAvailable($newMechanicId, $appt['appointment_date'], (int)$appt['slot_index'])) return false;
+    if ((int)$appt['mechanic_id'] === $newMechanicId) return ['success' => false, 'message' => 'That is already their mechanic.'];
+
+    $dow = (int)date('w', strtotime($appt['appointment_date']));
+    $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
+    $stmt->execute([$newMechanicId, $dow]);
+    $schedule = $stmt->fetch();
+    if (!$schedule) return ['success' => false, 'message' => "{$name} does not work on {$dayNames[$dow]}."];
+
+    $slotKey = 'slot_' . ((int)$appt['slot_index'] + 1);
+    if (!$schedule[$slotKey]) return ['success' => false, 'message' => "{$name} is not scheduled for that time slot."];
+
+    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_overrides WHERE mechanic_id = ? AND override_date = ?");
+    $stmt->execute([$newMechanicId, $appt['appointment_date']]);
+    $override = $stmt->fetch();
+    if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$name} has a schedule override blocking that slot on this date."];
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != 'cancelled' AND id != ?");
+    $stmt->execute([$newMechanicId, $appt['appointment_date'], $appt['slot_index'], $appointmentId]);
+    if ($stmt->fetchColumn() > 0) return ['success' => false, 'message' => "{$name} already has an appointment at that date and time."];
 
     $stmt = $db->prepare("UPDATE appointments SET mechanic_id = ? WHERE id = ?");
     $stmt->execute([$newMechanicId, $appointmentId]);
-    return true;
+    return ['success' => true, 'message' => 'Appointment mechanic updated.'];
 }
 
 function cancelAppointment(int $appointmentId): bool {
@@ -300,7 +351,13 @@ function addMechanic(string $name, ?string $nickname, ?string $specialties, int 
     $db = getDB();
     $stmt = $db->prepare("INSERT INTO mechanics (name, nickname, specialties, years_experience, is_active) VALUES (?, ?, ?, ?, 1)");
     $stmt->execute([$name, $nickname, $specialties, $years]);
-    return (int)$db->lastInsertId();
+    $id = (int)$db->lastInsertId();
+
+    $insert = $db->prepare("INSERT INTO mechanic_schedule (mechanic_id, day_of_week, slot_1, slot_2, slot_3, slot_4) VALUES (?, ?, 1, 1, 1, 1)");
+    for ($dow = 0; $dow <= 6; $dow++) {
+        $insert->execute([$id, $dow]);
+    }
+    return $id;
 }
 
 function updateMechanic(int $id, string $name, ?string $nickname, ?string $specialties, int $years): void {
