@@ -18,6 +18,11 @@ PHP 8+, MySQL (MariaDB), vanilla JS. Served via XAMPP.
 
 ## Setup
 
+**Live (hosted on InfinityFree):**
+- Booking page: https://mayhem-mobility.page.gd
+- Admin panel: https://mayhem-mobility.page.gd/admin.php
+
+**Local (XAMPP):**
 Copy `config.example.php` to `config.php` and fill in your DB credentials. `config.php` is gitignored — credentials stay local.
 
 ## Database
@@ -28,13 +33,17 @@ Copy `config.example.php` to `config.php` and fill in your DB credentials. `conf
 
 Retro 60s/70s pop art inspired — Ben-Day dots, jagged speech bubbles, action bursts, onomatopoeia watermarks, comic panel rotation.
 
-- `--paper`: #e0cc5a (yellowed page)
-- `--cream`: #e8d86a (panel surface)
 - `--ink`: #1a1a2e
-- `--pink`: #d63384
+- `--paper`: #e0cc5a
+- `--cream`: #e2d055
 - `--teal`: #2a6b6b
+- `--teal-light`: #3a9b9b
+- `--teal-dark`: #1a4a4a
+- `--rust`: #a0453b
+- `--navy`: #16213e
+- `--pink`: #d63384
 - `--gold`: #f5c518
-- `--burst`: #8b5cf6
+- `--burst`: #e524e2
 
 Font stack: Bangers / Action Man Bold / Walter Turncoat / Luckiest Guy / Permanent Marker.
 
