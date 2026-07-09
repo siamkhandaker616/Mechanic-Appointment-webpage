@@ -1,6 +1,11 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+function fmtDate(string $date): string {
+    $ts = strtotime($date);
+    return $ts ? date('d-m-Y', $ts) : $date;
+}
+
 function getMechanics(): array {
     return getDB()->query("SELECT id, name, nickname, bio, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
@@ -170,7 +175,7 @@ function advanceAppointmentStatuses(): void {
     $now = getEffectiveTime();
     $today = $now->format('Y-m-d');
     $currentHour = (int)$now->format('G');
-    $currentSlot = intdiv($currentHour, 2) - 4;
+    $currentSlot = intdiv($currentHour, 2) - 5;
     if ($currentSlot < 0) $currentSlot = -1;
 
     $db = getDB();
@@ -181,7 +186,7 @@ function advanceAppointmentStatuses(): void {
         if ($a['appointment_date'] > $today) {
             $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
         } elseif ($a['appointment_date'] === $today) {
-            $slotEnd = ((int)$a['slot_index'] + 4) * 2 + 2;
+            $slotEnd = ((int)$a['slot_index'] + 5) * 2 + 2;
             if ($currentHour < $slotEnd) {
                 $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
             }
@@ -209,7 +214,7 @@ function advanceAppointmentStatuses(): void {
     $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
-        $slotEndHour = ((int)$a['slot_index'] + 4) * 2;
+        $slotEndHour = ((int)$a['slot_index'] + 5) * 2;
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotEndHour + 2)) {
             $db->prepare("UPDATE appointments SET status = 'completed' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
         }

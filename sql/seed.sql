@@ -1,6 +1,6 @@
 -- Seed data for Mystery Motors
 
-USE mystery_motors;
+USE mayhem_mobility;
 
 INSERT INTO mechanics (name, bio, nickname, specialties, years_experience) VALUES
 ('Clark Kent',

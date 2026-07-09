@@ -8,6 +8,26 @@ $conflictList = [];
 
 // --- GET action handlers (redirect after) ---
 
+if (isset($_GET['remove_all_cancelled'])) {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM appointments WHERE status = 'cancelled'");
+    $stmt->execute();
+    $_SESSION['flash_msg'] = $stmt->rowCount() . ' cancelled appointment(s) removed.';
+    $_SESSION['flash_type'] = 'success';
+    header('Location: admin.php');
+    exit;
+}
+
+if (isset($_GET['remove'])) {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = 'cancelled'");
+    $stmt->execute([(int)$_GET['remove']]);
+    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Appointment removed.' : 'Appointment not found or not cancellable.';
+    $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
+    header('Location: admin.php');
+    exit;
+}
+
 if (isset($_GET['cancel'])) {
     $id = (int)$_GET['cancel'];
     if (cancelAppointment($id)) {
@@ -304,6 +324,8 @@ $effectiveTime = getEffectiveTime();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mayhem Mobility — Admin Panel</title>
+<link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css?v=<?= time() ?>">
 </head>
 <body>
@@ -330,7 +352,7 @@ $effectiveTime = getEffectiveTime();
         <form method="post" style="display:contents">
         <span>
             <strong>Current Time:</strong>
-            <?= htmlspecialchars($effectiveTime->format('Y-m-d H:i')) ?>
+            <?= htmlspecialchars($effectiveTime->format('d-m-Y H:i')) ?>
             <?php if ($useSim): ?>
             <em>(simulated)</em>
             <?php endif; ?>
@@ -372,13 +394,13 @@ $effectiveTime = getEffectiveTime();
             <?php foreach ($appointments as $a): ?>
             <tr>
                 <td><strong><?= htmlspecialchars($a['client_name']) ?></strong></td>
-                <td><?= htmlspecialchars($a['phone']) ?></td>
-                <td><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
-                <td><?= htmlspecialchars($a['appointment_date']) ?></td>
-                <td><?= htmlspecialchars($SLOT_LABELS[(int)$a['slot_index']] ?? '') ?></td>
+                <td style="white-space:nowrap;"><?= htmlspecialchars($a['phone']) ?></td>
+                <td style="white-space:nowrap;"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
+                <td style="white-space:nowrap;"><?= htmlspecialchars(fmtDate($a['appointment_date'])) ?></td>
+                <td><?= htmlspecialchars([0 => 'Morning', 1 => 'Noon', 2 => 'Afternoon', 3 => 'Evening'][(int)$a['slot_index']] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['mechanic_name']) ?></td>
-                <td><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
-                <td>
+                <td style="white-space:nowrap;"><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
+                <td style="white-space:nowrap;">
                     <?php if ($a['status'] === 'scheduled'): ?>
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
@@ -418,6 +440,9 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </tbody>
     </table>
+    <div style="margin-top:16px;text-align:right;">
+        <a href="?remove_all_cancelled" class="btn btn-sm btn-rust">Remove All Cancelled</a>
+    </div>
     </div>
 </div>
 
@@ -489,11 +514,11 @@ $effectiveTime = getEffectiveTime();
             ?>
             <tr>
                 <td><strong><?= htmlspecialchars($o['mechanic_name']) ?></strong></td>
-                <td><?= htmlspecialchars($o['override_date']) ?></td>
+                <td><?= htmlspecialchars(fmtDate($o['override_date'])) ?></td>
                 <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
                 <td><?= htmlspecialchars($o['reason'] ?? '—') ?></td>
                 <td>
-                    <button type="button" class="btn btn-sm btn-rust" onclick="showUnblockModal(<?= (int)$o['id'] ?>, '<?= htmlspecialchars($o['mechanic_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($o['override_date']) ?>')">Unblock</button>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showUnblockModal(<?= (int)$o['id'] ?>, '<?= htmlspecialchars($o['mechanic_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars(fmtDate($o['override_date'])) ?>')">Unblock</button>
                 </td>
             </tr>
             <?php endforeach; ?>

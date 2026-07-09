@@ -31,9 +31,12 @@ class DatePicker {
         this.wrapper.appendChild(this.display);
 
         if (this.input.value) {
-            this.display.value = this.isDateTime
-                ? this.input.value.replace('T', ' ')
-                : this.input.value;
+            var parts = this.input.value.split('T');
+            var datePart = parts[0];
+            var ymd = datePart.split('-');
+            var formatted = ymd[2] + '-' + ymd[1] + '-' + ymd[0];
+            if (parts[1]) formatted += ' ' + parts[1];
+            this.display.value = formatted;
         }
 
         this.input.style.display = 'none';
@@ -238,15 +241,19 @@ class DatePicker {
     updateValue() {
         if (!this.date) return;
 
+        var y = this.date.getFullYear();
+        var mo = String(this.date.getMonth() + 1).padStart(2, '0');
+        var d = String(this.date.getDate()).padStart(2, '0');
         var value;
+
         if (this.isDateTime) {
             var h = this.popup.querySelector('.dp-hour').value.padStart(2, '0');
             var m = this.popup.querySelector('.dp-min').value.padStart(2, '0');
-            value = this.date.getFullYear() + '-' + String(this.date.getMonth()+1).padStart(2,'0') + '-' + String(this.date.getDate()).padStart(2,'0') + 'T' + h + ':' + m;
-            this.display.value = this.date.getFullYear() + '-' + String(this.date.getMonth()+1).padStart(2,'0') + '-' + String(this.date.getDate()).padStart(2,'0') + ' ' + h + ':' + m;
+            value = y + '-' + mo + '-' + d + 'T' + h + ':' + m;
+            this.display.value = d + '-' + mo + '-' + y + ' ' + h + ':' + m;
         } else {
-            value = this.date.getFullYear() + '-' + String(this.date.getMonth()+1).padStart(2,'0') + '-' + String(this.date.getDate()).padStart(2,'0');
-            this.display.value = value;
+            value = y + '-' + mo + '-' + d;
+            this.display.value = d + '-' + mo + '-' + y;
         }
 
         this.input.value = value;

@@ -44,7 +44,9 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mayhem Mobility — Book Your Appointment</title>
-<link rel="stylesheet" href="style.css">
+<link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=<?= time() ?>">
 </head>
 <body>
 
@@ -61,11 +63,11 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 
 <?php if ($success): ?>
 <div class="panel confirm-box">
-    <div class="burst burst-right">OK!</div>
+    <img src="images/icons/pow.png" alt="POW!" class="pow-burst">
     <h2>APPOINTMENT CONFIRMED!</h2>
     <div class="bubble">
         Your car is in good hands. We'll see you at
-        <strong><?= htmlspecialchars($_POST['date']) ?></strong>,
+        <strong><?= htmlspecialchars(fmtDate($_POST['date'])) ?></strong>,
         slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$_POST['slot_index']] ?? '') ?></strong>
         with <strong><?= htmlspecialchars(getMechanicById((int)$_POST['mechanic_id'])['name'] ?? '') ?></strong>.
     </div>

@@ -5,3 +5,4 @@ docs/hosting-guide.md
 .DS_Store
 Thumbs.db
 ideas/
+db-sync.php
