@@ -764,11 +764,22 @@ tr:last-child td {
     margin-bottom: 20px;
     font-size: 0.85rem;
     display: flex;
+    justify-content: space-between;
     gap: 16px;
     align-items: center;
-    flex-wrap: wrap;
     border: 3px solid var(--ink);
     box-shadow: 4px 4px 0 var(--ink);
+}
+
+.sim-group {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.sim-bar > * {
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .sim-bar.active {
@@ -931,6 +942,8 @@ tr:last-child td {
     .col { min-width: 0; }
     .admin-nav { flex-direction: column; }
     .sim-bar { flex-direction: column; align-items: stretch; }
+    .sim-group { width: 100%; }
+    .sim-group input { width: 100%; }
     .inline-form { flex-direction: column; align-items: stretch; }
     .inline-form select,
     .inline-form input { width: 100%; }

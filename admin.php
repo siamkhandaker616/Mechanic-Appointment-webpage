@@ -264,7 +264,7 @@ $effectiveTime = getEffectiveTime();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mayhem Mobility — Admin Panel</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=<?= time() ?>">
 </head>
 <body>
 
@@ -287,6 +287,7 @@ $effectiveTime = getEffectiveTime();
     <div class="burst burst-right">TIME!</div>
     <h2>Simulated Time</h2>
     <div class="sim-bar <?= $useSim ? 'active' : '' ?>">
+        <form method="post" style="display:contents">
         <span>
             <strong>Current Time:</strong>
             <?= htmlspecialchars($effectiveTime->format('Y-m-d H:i')) ?>
@@ -294,12 +295,15 @@ $effectiveTime = getEffectiveTime();
             <em>(simulated)</em>
             <?php endif; ?>
         </span>
-        <form method="post" class="inline-form">
+        <span class="sim-group">
+            <input type="datetime-local" name="sim_datetime" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
+            <button type="submit" name="toggle_sim" value="1" class="btn btn-sm">Set</button>
+        </span>
+        <span class="sim-group">
             <input type="checkbox" name="use_sim" value="1" id="use-sim" <?= $useSim ? 'checked' : '' ?> onchange="this.form.submit()">
             <input type="hidden" name="sim_toggle" value="1">
             <label for="use-sim">Use simulated time</label>
-            <input type="datetime-local" name="sim_datetime" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
-            <button type="submit" name="toggle_sim" value="1" class="btn btn-sm">Set</button>
+        </span>
         </form>
     </div>
 </div>
