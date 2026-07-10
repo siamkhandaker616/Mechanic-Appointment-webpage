@@ -12,33 +12,24 @@ if (isset($_GET['remove_all_cancelled'])) {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = 'cancelled'");
     $stmt->execute();
-    $_SESSION['flash_msg'] = $stmt->rowCount() . ' cancelled appointment(s) removed.';
-    $_SESSION['flash_type'] = 'success';
-    header('Location: admin.php');
-    exit;
+    flashAndRedirect($stmt->rowCount() . ' cancelled appointment(s) removed.');
 }
 
 if (isset($_GET['remove'])) {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = 'cancelled'");
     $stmt->execute([(int)$_GET['remove']]);
-    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Appointment removed.' : 'Appointment not found or not cancellable.';
-    $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
-    header('Location: admin.php');
-    exit;
+    $ok = $stmt->rowCount() > 0;
+    flashAndRedirect($ok ? 'Appointment removed.' : 'Appointment not found or not cancellable.', $ok ? 'success' : 'error');
 }
 
 if (isset($_GET['cancel'])) {
     $id = (int)$_GET['cancel'];
     if (cancelAppointment($id)) {
-        $_SESSION['flash_msg'] = 'Appointment cancelled.';
-        $_SESSION['flash_type'] = 'success';
+        flashAndRedirect('Appointment cancelled.');
     } else {
-        $_SESSION['flash_msg'] = 'Could not cancel — appointment may already be in progress or completed.';
-        $_SESSION['flash_type'] = 'error';
+        flashAndRedirect('Could not cancel — appointment may already be in progress or completed.', 'error');
     }
-    header('Location: admin.php');
-    exit;
 }
 
 if (isset($_GET['fire'])) {
@@ -47,10 +38,7 @@ if (isset($_GET['fire'])) {
     $stmt->execute([(int)$_GET['fire']]);
     $m = $stmt->fetch();
     fireMechanic((int)$_GET['fire']);
-    $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been fired!';
-    $_SESSION['flash_type'] = 'success';
-    header('Location: admin.php');
-    exit;
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been fired!');
 }
 
 if (isset($_GET['restore'])) {
@@ -59,28 +47,20 @@ if (isset($_GET['restore'])) {
     $stmt->execute([(int)$_GET['restore']]);
     $m = $stmt->fetch();
     restoreMechanic((int)$_GET['restore']);
-    $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!';
-    $_SESSION['flash_type'] = 'success';
-    header('Location: admin.php');
-    exit;
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!');
 }
 
 if (isset($_GET['unblock'])) {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
     $stmt->execute([(int)$_GET['unblock']]);
-    $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Override removed.' : 'Override not found.';
-    $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
-    header('Location: admin.php');
-    exit;
+    $ok = $stmt->rowCount() > 0;
+    flashAndRedirect($ok ? 'Override removed.' : 'Override not found.', $ok ? 'success' : 'error');
 }
 
 if (isset($_GET['remove_vacation'])) {
     removeMechanicVacation((int)$_GET['remove_vacation']);
-    $_SESSION['flash_msg'] = 'Vacation removed.';
-    $_SESSION['flash_type'] = 'success';
-    header('Location: admin.php');
-    exit;
+    flashAndRedirect('Vacation removed.');
 }
 
 // --- POST action handlers (redirect after) ---
@@ -91,20 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newDate = $_POST['new_date'] ?? '';
         $newSlot = (int)($_POST['new_slot'] ?? 0);
         $result = updateAppointmentDate($id, $newDate, $newSlot);
-        $_SESSION['flash_msg'] = $result['message'];
-        $_SESSION['flash_type'] = $result['success'] ? 'success' : 'error';
-        header('Location: admin.php');
-        exit;
+        flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
     }
 
     if (isset($_POST['update_mechanic']) && isset($_POST['appointment_id'])) {
         $id = (int)$_POST['appointment_id'];
         $newMech = (int)$_POST['new_mechanic'];
         $result = updateAppointmentMechanic($id, $newMech);
-        $_SESSION['flash_msg'] = $result['message'];
-        $_SESSION['flash_type'] = $result['success'] ? 'success' : 'error';
-        header('Location: admin.php');
-        exit;
+        flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
     }
 
     if (isset($_POST['sim_toggle']) && !isset($_POST['toggle_sim'])) {
@@ -112,10 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $useSim = (int)(isset($_POST['use_sim']));
         $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
         $stmt->execute([$useSim]);
-        $_SESSION['flash_msg'] = $useSim ? 'Simulated time activated.' : 'Real time restored.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php');
-        exit;
+    flashAndRedirect($useSim ? 'Simulated time activated.' : 'Real time restored.');
     }
 
     if (isset($_POST['toggle_sim'])) {
@@ -129,10 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("UPDATE sim_config SET simulated_datetime = ? WHERE id = 1");
             $stmt->execute([$simDt]);
         }
-        $_SESSION['flash_msg'] = 'Simulated time updated.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php');
-        exit;
+    flashAndRedirect('Simulated time updated.');
     }
 
     if (isset($_POST['add_mechanic'])) {
@@ -143,8 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name) {
             addMechanic($name, $nickname, $specialties, $years, $quote);
-            $_SESSION['flash_msg'] = htmlspecialchars($name) . ' has been hired!';
-            $_SESSION['flash_type'] = 'success';
+            flashAndRedirect(htmlspecialchars($name) . ' has been hired!');
         }
         header('Location: admin.php');
         exit;
@@ -159,8 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name && $id) {
             updateMechanic($id, $name, $nickname, $specialties, $years, $quote);
-            $_SESSION['flash_msg'] = 'Mechanic updated.';
-            $_SESSION['flash_type'] = 'success';
+            flashAndRedirect('Mechanic updated.');
         }
         header('Location: admin.php');
         exit;
@@ -182,10 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         updateMechanicSchedule($mechId, $schedule);
-        $_SESSION['flash_msg'] = 'Schedule updated.';
-        $_SESSION['flash_type'] = 'success';
-        header('Location: admin.php');
-        exit;
+    flashAndRedirect('Schedule updated.');
     }
 
     if (isset($_POST['add_vacation'])) {
@@ -198,14 +161,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
             $stmt->execute([$mechId]);
             $m = $stmt->fetch();
-            $_SESSION['flash_msg'] = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . $start . ' to ' . $end . '.';
-            $_SESSION['flash_type'] = 'success';
+            flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . $start . ' to ' . $end . '.');
         } else {
-            $_SESSION['flash_msg'] = 'Invalid vacation dates.';
-            $_SESSION['flash_type'] = 'error';
+            flashAndRedirect('Invalid vacation dates.', 'error');
         }
-        header('Location: admin.php');
-        exit;
     }
 
     if (isset($_POST['override_slot'])) {
@@ -216,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $reason = trim($_POST['reason'] ?? '');
 
         $dow = (int)date('w', strtotime($date));
-        $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        $dayNames = $GLOBALS['DAY_NAMES_FULL'];
 
         $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
         $stmt->execute([$mechId]);
@@ -228,10 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $schedule = $stmt->fetch();
 
         if (!$schedule) {
-            $_SESSION['flash_msg'] = "{$mechName} does not work on {$dayNames[$dow]} — no override needed.";
-            $_SESSION['flash_type'] = 'error';
-            header('Location: admin.php');
-            exit;
+            flashAndRedirect("{$mechName} does not work on {$dayNames[$dow]} — no override needed.", 'error');
         }
 
         $invalidSlots = [];
@@ -242,10 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if (!empty($invalidSlots)) {
-            $_SESSION['flash_msg'] = "{$mechName} is not scheduled for slot(s) " . implode(', ', $invalidSlots) . " on {$dayNames[$dow]} — cannot block them.";
-            $_SESSION['flash_type'] = 'error';
-            header('Location: admin.php');
-            exit;
+            flashAndRedirect("{$mechName} is not scheduled for slot(s) " . implode(', ', $invalidSlots) . " on {$dayNames[$dow]} — cannot block them.", 'error');
         }
 
         $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('cancelled','completed')");
@@ -268,22 +221,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                   VALUES (?, ?, ?, ?, ?, ?, ?)
                                   ON DUPLICATE KEY UPDATE slot_1=VALUES(slot_1), slot_2=VALUES(slot_2), slot_3=VALUES(slot_3), slot_4=VALUES(slot_4), reason=VALUES(reason)");
             $stmt->execute([$mechId, $date, $slotFlags['slot_1'], $slotFlags['slot_2'], $slotFlags['slot_3'], $slotFlags['slot_4'], $reason]);
-            $_SESSION['flash_msg'] = 'Schedule override saved.';
-            $_SESSION['flash_type'] = 'success';
+            flashAndRedirect('Schedule override saved.');
         }
         header('Location: admin.php');
         exit;
     }
 
-    if (isset($_GET['unblock'])) {
-        $db = getDB();
-        $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
-        $stmt->execute([(int)$_GET['unblock']]);
-        $_SESSION['flash_msg'] = $stmt->rowCount() > 0 ? 'Override removed.' : 'Override not found.';
-        $_SESSION['flash_type'] = $stmt->rowCount() > 0 ? 'success' : 'error';
-        header('Location: admin.php');
-        exit;
-    }
 }
 
 // --- Read flash messages for display (only reached on GET) ---
@@ -683,10 +626,9 @@ $effectiveTime = getEffectiveTime();
                     </tr>
                 </thead>
                 <tbody>
-                    <?php $dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; ?>
                     <?php for ($d = 0; $d <= 6; $d++): ?>
                     <tr>
-                        <td><strong><?= $dayNames[$d] ?></strong></td>
+                        <td><strong><?= $GLOBALS['DAY_NAMES_ABBR'][$d] ?></strong></td>
                         <?php for ($si = 0; $si < SLOT_COUNT; $si++): ?>
                         <td style="text-align:center;">
                             <input type="checkbox" name="dow_<?= $d ?>[]" value="<?= $si ?>" class="sched-cb" data-dow="<?= $d ?>" data-slot="<?= $si ?>">

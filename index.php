@@ -96,11 +96,11 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             <div class="col">
                 <div class="form-group">
                     <label for="name">Your Name</label>
-                    <input type="text" id="name" name="name" value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" required>
+                    <input type="text" id="name" name="name" data-validate="required" data-err-required="Name is required." value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
+                    <input type="tel" id="phone" name="phone" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Digits only." value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">
                     <label for="address">Address</label>
@@ -110,11 +110,11 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             <div class="col">
                 <div class="form-group">
                     <label for="license_no">Car License Number</label>
-                    <input type="text" id="license_no" name="license_no" value="<?= htmlspecialchars($_POST['license_no'] ?? '') ?>" required>
+                    <input type="text" id="license_no" name="license_no" data-validate="required" data-err-required="License number is required." value="<?= htmlspecialchars($_POST['license_no'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">
                     <label for="engine_no">Car Engine Number</label>
-                    <input type="text" id="engine_no" name="engine_no" value="<?= htmlspecialchars($_POST['engine_no'] ?? '') ?>" required>
+                    <input type="text" id="engine_no" name="engine_no" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($_POST['engine_no'] ?? '') ?>" required>
                 </div>
                 <div class="form-group">
                     <label for="car_model">Car Model <span style="font-weight:normal;">(optional)</span></label>
@@ -135,7 +135,6 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
         <div class="form-group">
             <label>Select a Mechanic</label>
             <div id="mechanic-list">
-                <?php $dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; ?>
                 <?php foreach ($mechanics as $m): ?>
                 <?php $sched = $mechSchedules[$m['id']] ?? []; ?>
                 <?php $onVacation = $selectedDate && isMechanicOnVacation((int)$m['id'], $selectedDate); ?>
@@ -144,10 +143,10 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
                     <?php if ($onVacation): ?><span class="status-badge status-cancelled" style="margin-left:6px;font-size:0.65rem;">ON VACATION</span><?php endif; ?>
-                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= $m['years_experience'] ?> yrs</div>
+                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= htmlspecialchars($m['years_experience']) ?> yrs</div>
                     <div class="work-days">
                         <?php for ($d = 0; $d <= 6; $d++): ?>
-                        <span class="work-day <?= isset($sched[$d]) ? 'on' : 'off' ?>"><?= $dayAbbr[$d] ?></span>
+                        <span class="work-day <?= isset($sched[$d]) ? 'on' : 'off' ?>"><?= $GLOBALS['DAY_NAMES_ABBR'][$d] ?></span>
                         <?php endfor; ?>
                     </div>
                 </div>
