@@ -3,6 +3,7 @@ class DatePicker {
         this.input = input;
         this.isDateTime = input.type === 'datetime-local';
         this.confirm = input.dataset.confirm === '' || input.dataset.confirm === 'true';
+        this.placement = input.dataset.placement || 'auto';
         this.date = null;
         this.viewDate = new Date();
         this.popup = null;
@@ -25,7 +26,7 @@ class DatePicker {
 
         this.display = document.createElement('input');
         this.display.type = 'text';
-        this.display.className = 'datepicker-display';
+        this.display.className = 'datepicker-display' + (this.isDateTime ? ' datepicker-display--dt' : '');
         this.display.readOnly = true;
         this.display.placeholder = this.input.placeholder || (this.isDateTime ? 'Pick date & time' : 'Pick a date');
         this.wrapper.appendChild(this.display);
@@ -120,7 +121,9 @@ class DatePicker {
         var popupH = this.popup.offsetHeight;
         var top;
 
-        if (rect.top > popupH + 10) {
+        if (this.placement === 'top') {
+            top = Math.max(4, rect.top - popupH - 6);
+        } else if (rect.top > popupH + 10) {
             top = rect.top - popupH - 6;
         } else {
             top = rect.bottom + 6;

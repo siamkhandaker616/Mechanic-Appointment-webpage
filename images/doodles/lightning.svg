@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+  <!-- Drop shadow -->
+  <polygon points="55,5 25,55 50,55 45,95 75,45 50,45" fill="#1a1a2e" transform="translate(4, 4)"/>
+  <!-- Lightning bolt -->
+  <polygon points="55,5 25,55 50,55 45,95 75,45 50,45" fill="#ffd43f" stroke="#1a1a2e" stroke-width="4.5" stroke-linejoin="round"/>
+</svg>

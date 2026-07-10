@@ -7,7 +7,7 @@ function fmtDate(string $date): string {
 }
 
 function getMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
 
 function getMechanicById(int $id): ?array {
@@ -395,13 +395,13 @@ function validateAppointmentInput(array $data): array {
 }
 
 function getAllMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
 }
 
-function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null): int {
+function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null, string $theme = 'default'): int {
     $db = getDB();
-    $stmt = $db->prepare("INSERT INTO mechanics (name, nickname, quote, specialties, years_experience, is_active) VALUES (?, ?, ?, ?, ?, 1)");
-    $stmt->execute([$name, $nickname, $quote, $specialties, $years]);
+    $stmt = $db->prepare("INSERT INTO mechanics (name, nickname, quote, theme, specialties, years_experience, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)");
+    $stmt->execute([$name, $nickname, $quote, $theme, $specialties, $years]);
     $id = (int)$db->lastInsertId();
 
     $insert = $db->prepare("INSERT INTO mechanic_schedule (mechanic_id, day_of_week, slot_1, slot_2, slot_3, slot_4) VALUES (?, ?, 1, 1, 1, 1)");
@@ -411,9 +411,9 @@ function addMechanic(string $name, ?string $nickname, ?string $specialties, int 
     return $id;
 }
 
-function updateMechanic(int $id, string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null): void {
-    $stmt = getDB()->prepare("UPDATE mechanics SET name = ?, nickname = ?, quote = ?, specialties = ?, years_experience = ? WHERE id = ?");
-    $stmt->execute([$name, $nickname, $quote, $specialties, $years, $id]);
+function updateMechanic(int $id, string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null, string $theme = 'default'): void {
+    $stmt = getDB()->prepare("UPDATE mechanics SET name = ?, nickname = ?, quote = ?, theme = ?, specialties = ?, years_experience = ? WHERE id = ?");
+    $stmt->execute([$name, $nickname, $quote, $theme, $specialties, $years, $id]);
 }
 
 function fireMechanic(int $id): void {

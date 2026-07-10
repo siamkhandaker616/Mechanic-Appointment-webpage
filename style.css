@@ -40,8 +40,9 @@
 
 :root {
     --ink: #1a1a2e;
+    --ink-alt: #78a1f5;
     --paper: #e0cc5a;
-    --cream: #e2d055;
+    --cream: #ecd94d;
     --teal: #2a6b6b;
     --teal-light: #3a9b9b;
     --teal-dark: #1a4a4a;
@@ -54,7 +55,7 @@
     --burst: #e524e2;
     --pop: #25a9f0;
     --cyan-light: #d8ecec;
-    --dot-teal: rgba(26, 26, 46, 0.15);
+    --dot-blue: rgba(26, 26, 46, 0.15);
     --dot-pink: rgba(214, 51, 132, 0.15);
     --panel-border: 4px solid var(--ink);
     --shadow-offset: 6px;
@@ -67,14 +68,36 @@
     --font-body: 'Walter Turncoat', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ink) transparent;
+}
+
+/* === CUSTOM RETRO COMIC SCROLLBARS === */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--ink);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
 
 body {
     font-family: var(--font-body);
     background-color: var(--paper);
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E"),
-        radial-gradient(var(--dot-teal) 2.5px, transparent 2.5px),
+        radial-gradient(var(--dot-blue) 2.5px, transparent 2.5px),
         radial-gradient(var(--dot-pink) 2.5px, transparent 2.5px);
     background-size: 300px 300px, 20px 20px, 20px 20px;
     background-position: 0 0, 0 0, 10px 10px;
@@ -107,10 +130,10 @@ h1 {
     color: var(--ink);
     text-shadow:
         3px 3px 0 var(--pink),
-        -1px -1px 0 var(--ink),
-        1px -1px 0 var(--ink),
-        -1px 1px 0 var(--ink),
-        1px 1px 0 var(--ink);
+        -1px -1px 0 var(--ink-alt),
+        1px -1px 0 var(--ink-alt),
+        -1px 1px 0 var(--ink-alt),
+        1px 1px 0 var(--ink-alt);
     letter-spacing: 2px;
     transform: rotate(-1deg);
     position: relative;
@@ -169,7 +192,7 @@ header::after {
 }
 
 .container {
-    max-width: 1050px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: 0 20px 40px;
 }
@@ -184,6 +207,8 @@ header::after {
     position: relative;
     box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--ink);
     transition: transform 0.15s ease;
+    outline: 1px solid transparent;
+    transform-style: preserve-3d;
 }
 
 .panel:nth-child(even of .panel) {
@@ -192,6 +217,12 @@ header::after {
 
 .panel:nth-child(odd of .panel) {
     transform: rotate(-0.4deg);
+    border-top: 4px dashed var(--pink);
+}
+
+#overrides-panel[style*="display: none"] ~ .panel:last-of-type,
+#overrides-panel[style*="display:none"] ~ .panel:last-of-type {
+    border-top: 4px solid var(--ink);
 }
 
 .panel::before {
@@ -213,7 +244,7 @@ header::after {
     right: 10px;
     font-size: 0.6rem;
     color: var(--pink);
-    opacity: 0.3;
+    opacity: 0.6;
 }
 
 .panel:first-of-type {
@@ -390,11 +421,17 @@ input, select, textarea {
     border: 3px solid var(--ink);
     background: var(--cyan-light);
     font-family: var(--font-body);
-    font-size: 0.95rem;
+    font-size: 1rem;
+    line-height: normal;
     color: var(--ink);
     outline: none;
     transition: box-shadow 0.15s, border-color 0.15s;
-    color-scheme: dark;
+    caret-color: #fe55af;
+    color-scheme: light;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
 }
 
 input[type="checkbox"] {
@@ -687,6 +724,7 @@ textarea {
 .slot-tooltip.hidden {
     display: none;
 }
+/* Tail above (default) — points down from bottom */
 .slot-tooltip::before {
     content: "";
     position: absolute;
@@ -706,6 +744,22 @@ textarea {
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
     border-top: 14px solid var(--cyan-light);
+}
+/* Tail below — transforms the whole tail group so the arrow melts in seamlessly */
+.slot-tooltip.below {
+    transform-origin: 38px top;
+}
+.slot-tooltip.below::before {
+    top: auto;
+    bottom: 100%;
+    border-top: none;
+    border-bottom: 16px solid var(--pink);
+}
+.slot-tooltip.below::after {
+    top: auto;
+    bottom: calc(100% - 2px);
+    border-top: none;
+    border-bottom: 14px solid var(--cyan-light);
 }
 .slot-tooltip .tt-title {
     font-family: var(--font-display);
@@ -736,56 +790,102 @@ textarea {
 }
 
 .quote-tooltip {
-    position: fixed;
+    position: absolute;
     z-index: 9998;
     background: var(--gold);
-    border: 3px solid var(--ink);
-    border-radius: 24px;
-    padding: 16px 22px;
-    max-width: 420px;
+    border: 4px solid var(--ink);
+    border-radius: 28px;
+    padding: 18px 24px;
+    max-width: 460px;
     font-family: var(--font-sub);
     color: var(--ink);
-    box-shadow: 5px 5px 0 var(--ink);
-    line-height: 1.5;
+    box-shadow: 6px 6px 0 var(--ink);
+    line-height: 1.4;
     pointer-events: none;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
+
 .quote-tooltip.hidden {
     display: none;
 }
+
+.quote-tooltip.comic-pop {
+    animation: comicPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    transform-origin: 42px 100%;
+}
+
+@keyframes comicPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.3) rotate(-12deg);
+    }
+    55% {
+        transform: scale(1.1) rotate(4deg);
+    }
+    75% {
+        transform: scale(0.96) rotate(-2deg);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(-1deg);
+    }
+}
+
 .quote-tooltip .qt-text {
     display: block;
     font-style: italic;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
 }
+
 .quote-tooltip .qt-author {
     display: block;
     margin-top: 6px;
     font-family: var(--font-display);
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     text-align: right;
     color: var(--rust);
 }
-.quote-tooltip::before {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 60px;
-    width: 0; height: 0;
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-top: 16px solid var(--ink);
-}
+
+.quote-tooltip::before,
 .quote-tooltip::after {
     content: "";
     position: absolute;
-    top: calc(100% - 2px);
-    left: 62px;
     width: 0; height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
-    border-top: 14px solid var(--gold);
+    border: solid transparent;
 }
 
+/* Default (above) pointing arrow - left aligned */
+.quote-tooltip.above::before {
+    top: 100%;
+    left: 40px;
+    right: auto;
+    border-width: 14px 14px 0 14px;
+    border-top-color: var(--ink);
+}
+
+.quote-tooltip.above::after {
+    top: calc(100% - 2px);
+    left: 42px;
+    right: auto;
+    border-width: 11px 11px 0 11px;
+    border-top-color: var(--gold);
+}
+
+/* Right positioning arrow */
+.quote-tooltip.right::before {
+    right: 100%;
+    top: calc(50% - 12px);
+    border-width: 12px 12px 12px 0;
+    border-right-color: var(--ink);
+}
+
+.quote-tooltip.right::after {
+    right: calc(100% - 2px);
+    top: calc(50% - 10px);
+    border-width: 10px 10px 10px 0;
+    border-right-color: var(--gold);
+}
 
 /* === SUGGESTION CHIPS === */
 
@@ -1132,6 +1232,8 @@ tr:last-child td {
     max-width: 480px;
     position: relative;
     transform: rotate(-0.5deg);
+    outline: 1px solid transparent;
+    transform-style: preserve-3d;
 }
 
 .msg-box {
@@ -1193,6 +1295,12 @@ tr:last-child td {
 .datepicker-display {
     cursor: pointer;
     background: var(--cyan-light);
+    max-width: 160px;
+}
+
+.datepicker-display--dt {
+    width: 102%;
+    max-width: 320px;
 }
 
 .datepicker-popup {

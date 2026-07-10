@@ -453,35 +453,35 @@ $effectiveTime = getEffectiveTime();
     <div class="burst burst-right">LOCK!</div>
     <h2>Schedule Override</h2>
     <p style="margin-bottom:12px;font-size:0.9rem;">Block specific slots for a mechanic on a given date (days off, early leave).</p>
-    <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
-        <div>
-            <label>Mechanic</label>
-            <select name="override_mechanic" required>
-                <option value="">— Select —</option>
-                <?php foreach ($mechanics as $m): ?>
-                <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label>Date</label>
-            <input type="date" name="override_date" required min="<?= date('Y-m-d') ?>">
-        </div>
-        <div>
-            <label>Blocked Slots</label>
-            <div style="display:flex;gap:6px;">
-                <?php for ($i = 0; $i < SLOT_COUNT; $i++): ?>
-                <label style="font-size:0.75rem;border:2px solid var(--ink);padding:6px;cursor:pointer;">
-                    <input type="checkbox" name="slots[]" value="<?= $i ?>"> <?= htmlspecialchars($SLOT_LABELS[$i] ?? ($i + 1)) ?>
-                </label>
-                <?php endfor; ?>
+    <form method="post" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div>
+                <label>Mechanic</label>
+                <select name="override_mechanic" required>
+                    <option value="">— Select —</option>
+                    <?php foreach ($mechanics as $m): ?>
+                    <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label>Date</label>
+                <input type="date" name="override_date" required min="<?= date('Y-m-d') ?>">
+            </div>
+            <div>
+                <label style="font-size:0.9rem;">Blocked Slots</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <?php for ($i = 0; $i < SLOT_COUNT; $i++): ?>
+                    <label style="font-size:0.75rem;border:2px solid var(--ink);padding:6px;cursor:pointer;">
+                        <input type="checkbox" name="slots[]" value="<?= $i ?>"> <?= htmlspecialchars($SLOT_LABELS[$i] ?? ($i + 1)) ?>
+                    </label>
+                    <?php endfor; ?>
+                </div>
+                <label style="margin-top:6px;">Reason (optional)</label>
+                <input type="text" name="reason" placeholder="e.g. sick day" style="width:100%;max-width:526px;">
             </div>
         </div>
-        <div>
-            <label>Reason (optional)</label>
-            <input type="text" name="reason" placeholder="e.g. sick day">
-        </div>
-        <div style="display:flex;gap:12px;justify-content:space-between;width:100%;flex-wrap:wrap;">
+        <div style="display:flex;gap:12px;justify-content:space-between;">
             <button type="submit" name="override_slot" class="btn btn-sm btn-rust">Save Override</button>
             <?php if (!empty($overrides)): ?>
             <button type="button" class="btn btn-sm btn-outline" onclick="toggleOverrides()" id="overrides-toggle">Show All Blocks</button>
@@ -491,7 +491,7 @@ $effectiveTime = getEffectiveTime();
 </div>
 
 <?php if (!empty($overrides)): ?>
-<div class="panel" id="overrides-panel" style="display:none;">
+<div class="panel" id="overrides-panel" style="display: none;">
     <div class="burst burst-right" style="background:var(--rust);">HELD!</div>
     <h2>Active Overrides</h2>
     <div style="overflow-x:auto;">
@@ -562,7 +562,7 @@ $effectiveTime = getEffectiveTime();
                     <?php endif; ?>
                 </td>
                 <td style="white-space:nowrap;">
-                    <button class="btn btn-sm btn-outline" onclick="openMechModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>', <?= (int)$m['years_experience'] ?>)">Edit</button>
+                    <button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="<?= $m['id'] ?>" data-mname="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" data-mnick="<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>" data-mquote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-mspec="<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>" data-myears="<?= (int)$m['years_experience'] ?>">Edit</button>
                     <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <?php if ($m['is_active']): ?>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
@@ -607,53 +607,60 @@ $effectiveTime = getEffectiveTime();
 </div>
 
 <div class="modal-overlay hidden" id="mech-modal" onclick="closeMechModal(event)">
-    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px;">
+    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:650px;">
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Mechanic</h2>
-        <form method="post" id="mech-modal-form">
-            <input type="hidden" name="mech_id" id="modal-mech-id">
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" name="mech_name" id="modal-mech-name" readonly style="background:var(--paper);cursor:not-allowed;">
+        <div style="display:flex;gap:12px;align-items:stretch;">
+            <div style="flex:1;">
+                <form method="post" id="mech-modal-form">
+                    <input type="hidden" name="mech_id" id="modal-mech-id">
+                    <div style="display:flex;gap:12px;">
+                        <div class="form-group" style="flex:1;">
+                            <label>Name</label>
+                            <input type="text" name="mech_name" id="modal-mech-name" readonly style="width:100%;background:var(--paper);cursor:not-allowed;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Nickname</label>
+                            <input type="text" name="mech_nickname" id="modal-mech-nickname" style="width:100%;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Catchphrase</label>
+                        <input type="text" name="mech_quote" id="modal-mech-quote" placeholder="e.g. I'll fix it fast!">
+                    </div>
+                    <div class="form-group">
+                        <label>Specialties</label>
+                        <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="e.g. Engine, Transmission">
+                    </div>
+                    <div class="form-group">
+                        <label>Years Experience</label>
+                        <input type="number" name="mech_years" id="modal-mech-years" style="width:100px;background:var(--paper);cursor:not-allowed;" readonly>
+                    </div>
+                    <div style="display:flex;gap:12px;margin-top:8px;">
+                        <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('mech-modal').classList.add('hidden')">Cancel</button>
+                    </div>
+                </form>
             </div>
-            <div class="form-group">
-                <label>Nickname</label>
-                <input type="text" name="mech_nickname" id="modal-mech-nickname">
-            </div>
-            <div class="form-group">
-                <label>Catchphrase</label>
-                <input type="text" name="mech_quote" id="modal-mech-quote" placeholder="e.g. I'll fix it fast!">
-            </div>
-            <div class="form-group">
-                <label>Specialties</label>
-                <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="e.g. Engine, Transmission">
-            </div>
-            <div class="form-group">
-                <label>Years Experience</label>
-                <input type="number" name="mech_years" id="modal-mech-years" style="width:100px;background:var(--paper);cursor:not-allowed;" readonly>
-            </div>
-            <div style="display:flex;gap:12px;margin-top:8px;">
-                <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('mech-modal').classList.add('hidden')">Cancel</button>
-            </div>
-        </form>
-        <div style="margin-top:18px;border-top:2px dashed var(--ink);padding-top:14px;">
-            <h3 style="font-family:var(--font-sub);font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;">Vacations</h3>
-            <div id="vacation-list" style="margin-bottom:10px;"></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
-                <div>
-                    <label style="font-size:0.75rem;">Start</label>
-                    <input type="date" id="vac-start" style="width:auto;font-size:0.8rem;">
+            <div style="border-left:2px dashed var(--ink);align-self:stretch;"></div>
+            <div style="flex:1;">
+                <h3 style="font-family:var(--font-sub);font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;">Vacations</h3>
+                <div id="vacation-list" style="margin-bottom:10px;"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                    <div>
+                        <label style="font-size:0.75rem;">Start</label>
+                        <input type="date" id="vac-start" style="width:auto;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;">End</label>
+                        <input type="date" id="vac-end" data-placement="top" style="width:auto;font-size:0.8rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;">Reason (Optional)</label>
+                        <input type="text" id="vac-reason" placeholder="Outside commitments" style="width: 200px;font-size:0.8rem;">
+                    </div>
+                    <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;">Send On Vacation</button>
                 </div>
-                <div>
-                    <label style="font-size:0.75rem;">End</label>
-                    <input type="date" id="vac-end" style="width:auto;font-size:0.8rem;">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem;">Reason</label>
-                    <input type="text" id="vac-reason" placeholder="Optional" style="width:auto;font-size:0.8rem;">
-                </div>
-                <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;">Send On Vacation</button>
             </div>
         </div>
     </div>
@@ -735,7 +742,7 @@ $effectiveTime = getEffectiveTime();
         <button type="button" class="modal-close" onclick="document.getElementById('fire-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">FIRED!</div>
         <h2 style="margin-top:30px; margin-left: 5px;" id="fire-modal-title">Fire Mechanic?</h2>
-        <p style="margin:16px 0;" id="fire-modal-msg">They'll be deactivated and won't appear for new bookings.</p>
+        <p style="margin:16px 0;" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <a href="#" id="fire-confirm-link" class="btn btn-sm btn-rust">Yes, Fire</a>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Nevermind</button>
@@ -798,14 +805,14 @@ function toggleOverrides() {
     btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
 }
 
-function openMechModal(id, name, nickname, quote, specialties, years) {
-    document.getElementById('modal-mech-id').value = id;
-    document.getElementById('modal-mech-name').value = name;
-    document.getElementById('modal-mech-nickname').value = nickname;
-    document.getElementById('modal-mech-quote').value = quote;
-    document.getElementById('modal-mech-specialties').value = specialties;
-    document.getElementById('modal-mech-years').value = years;
-    renderVacations(id);
+function openMechModal(btn) {
+    document.getElementById('modal-mech-id').value = btn.dataset.mid;
+    document.getElementById('modal-mech-name').value = btn.dataset.mname;
+    document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
+    document.getElementById('modal-mech-quote').value = btn.dataset.mquote;
+    document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
+    document.getElementById('modal-mech-years').value = btn.dataset.myears;
+    renderVacations(parseInt(btn.dataset.mid));
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 

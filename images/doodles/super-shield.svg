@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+  <!-- Shield Outer border -->
+  <polygon points="50,10 90,30 75,85 50,95 25,85 10,30" 
+           fill="#ffd43f" stroke="#e63946" stroke-width="6" stroke-linejoin="round"/>
+  <!-- Shield Inner line -->
+  <polygon points="50,16 82,32 70,80 50,88 30,80 18,32" 
+           fill="none" stroke="#e63946" stroke-width="2"/>
+  <!-- Red "S" character styled customly inside -->
+  <path d="M48,22 C36,22 30,28 32,36 C34,44 54,46 54,54 C54,60 48,64 40,64 C32,64 28,58 28,58 L24,68 C24,68 32,76 44,76 C56,76 66,70 66,58 C66,46 46,42 46,36 C46,30 52,28 58,28 C64,28 66,32 66,32 L70,22 C70,22 62,14 48,22 Z"
+        fill="#e63946" stroke="#1a1a2e" stroke-width="3" stroke-linejoin="round"/>
+</svg>

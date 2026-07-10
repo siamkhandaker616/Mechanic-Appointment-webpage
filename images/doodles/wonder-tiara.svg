@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+  <!-- Gold Tiara shape -->
+  <path d="M5,40 L30,45 L50,15 L70,45 L95,40 C85,65 70,75 50,75 C30,75 15,65 5,40 Z" 
+        fill="#ffd43f" stroke="#1a1a2e" stroke-width="4.5" stroke-linejoin="round"/>
+  <!-- Red Star in center -->
+  <polygon points="50,32 54,44 66,44 57,51 60,63 50,55 40,63 43,51 34,44 46,44" 
+           fill="#e63946" stroke="#1a1a2e" stroke-width="2" stroke-linejoin="round"/>
+</svg>

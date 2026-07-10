@@ -206,14 +206,66 @@ function htmlspecialchars(s) {
     return d.innerHTML;
 }
 
+function updateQuotePosition(card) {
+    var qt = document.getElementById('quote-tooltip');
+    if (!qt || qt.classList.contains('hidden')) return;
+
+    var quote = card.getAttribute('data-quote');
+    var name = card.querySelector('h3')?.textContent || '';
+    if (!quote) {
+        qt.classList.add('hidden');
+        return;
+    }
+
+    qt.innerHTML = '<span class="qt-text">"' + htmlspecialchars(quote) + '"</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
+
+    var rect = card.getBoundingClientRect();
+    var tooltipWidth = qt.offsetWidth;
+    var tooltipHeight = qt.offsetHeight;
+
+    var cardTopInDoc = rect.top + window.scrollY;
+    var cardLeftInDoc = rect.left + window.scrollX;
+    var cardWidth = rect.width;
+
+    var top = cardTopInDoc - tooltipHeight - 12;
+    var left = cardLeftInDoc + cardWidth - tooltipWidth + 180;
+
+    qt.style.top = top + 'px';
+    qt.style.left = Math.max(10, Math.min(left, window.innerWidth - tooltipWidth - 10)) + 'px';
+}
+
 function selectMechanic(id) {
+    var selectedCard = null;
     document.querySelectorAll('.mechanic-card').forEach(c => c.classList.remove('selected'));
     document.querySelectorAll('input[name="mechanic_id"]').forEach(r => {
         if (parseInt(r.value) === id) {
             r.checked = true;
-            r.closest('.mechanic-card').classList.add('selected');
+            selectedCard = r.closest('.mechanic-card');
+            selectedCard.classList.add('selected');
         }
     });
+
+    var qt = document.getElementById('quote-tooltip');
+    if (!qt) {
+        qt = document.createElement('div');
+        qt.id = 'quote-tooltip';
+        qt.className = 'quote-tooltip above hidden';
+        document.body.appendChild(qt);
+    }
+
+    if (selectedCard) {
+        qt.classList.remove('hidden');
+        updateQuotePosition(selectedCard);
+
+        // Re-trigger springy comic pop animation
+        qt.classList.remove('comic-pop');
+        void qt.offsetHeight;
+        qt.classList.add('comic-pop');
+    } else {
+        qt.classList.add('hidden');
+        qt.classList.remove('comic-pop');
+    }
+
     fetchAvailability();
 }
 
@@ -252,7 +304,7 @@ function showTooltip(el) {
                 for (var i = 0; i < slots.length; i++) {
                     if (slots[i].available && slots[i].index === slotIndex) {
                         var name = data.all_names[mid] || ('Mechanic #' + mid);
-                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ')"><strong>' + name + '</strong><span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ')"><strong>' + name + '</strong></button>';
                         hasOtherSlots = true;
                         break;
                     }
@@ -284,7 +336,16 @@ function showTooltip(el) {
         t.classList.remove('hidden');
 
         var rect = el.getBoundingClientRect();
-        var top = rect.top - t.offsetHeight - 8;
+        var spaceAbove = rect.top;
+        var needsBelow = spaceAbove < t.offsetHeight + 8;
+        var top;
+        if (needsBelow) {
+            top = rect.bottom + 8;
+            t.classList.add('below');
+        } else {
+            top = rect.top - t.offsetHeight - 8;
+            t.classList.remove('below');
+        }
         var left = rect.left + rect.width - 60;
         left = Math.min(left, window.innerWidth - t.offsetWidth - 10);
         t.style.top = Math.max(4, top) + 'px';
@@ -374,36 +435,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     window.addEventListener('scroll', function() {
-        var qt = document.getElementById('quote-tooltip');
-        if (qt) qt.classList.add('hidden');
+        var t = document.getElementById('slot-tooltip');
+        if (t && !t.classList.contains('hidden') && t._target) {
+            var rect = t._target.getBoundingClientRect();
+            var spaceAbove = rect.top;
+            var needsBelow = spaceAbove < t.offsetHeight + 8;
+            var top;
+            if (needsBelow) {
+                top = rect.bottom + 8;
+                t.classList.add('below');
+            } else {
+                top = rect.top - t.offsetHeight - 8;
+                t.classList.remove('below');
+            }
+            t.style.top = Math.max(4, top) + 'px';
+            t.style.left = Math.max(4, Math.min(rect.left + rect.width - 60, window.innerWidth - t.offsetWidth - 10)) + 'px';
+        }
     });
 
-    document.querySelectorAll('.mechanic-card[data-quote]').forEach(function(card) {
-        var quote = card.getAttribute('data-quote');
-        if (!quote) return;
-        var qt = document.getElementById('quote-tooltip');
-        if (!qt) {
-            qt = document.createElement('div');
-            qt.id = 'quote-tooltip';
-            qt.className = 'quote-tooltip';
-            document.body.appendChild(qt);
+    window.addEventListener('resize', function() {
+        var selectedCard = document.querySelector('.mechanic-card.selected');
+        if (selectedCard) {
+            updateQuotePosition(selectedCard);
         }
-        card.addEventListener('mouseenter', function() {
-            var name = card.querySelector('h3')?.textContent || '';
-            qt.innerHTML = '<span class="qt-text">' + htmlspecialchars(quote) + '</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
-            qt.style.top = '';
-            qt.style.left = '';
-            qt.classList.remove('hidden');
-            var rect = card.getBoundingClientRect();
-            var top = rect.top - qt.offsetHeight - 12;
-            var left = rect.left + 750;
-            left = Math.min(left, window.innerWidth - qt.offsetWidth - 10);
-            qt.style.top = Math.max(4, top) + 'px';
-            qt.style.left = Math.max(4, left) + 'px';
-        });
-        card.addEventListener('mouseleave', function() {
-            qt.classList.add('hidden');
-        });
     });
 
     if (initialMechId && initialDate) {
