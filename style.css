@@ -639,6 +639,16 @@ textarea {
     margin-top: 6px;
 }
 
+.status-badge.vacation-badge {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    font-size: 0.65rem;
+    padding: 5px 12px;
+    letter-spacing: 1px;
+    animation: vacay-pop 1s infinite;
+}
+
 .work-days {
     display: flex;
     gap: 4px;
@@ -662,9 +672,9 @@ textarea {
 }
 
 .work-day.off {
-    background: transparent;
-    color: #999;
-    border-color: #ddd;
+    background: #e8e8e8;
+    color: #888;
+    border-color: #bbb;
 }
 
 /* === SLOT GRID === */
@@ -1128,6 +1138,11 @@ tr:last-child td {
 @keyframes burst-pop {
     0%, 49.99% { background: var(--burst); }
     50%, 100% { background: var(--pop); }
+}
+
+@keyframes vacay-pop {
+    0%, 49.99% { background: var(--rust-alt); }
+    50%, 100% { background: var(--pink); }
 }
 
 @keyframes float {

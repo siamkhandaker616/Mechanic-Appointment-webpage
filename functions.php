@@ -52,7 +52,7 @@ function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     $override = $stmt->fetch();
     if ($override && !$override[$slotKey]) return false;
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != 'cancelled'");
+    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$mechanicId, $date, $slotIndex]);
     if ($stmt->fetchColumn() > 0) return false;
 
@@ -81,7 +81,7 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     $db = getDB();
     $result = ['prev' => null, 'next' => null];
 
-    $stmt = $db->prepare("SELECT DISTINCT appointment_date FROM appointments WHERE mechanic_id = ? AND slot_index = ? AND status != 'cancelled' ORDER BY appointment_date");
+    $stmt = $db->prepare("SELECT DISTINCT appointment_date FROM appointments WHERE mechanic_id = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "' ORDER BY appointment_date");
     $stmt->execute([$mechanicId, $slotIndex]);
     $bookedDates = [];
     foreach ($stmt->fetchAll() as $row) {
@@ -130,7 +130,7 @@ function getAllMechanicsAvailability(string $date): array {
 }
 
 function isCarBookedOnDate(int $carId, string $date): bool {
-    $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != 'cancelled'");
+    $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$carId, $date]);
     return $stmt->fetchColumn() > 0;
 }
@@ -235,42 +235,42 @@ function advanceAppointmentStatuses(): void {
     $db = getDB();
 
     // Revert over-advanced: completed → in_progress if slot hasn't ended
-    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'completed'");
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] > $today) {
-            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ? AND status = '" . STATUS_COMPLETED . "'")->execute([$a['id']]);
         } elseif ($a['appointment_date'] === $today) {
             $slotEnd = slotEndHour((int)$a['slot_index']);
             if ($currentHour < $slotEnd) {
-                $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+                $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE id = ? AND status = '" . STATUS_COMPLETED . "'")->execute([$a['id']]);
             }
         }
     }
 
     // Revert over-advanced: in_progress → scheduled if slot hasn't started
-    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress'");
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "'");
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] > $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] > $currentSlot)) {
-            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ? AND status = '" . STATUS_IN_PROGRESS . "'")->execute([$a['id']]);
         }
     }
 
     // Forward: scheduled → in_progress
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'scheduled' AND appointment_date <= ?");
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_SCHEDULED . "' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] <= $currentSlot)) {
-            $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'scheduled'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'")->execute([$a['id']]);
         }
     }
 
     // Forward: in_progress → completed
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress' AND appointment_date <= ?");
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
         $slotStart = slotStartHour((int)$a['slot_index']);
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotStart + 2)) {
-            $db->prepare("UPDATE appointments SET status = 'completed' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_COMPLETED . "' WHERE id = ? AND status = '" . STATUS_IN_PROGRESS . "'")->execute([$a['id']]);
         }
     }
 }
@@ -318,7 +318,7 @@ function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?
     $override = $stmt->fetch();
     if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$name} has a schedule override blocking that slot."];
 
-    $sql = "SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != 'cancelled'";
+    $sql = "SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "'";
     $params = [$mechanicId, $date, $slotIndex];
     if ($excludeAppointmentId !== null) {
         $sql .= " AND id != ?";
@@ -333,7 +333,7 @@ function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?
 
 function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot): array {
     $db = getDB();
-    $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
+    $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
     if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
@@ -349,7 +349,7 @@ function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot
 function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): array {
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
+    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id FROM appointments WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
     if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
@@ -365,7 +365,7 @@ function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): arra
 }
 
 function cancelAppointment(int $appointmentId): bool {
-    $stmt = getDB()->prepare("UPDATE appointments SET status = 'cancelled', cancelled_at = NOW() WHERE id = ? AND status = 'scheduled'");
+    $stmt = getDB()->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     return $stmt->rowCount() > 0;
 }

@@ -3,8 +3,10 @@ require_once __DIR__ . '/functions.php';
 
 $mechanics = getMechanics();
 $mechSchedules = [];
+$mechVacations = [];
 foreach ($mechanics as $m) {
     $mechSchedules[$m['id']] = getMechanicSchedule((int)$m['id']);
+    $mechVacations[$m['id']] = getMechanicVacations((int)$m['id']);
 }
 $errors = [];
 $success = false;
@@ -137,12 +139,11 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             <div id="mechanic-list">
                 <?php foreach ($mechanics as $m): ?>
                 <?php $sched = $mechSchedules[$m['id']] ?? []; ?>
-                <?php $onVacation = $selectedDate && isMechanicOnVacation((int)$m['id'], $selectedDate); ?>
+                <?php $onVacation = isMechanicOnVacation((int)$m['id'], $selectedDate ?: date('Y-m-d')); ?>
                 <div class="mechanic-card <?= $selectedMechId === (int)$m['id'] ? 'selected' : '' ?>" data-quote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" onclick="selectMechanic(<?= $m['id'] ?>)">
                     <input type="radio" name="mechanic_id" value="<?= $m['id'] ?>" <?= $selectedMechId === (int)$m['id'] ? 'checked' : '' ?> style="display:none;">
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
-                    <?php if ($onVacation): ?><span class="status-badge status-cancelled" style="margin-left:6px;font-size:0.65rem;">ON VACATION</span><?php endif; ?>
                     <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= htmlspecialchars($m['years_experience']) ?> yrs</div>
                     <div class="work-days">
                         <?php for ($d = 0; $d <= 6; $d++): ?>
@@ -185,8 +186,8 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
         <p>No. Just provide your phone number — it's how we identify returning customers.</p>
     </details>
     <details>
-        <summary>What do the slot times mean?</summary>
-        <p>Slot 1: 08:00–10:00 &bull; Slot 2: 10:00–12:00 &bull; Slot 3: 12:00–14:00 &bull; Slot 4: 14:00–16:00</p>
+        <summary>How do I check a mechanic's work schedule?</summary>
+        <p>Each mechanic card shows the days they work with colored dots below their name. A green dot (<span style="display:inline-block;width:12px;height:12px;background:var(--teal);vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're available that day &bull; a gray dot (<span style="display:inline-block;width:12px;height:12px;background:#e8e8e8;border:2px solid #bbb;vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're off. If a mechanic is on vacation, an <strong>ON VACATION</strong> badge will also appear.</p>
     </details>
 </div>
 </div>
@@ -194,7 +195,9 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 
 <script>
 var SLOT_LABELS = <?= json_encode($SLOT_LABELS) ?>;
+var SLOT_NAMES = <?= json_encode($SLOT_NAMES) ?>;
 var MECHANIC_NAMES = <?= json_encode(getMechanicsForSelect()) ?>;
+var VACATION_DATA = <?= json_encode($mechVacations) ?>;
 var initialMechId = <?= $selectedMechId ?: '0' ?>;
 var initialDate = <?= json_encode($selectedDate) ?>;
 var initialSlot = <?= json_encode($selectedSlot !== '' ? (int)$selectedSlot : 'null') ?>;
@@ -203,6 +206,32 @@ function htmlspecialchars(s) {
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(s));
     return d.innerHTML;
+}
+
+function isOnVacation(mechId, date) {
+    var vacs = VACATION_DATA[mechId] || [];
+    for (var i = 0; i < vacs.length; i++) {
+        if (vacs[i].start_date <= date && vacs[i].end_date >= date) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function updateVacationBadges(date) {
+    var checkDate = date || new Date().toISOString().slice(0, 10);
+
+    document.querySelectorAll('.vacation-badge').forEach(function(b) { b.remove(); });
+
+    document.querySelectorAll('.mechanic-card').forEach(function(card) {
+        var mechId = parseInt(card.querySelector('input[name="mechanic_id"]').value);
+        if (isOnVacation(mechId, checkDate)) {
+            var badge = document.createElement('span');
+            badge.className = 'status-badge status-cancelled vacation-badge';
+            badge.textContent = 'ON VACATION';
+            card.appendChild(badge);
+        }
+    });
 }
 
 function updateQuotePosition(card) {
@@ -361,8 +390,11 @@ function fetchAvailability() {
 
     if (!mechIdEl || !dateEl.value) {
         container.innerHTML = '<p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>';
+        updateVacationBadges(dateEl.value);
         return;
     }
+
+    updateVacationBadges(dateEl.value);
 
     var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
 
@@ -376,7 +408,7 @@ function fetchAvailability() {
         var html = '';
         data.slots.forEach(function(slot) {
             var taken = slot.available ? '' : 'taken';
-            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '</div>';
+            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
         });
         container.innerHTML = html;
 
@@ -471,6 +503,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 400);
         }
     }
+
+    updateVacationBadges(initialDate);
 });
 </script>
 <script src="datepicker.js"></script>

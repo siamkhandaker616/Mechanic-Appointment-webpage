@@ -10,14 +10,14 @@ $conflictList = [];
 
 if (isset($_GET['remove_all_cancelled'])) {
     $db = getDB();
-    $stmt = $db->prepare("DELETE FROM appointments WHERE status = 'cancelled'");
+    $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
     $stmt->execute();
     flashAndRedirect($stmt->rowCount() . ' cancelled appointment(s) removed.');
 }
 
 if (isset($_GET['remove'])) {
     $db = getDB();
-    $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = 'cancelled'");
+    $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
     $stmt->execute([(int)$_GET['remove']]);
     $ok = $stmt->rowCount() > 0;
     flashAndRedirect($ok ? 'Appointment removed.' : 'Appointment not found or not cancellable.', $ok ? 'success' : 'error');
@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flashAndRedirect("{$mechName} is not scheduled for slot(s) " . implode(', ', $invalidSlots) . " on {$dayNames[$dow]} — cannot block them.", 'error');
         }
 
-        $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('cancelled','completed')");
+        $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('" . STATUS_CANCELLED . "','" . STATUS_COMPLETED . "')");
         $stmt->execute([$mechId, $date]);
         $conflicts = [];
         foreach ($stmt->fetchAll() as $a) {
@@ -347,10 +347,10 @@ $effectiveTime = getEffectiveTime();
                 <td><?= htmlspecialchars($a['mechanic_name']) ?></td>
                 <td style="white-space:nowrap;"><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
                 <td style="white-space:nowrap;">
-                    <?php if ($a['status'] === 'scheduled'): ?>
+                    <?php if ($a['status'] === STATUS_SCHEDULED): ?>
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
-                    <?php elseif ($a['status'] === 'cancelled'): ?>
+                    <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(<?= $a['id'] ?>)">Remove</button>
                     <?php else: ?>
                     <span style="font-size:0.8rem;color:#888;">—</span>
