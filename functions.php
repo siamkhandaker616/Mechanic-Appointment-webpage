@@ -7,7 +7,7 @@ function fmtDate(string $date): string {
 }
 
 function getMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
 
 function getMechanicById(int $id): ?array {
@@ -59,6 +59,50 @@ function getAvailableSlotsForMechanic(int $mechanicId, string $date): array {
         }
     }
     return $available;
+}
+
+function getAdjacentSlotForMechanic(int $mechanicId, string $date, int $slotIndex): ?int {
+    if (isSlotAvailable($mechanicId, $date, $slotIndex + 1)) return $slotIndex + 1;
+    if (isSlotAvailable($mechanicId, $date, $slotIndex - 1)) return $slotIndex - 1;
+    return null;
+}
+
+function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date): array {
+    $db = getDB();
+    $result = ['prev' => null, 'next' => null];
+
+    $stmt = $db->prepare("SELECT DISTINCT appointment_date FROM appointments WHERE mechanic_id = ? AND slot_index = ? AND status != 'cancelled' ORDER BY appointment_date");
+    $stmt->execute([$mechanicId, $slotIndex]);
+    $bookedDates = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $bookedDates[] = $row['appointment_date'];
+    }
+    $bookedDates = array_flip($bookedDates);
+
+    $oneMonthBefore = date('Y-m-d', strtotime($date . ' -30 days'));
+    $oneMonthAfter = date('Y-m-d', strtotime($date . ' +30 days'));
+
+    $today = date('Y-m-d');
+    for ($i = 1; $i <= 30; $i++) {
+        $prev = date('Y-m-d', strtotime($date . " -$i days"));
+        if ($prev < $oneMonthBefore) break;
+        if ($prev <= $today) continue;
+        if (!isset($bookedDates[$prev]) && isSlotAvailable($mechanicId, $prev, $slotIndex)) {
+            $result['prev'] = $prev;
+            break;
+        }
+    }
+
+    for ($i = 1; $i <= 30; $i++) {
+        $next = date('Y-m-d', strtotime($date . " +$i days"));
+        if ($next > $oneMonthAfter) break;
+        if (!isset($bookedDates[$next]) && isSlotAvailable($mechanicId, $next, $slotIndex)) {
+            $result['next'] = $next;
+            break;
+        }
+    }
+
+    return $result;
 }
 
 function getAllMechanicsAvailability(string $date): array {
@@ -351,13 +395,13 @@ function validateAppointmentInput(array $data): array {
 }
 
 function getAllMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
 }
 
-function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years): int {
+function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null): int {
     $db = getDB();
-    $stmt = $db->prepare("INSERT INTO mechanics (name, nickname, specialties, years_experience, is_active) VALUES (?, ?, ?, ?, 1)");
-    $stmt->execute([$name, $nickname, $specialties, $years]);
+    $stmt = $db->prepare("INSERT INTO mechanics (name, nickname, quote, specialties, years_experience, is_active) VALUES (?, ?, ?, ?, ?, 1)");
+    $stmt->execute([$name, $nickname, $quote, $specialties, $years]);
     $id = (int)$db->lastInsertId();
 
     $insert = $db->prepare("INSERT INTO mechanic_schedule (mechanic_id, day_of_week, slot_1, slot_2, slot_3, slot_4) VALUES (?, ?, 1, 1, 1, 1)");
@@ -367,9 +411,9 @@ function addMechanic(string $name, ?string $nickname, ?string $specialties, int 
     return $id;
 }
 
-function updateMechanic(int $id, string $name, ?string $nickname, ?string $specialties, int $years): void {
-    $stmt = getDB()->prepare("UPDATE mechanics SET name = ?, nickname = ?, specialties = ?, years_experience = ? WHERE id = ?");
-    $stmt->execute([$name, $nickname, $specialties, $years, $id]);
+function updateMechanic(int $id, string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null): void {
+    $stmt = getDB()->prepare("UPDATE mechanics SET name = ?, nickname = ?, quote = ?, specialties = ?, years_experience = ? WHERE id = ?");
+    $stmt->execute([$name, $nickname, $quote, $specialties, $years, $id]);
 }
 
 function fireMechanic(int $id): void {

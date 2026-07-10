@@ -651,18 +651,15 @@ textarea {
 }
 
 .slot-chip.taken {
-    opacity: 0.3;
-    cursor: not-allowed;
-    text-decoration: line-through;
-    box-shadow: none;
-    transform: none;
+    opacity: 0.55;
 }
 
 .slot-chip.taken:hover {
-    background: var(--cyan-light);
-    color: var(--ink);
-    transform: none;
-    box-shadow: none;
+    opacity: 0.85;
+    background: var(--teal);
+    color: var(--gold);
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--ink);
 }
 
 .slot-chip.selected {
@@ -719,6 +716,13 @@ textarea {
     margin-top: 6px;
     font-size: 0.85rem;
 }
+.slot-tooltip .tt-section {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    color: var(--ink);
+    margin-top: 12px;
+    margin-bottom: 4px;
+}
 .slot-tooltip .tt-chips {
     margin-top: 10px;
     display: flex;
@@ -729,6 +733,57 @@ textarea {
     font-size: 0.78rem;
     padding: 7px 14px;
     margin: 0;
+}
+
+.quote-tooltip {
+    position: fixed;
+    z-index: 9998;
+    background: var(--gold);
+    border: 3px solid var(--ink);
+    border-radius: 24px;
+    padding: 16px 22px;
+    max-width: 420px;
+    font-family: var(--font-sub);
+    color: var(--ink);
+    box-shadow: 5px 5px 0 var(--ink);
+    line-height: 1.5;
+    pointer-events: none;
+}
+.quote-tooltip.hidden {
+    display: none;
+}
+.quote-tooltip .qt-text {
+    display: block;
+    font-style: italic;
+    font-size: 0.95rem;
+}
+.quote-tooltip .qt-author {
+    display: block;
+    margin-top: 6px;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    text-align: right;
+    color: var(--rust);
+}
+.quote-tooltip::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 60px;
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 16px solid var(--ink);
+}
+.quote-tooltip::after {
+    content: "";
+    position: absolute;
+    top: calc(100% - 2px);
+    left: 62px;
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 14px solid var(--gold);
 }
 
 

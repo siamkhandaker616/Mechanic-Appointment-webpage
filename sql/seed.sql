@@ -2,30 +2,35 @@
 
 USE mayhem_mobility;
 
-INSERT INTO mechanics (name, bio, nickname, specialties, years_experience) VALUES
+INSERT INTO mechanics (name, bio, nickname, quote, specialties, years_experience) VALUES
 ('Clark Kent',
  'A mild-mannered guy who somehow gets every job done before anyone else even finishes their coffee. Claims it''s "just good technique." Nobody''s buying it.',
  'The Big Guy',
+ 'I''ll have you back on the road before you can say "vroom!"',
  'everything, heavy lifting, engine rebuilds, impossible deadlines',
  20),
 ('Diana Prince',
  'Former military transport officer with an almost supernatural ability to diagnose electrical gremlins from across the room. Her tools are always immaculate. She never raises her voice. She never has to.',
  'The Princess',
+ 'Your car won''t know what hit it. Pure precision, zero drama.',
  'electrical systems, diagnostics, european imports, wiring',
  14),
 ('Jay Garrick',
  'A blur in the shop. Oil changes in under 4 minutes. Tire rotations before you can blink. Rumor has it he once rebuilt a carburetor during a coffee break.',
  'The Flash',
+ 'Blink and you''ll miss it. I''m that fast. Your car will thank you later.',
  'quick service, tune-ups, carburetors, brake systems',
  11),
 ('Rex Tyler',
  'A man who lives by the clock. Gives every job exactly one hour — no more, no less. Somehow it always works. His station has three different stopwatches bolted to the bench.',
  'The Hourman',
+ 'Sixty minutes. Not a second more. I don''t waste time, and neither should your car.',
  'precision work, timing belts, engine tuning, diesel engines',
  16),
 ('Dinah Drake',
  'A former singer who claims she can "hear" what''s wrong with an engine just by listening. Oddly, she''s never wrong. Specializes in transmissions and engines that "sound off."',
  'The Canary',
+ 'I can hear a cracked manifold from three bays away. Your secret''s safe with me.',
  'transmissions, engine acoustics, american muscle, exhaust',
  12);
 

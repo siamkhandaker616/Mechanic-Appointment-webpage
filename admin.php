@@ -138,10 +138,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_mechanic'])) {
         $name = trim($_POST['mech_name'] ?? '');
         $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
+        $quote = trim($_POST['mech_quote'] ?? '') ?: null;
         $specialties = trim($_POST['mech_specialties'] ?? '');
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name) {
-            addMechanic($name, $nickname, $specialties, $years);
+            addMechanic($name, $nickname, $specialties, $years, $quote);
             $_SESSION['flash_msg'] = htmlspecialchars($name) . ' has been hired!';
             $_SESSION['flash_type'] = 'success';
         }
@@ -153,10 +154,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)$_POST['mech_id'];
         $name = trim($_POST['mech_name'] ?? '');
         $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
+        $quote = trim($_POST['mech_quote'] ?? '') ?: null;
         $specialties = trim($_POST['mech_specialties'] ?? '');
         $years = (int)($_POST['mech_years'] ?? 0);
         if ($name && $id) {
-            updateMechanic($id, $name, $nickname, $specialties, $years);
+            updateMechanic($id, $name, $nickname, $specialties, $years, $quote);
             $_SESSION['flash_msg'] = 'Mechanic updated.';
             $_SESSION['flash_type'] = 'success';
         }
@@ -323,7 +325,7 @@ $effectiveTime = getEffectiveTime();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="images/icons/favicon.ico">
+
 <title>Mayhem Mobility — Admin Panel</title>
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -560,7 +562,7 @@ $effectiveTime = getEffectiveTime();
                     <?php endif; ?>
                 </td>
                 <td style="white-space:nowrap;">
-                    <button class="btn btn-sm btn-outline" onclick="openMechModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>', <?= (int)$m['years_experience'] ?>)">Edit</button>
+                    <button class="btn btn-sm btn-outline" onclick="openMechModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>', <?= (int)$m['years_experience'] ?>)">Edit</button>
                     <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <?php if ($m['is_active']): ?>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
@@ -584,6 +586,10 @@ $effectiveTime = getEffectiveTime();
             <div>
                 <label>Nickname</label>
                 <input type="text" name="mech_nickname">
+            </div>
+            <div>
+                <label>Catchphrase</label>
+                <input type="text" name="mech_quote" placeholder="e.g. I'll fix it fast!">
             </div>
             <div>
                 <label>Specialties</label>
@@ -613,6 +619,10 @@ $effectiveTime = getEffectiveTime();
             <div class="form-group">
                 <label>Nickname</label>
                 <input type="text" name="mech_nickname" id="modal-mech-nickname">
+            </div>
+            <div class="form-group">
+                <label>Catchphrase</label>
+                <input type="text" name="mech_quote" id="modal-mech-quote" placeholder="e.g. I'll fix it fast!">
             </div>
             <div class="form-group">
                 <label>Specialties</label>
@@ -788,10 +798,11 @@ function toggleOverrides() {
     btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
 }
 
-function openMechModal(id, name, nickname, specialties, years) {
+function openMechModal(id, name, nickname, quote, specialties, years) {
     document.getElementById('modal-mech-id').value = id;
     document.getElementById('modal-mech-name').value = name;
     document.getElementById('modal-mech-nickname').value = nickname;
+    document.getElementById('modal-mech-quote').value = quote;
     document.getElementById('modal-mech-specialties').value = specialties;
     document.getElementById('modal-mech-years').value = years;
     renderVacations(id);

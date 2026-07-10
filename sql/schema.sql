@@ -12,6 +12,7 @@ CREATE TABLE mechanics (
     name VARCHAR(100) NOT NULL,
     bio TEXT,
     nickname VARCHAR(50) DEFAULT NULL,
+    quote VARCHAR(255) DEFAULT NULL,
     specialties TEXT,
     years_experience INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
