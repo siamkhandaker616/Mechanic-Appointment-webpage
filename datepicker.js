@@ -24,26 +24,34 @@ class DatePicker {
         this.input.parentNode.insertBefore(this.wrapper, this.input);
         this.wrapper.appendChild(this.input);
 
-        this.display = document.createElement('input');
-        this.display.type = 'text';
-        this.display.className = 'datepicker-display' + (this.isDateTime ? ' datepicker-display--dt' : '');
-        this.display.readOnly = true;
-        this.display.placeholder = this.input.placeholder || (this.isDateTime ? 'Pick date & time' : 'Pick a date');
+        if (this.isDateTime) {
+            this.display = document.createElement('div');
+            this.display.className = 'datepicker-display datepicker-display--dt';
+        } else {
+            this.display = document.createElement('input');
+            this.display.type = 'text';
+            this.display.className = 'datepicker-display';
+            this.display.readOnly = true;
+            this.display.placeholder = this.input.placeholder || 'Pick a date';
+        }
         this.wrapper.appendChild(this.display);
 
         if (this.input.value) {
             var parts = this.input.value.split('T');
-            var datePart = parts[0];
-            var ymd = datePart.split('-');
+            var ymd = parts[0].split('-');
             var formatted = ymd[2] + '-' + ymd[1] + '-' + ymd[0];
             if (parts[1]) formatted += ' ' + parts[1];
-            this.display.value = formatted;
+            if (this.isDateTime) {
+                this.display.textContent = formatted.replace(' ', '\n');
+            } else {
+                this.display.value = formatted;
+            }
         }
 
         this.input.style.display = 'none';
 
         this.popup = document.createElement('div');
-        this.popup.className = 'datepicker-popup hidden';
+        this.popup.className = 'datepicker-popup hidden' + (this.isDateTime ? ' datepicker-popup--dt' : '');
         this.popup.style.position = 'fixed';
         document.body.appendChild(this.popup);
 
@@ -69,6 +77,11 @@ class DatePicker {
         html += '<button type="button" class="dp-nav" data-action="next">▶</button>';
         html += '</div>';
 
+        if (this.isDateTime) {
+            html += '<div class="dp-body">';
+            html += '<div class="dp-grid-col">';
+        }
+
         html += '<div class="dp-days-header">';
         for (var i = 0; i < dayHeaders.length; i++) {
             html += '<span class="dp-dow">' + dayHeaders[i] + '</span>';
@@ -90,13 +103,20 @@ class DatePicker {
         html += '</div>';
 
         if (this.isDateTime) {
+            html += '</div>';
+
             var h = this.date ? String(this.date.getHours()).padStart(2, '0') : '08';
             var m = this.date ? String(this.date.getMinutes()).padStart(2, '0') : '00';
+            html += '<div class="dp-time-col">';
             html += '<div class="dp-time">';
             html += '<span class="dp-time-label">Time</span>';
+            html += '<div class="dp-time-inputs">';
             html += '<input type="number" class="dp-hour" value="' + h + '" min="0" max="23" step="1">';
             html += '<span class="dp-time-sep">:</span>';
             html += '<input type="number" class="dp-min" value="' + m + '" min="0" max="59" step="5">';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
             html += '</div>';
         }
 
@@ -234,7 +254,10 @@ class DatePicker {
         this.viewDate = this.date ? new Date(this.date) : new Date();
         this.render();
         this.popup.classList.remove('hidden');
-        this.positionPopup();
+        var self = this;
+        requestAnimationFrame(function () {
+            self.positionPopup();
+        });
     }
 
     close() {
@@ -253,7 +276,7 @@ class DatePicker {
             var h = this.popup.querySelector('.dp-hour').value.padStart(2, '0');
             var m = this.popup.querySelector('.dp-min').value.padStart(2, '0');
             value = y + '-' + mo + '-' + d + 'T' + h + ':' + m;
-            this.display.value = d + '-' + mo + '-' + y + ' ' + h + ':' + m;
+            this.display.textContent = d + '-' + mo + '-' + y + '\n' + h + ':' + m;
         } else {
             value = y + '-' + mo + '-' + d;
             this.display.value = d + '-' + mo + '-' + y;

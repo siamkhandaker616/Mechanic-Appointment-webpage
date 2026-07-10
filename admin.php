@@ -361,7 +361,7 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </span>
         <span class="sim-group">
-            <input type="datetime-local" name="sim_datetime" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
+            <input type="datetime-local" name="sim_datetime" data-placement="top" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
             <button type="submit" name="toggle_sim" value="1" class="btn btn-sm">Set</button>
         </span>
         <span class="sim-group">
