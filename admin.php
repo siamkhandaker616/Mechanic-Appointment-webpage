@@ -50,6 +50,15 @@ if (isset($_GET['restore'])) {
     flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!');
 }
 
+if (isset($_GET['remove_mechanic'])) {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['remove_mechanic']]);
+    $m = $stmt->fetch();
+    removeMechanic((int)$_GET['remove_mechanic']);
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been removed permanently.');
+}
+
 if (isset($_GET['unblock'])) {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
@@ -304,7 +313,7 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </span>
         <span class="sim-group">
-            <input type="datetime-local" name="sim_datetime" data-placement="top" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
+            <input type="datetime-local" name="sim_datetime" data-placement="top" style="text-align:right" value="<?= $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
             <button type="submit" name="toggle_sim" value="1" class="btn btn-sm">Set</button>
         </span>
         <span class="sim-group">
@@ -484,7 +493,7 @@ $effectiveTime = getEffectiveTime();
                 <th>Name</th>
                 <th>Nickname</th>
                 <th>Specialties</th>
-                <th>Years</th>
+                <th>Exp</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -496,7 +505,7 @@ $effectiveTime = getEffectiveTime();
                 <td><strong><?= htmlspecialchars($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($m['specialties'] ?? '—') ?></td>
-                <td><?= (int)$m['years_experience'] ?></td>
+                <td><?= (int)$m['experience'] ?></td>
                 <td>
                     <?php if ($onLeave): ?>
                     <span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>
@@ -505,12 +514,13 @@ $effectiveTime = getEffectiveTime();
                     <?php endif; ?>
                 </td>
                 <td style="white-space:nowrap;">
-                    <button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="<?= $m['id'] ?>" data-mname="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" data-mnick="<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>" data-mquote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-mspec="<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>" data-myears="<?= (int)$m['years_experience'] ?>">Edit</button>
-                    <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <?php if ($m['is_active']): ?>
+                    <button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="<?= $m['id'] ?>" data-mname="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" data-mnick="<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>" data-mquote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-mspec="<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>" data-experience="<?= (int)$m['experience'] ?>">Edit</button>
+                    <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
                     <?php else: ?>
                     <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Restore</a>
+                    <a href="?remove_mechanic=<?= $m['id'] ?>" class="btn btn-sm btn-rust" onclick="return confirm('Permanently delete <?= htmlspecialchars($m['name'], ENT_QUOTES) ?> and all their data?')">Remove</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -539,7 +549,7 @@ $effectiveTime = getEffectiveTime();
                 <input type="text" name="mech_specialties" placeholder="e.g. Engine, Transmission">
             </div>
             <div>
-                <label>Years Exp.</label>
+                <label>Experience</label>
                 <input type="number" name="mech_years" value="0" style="width:80px;">
             </div>
             <button type="submit" name="add_mechanic" class="btn btn-sm">Hire</button>
@@ -576,8 +586,8 @@ $effectiveTime = getEffectiveTime();
                         <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="e.g. Engine, Transmission">
                     </div>
                     <div class="form-group">
-                        <label>Years Experience</label>
-                        <input type="number" name="mech_years" id="modal-mech-years" style="width:100px;background:var(--paper);cursor:not-allowed;" readonly>
+                        <label>Experience</label>
+                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:100px;background:var(--paper);cursor:not-allowed;" readonly>
                     </div>
                     <div style="display:flex;gap:12px;margin-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
@@ -753,7 +763,7 @@ function openMechModal(btn) {
     document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
     document.getElementById('modal-mech-quote').value = btn.dataset.mquote;
     document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
-    document.getElementById('modal-mech-years').value = btn.dataset.myears;
+    document.getElementById('modal-mech-exp').value = btn.dataset.experience;
     renderVacations(parseInt(btn.dataset.mid));
     document.getElementById('mech-modal').classList.remove('hidden');
 }

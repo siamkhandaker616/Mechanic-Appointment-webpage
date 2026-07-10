@@ -144,7 +144,7 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
                     <input type="radio" name="mechanic_id" value="<?= $m['id'] ?>" <?= $selectedMechId === (int)$m['id'] ? 'checked' : '' ?> style="display:none;">
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
-                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= htmlspecialchars($m['years_experience']) ?> yrs</div>
+                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= htmlspecialchars($m['experience']) ?> exp</div>
                     <div class="work-days">
                         <?php for ($d = 0; $d <= 6; $d++): ?>
                         <span class="work-day <?= isset($sched[$d]) ? 'on' : 'off' ?>"><?= $GLOBALS['DAY_NAMES_ABBR'][$d] ?></span>

@@ -17,11 +17,11 @@ function slotIndexFromHour(int $hour): int {
 }
 
 function getMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
 
 function getMechanicById(int $id): ?array {
-    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, specialties, years_experience FROM mechanics WHERE id = ?");
+    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
 }
@@ -394,7 +394,7 @@ function validateAppointmentInput(array $data): array {
 }
 
 function getAllMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
 }
 
 function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null, string $theme = 'default'): int {
@@ -423,6 +423,14 @@ function fireMechanic(int $id): void {
 function restoreMechanic(int $id): void {
     $stmt = getDB()->prepare("UPDATE mechanics SET is_active = 1 WHERE id = ?");
     $stmt->execute([$id]);
+}
+
+function removeMechanic(int $id): void {
+    $db = getDB();
+    $db->prepare("DELETE FROM mechanic_schedule WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanic_vacations WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanic_overrides WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanics WHERE id = ?")->execute([$id]);
 }
 
 function getMechanicSchedule(int $id): array {
