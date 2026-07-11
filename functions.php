@@ -3,15 +3,33 @@ require_once __DIR__ . '/config.php';
 
 function fmtDate(string $date): string {
     $ts = strtotime($date);
-    return $ts ? date('d-m-Y', $ts) : $date;
+    return $ts ? date('j M Y', $ts) : $date;
+}
+
+function fmtNameTwoLines(string $name): string {
+    $parts = explode(' ', $name, 2);
+    if (count($parts) === 2) {
+        return htmlspecialchars($parts[0]) . '<br>' . htmlspecialchars($parts[1]);
+    }
+    return htmlspecialchars($name);
+}
+
+function slotStartHour(int $slotIndex): int {
+    return ($slotIndex + 5) * 2;
+}
+function slotEndHour(int $slotIndex): int {
+    return slotStartHour($slotIndex) + 2;
+}
+function slotIndexFromHour(int $hour): int {
+    return intdiv($hour, 2) - 5;
 }
 
 function getMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
 
 function getMechanicById(int $id): ?array {
-    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, specialties, years_experience FROM mechanics WHERE id = ?");
+    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
 }
@@ -42,7 +60,7 @@ function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     $override = $stmt->fetch();
     if ($override && !$override[$slotKey]) return false;
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != 'cancelled'");
+    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$mechanicId, $date, $slotIndex]);
     if ($stmt->fetchColumn() > 0) return false;
 
@@ -71,7 +89,7 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     $db = getDB();
     $result = ['prev' => null, 'next' => null];
 
-    $stmt = $db->prepare("SELECT DISTINCT appointment_date FROM appointments WHERE mechanic_id = ? AND slot_index = ? AND status != 'cancelled' ORDER BY appointment_date");
+    $stmt = $db->prepare("SELECT DISTINCT appointment_date FROM appointments WHERE mechanic_id = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "' ORDER BY appointment_date");
     $stmt->execute([$mechanicId, $slotIndex]);
     $bookedDates = [];
     foreach ($stmt->fetchAll() as $row) {
@@ -120,7 +138,7 @@ function getAllMechanicsAvailability(string $date): array {
 }
 
 function isCarBookedOnDate(int $carId, string $date): bool {
-    $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != 'cancelled'");
+    $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$carId, $date]);
     return $stmt->fetchColumn() > 0;
 }
@@ -219,48 +237,48 @@ function advanceAppointmentStatuses(): void {
     $now = getEffectiveTime();
     $today = $now->format('Y-m-d');
     $currentHour = (int)$now->format('G');
-    $currentSlot = intdiv($currentHour, 2) - 5;
+    $currentSlot = slotIndexFromHour($currentHour);
     if ($currentSlot < 0) $currentSlot = -1;
 
     $db = getDB();
 
     // Revert over-advanced: completed → in_progress if slot hasn't ended
-    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'completed'");
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] > $today) {
-            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ? AND status = '" . STATUS_COMPLETED . "'")->execute([$a['id']]);
         } elseif ($a['appointment_date'] === $today) {
-            $slotEnd = ((int)$a['slot_index'] + 5) * 2 + 2;
+            $slotEnd = slotEndHour((int)$a['slot_index']);
             if ($currentHour < $slotEnd) {
-                $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'completed'")->execute([$a['id']]);
+                $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE id = ? AND status = '" . STATUS_COMPLETED . "'")->execute([$a['id']]);
             }
         }
     }
 
     // Revert over-advanced: in_progress → scheduled if slot hasn't started
-    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress'");
+    $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "'");
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] > $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] > $currentSlot)) {
-            $db->prepare("UPDATE appointments SET status = 'scheduled' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ? AND status = '" . STATUS_IN_PROGRESS . "'")->execute([$a['id']]);
         }
     }
 
     // Forward: scheduled → in_progress
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'scheduled' AND appointment_date <= ?");
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_SCHEDULED . "' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && (int)$a['slot_index'] <= $currentSlot)) {
-            $db->prepare("UPDATE appointments SET status = 'in_progress' WHERE id = ? AND status = 'scheduled'")->execute([$a['id']]);
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'")->execute([$a['id']]);
         }
     }
 
     // Forward: in_progress → completed
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = 'in_progress' AND appointment_date <= ?");
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "' AND appointment_date <= ?");
     $stmt->execute([$today]);
     foreach ($stmt->fetchAll() as $a) {
-        $slotEndHour = ((int)$a['slot_index'] + 5) * 2;
-        if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotEndHour + 2)) {
-            $db->prepare("UPDATE appointments SET status = 'completed' WHERE id = ? AND status = 'in_progress'")->execute([$a['id']]);
+        $slotStart = slotStartHour((int)$a['slot_index']);
+        if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotStart + 2)) {
+            $db->prepare("UPDATE appointments SET status = '" . STATUS_COMPLETED . "' WHERE id = ? AND status = '" . STATUS_IN_PROGRESS . "'")->execute([$a['id']]);
         }
     }
 }
@@ -286,39 +304,50 @@ function getAppointments(?string $status = null): array {
     return $stmt->fetchAll();
 }
 
+function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?int $excludeAppointmentId = null): array {
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([$mechanicId]);
+    $m = $stmt->fetch();
+    $name = $m ? $m['name'] : "Mechanic #{$mechanicId}";
+
+    $dow = (int)date('w', strtotime($date));
+    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
+    $stmt->execute([$mechanicId, $dow]);
+    $schedule = $stmt->fetch();
+    if (!$schedule) return ['success' => false, 'message' => "{$name} does not work on {$GLOBALS['DAY_NAMES_FULL'][$dow]}."];
+
+    $slotKey = 'slot_' . ($slotIndex + 1);
+    if (!$schedule[$slotKey]) return ['success' => false, 'message' => "{$name} is not scheduled for that time slot."];
+
+    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_overrides WHERE mechanic_id = ? AND override_date = ?");
+    $stmt->execute([$mechanicId, $date]);
+    $override = $stmt->fetch();
+    if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$name} has a schedule override blocking that slot."];
+
+    $sql = "SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "'";
+    $params = [$mechanicId, $date, $slotIndex];
+    if ($excludeAppointmentId !== null) {
+        $sql .= " AND id != ?";
+        $params[] = $excludeAppointmentId;
+    }
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    if ($stmt->fetchColumn() > 0) return ['success' => false, 'message' => "{$name} already has an appointment at that date and time."];
+
+    return ['success' => true];
+}
+
 function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot): array {
     $db = getDB();
-    $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
+    $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
     if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
 
-    if (!isSlotAvailable((int)$appt['mechanic_id'], $newDate, $newSlot)) {
-        $newMechId = (int)$appt['mechanic_id'];
-        $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
-        $stmt->execute([$newMechId]);
-        $m = $stmt->fetch();
-        $mechName = $m ? $m['name'] : "Mechanic #{$newMechId}";
-
-        $dow = (int)date('w', strtotime($newDate));
-        $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-
-        $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
-        $stmt->execute([$newMechId, $dow]);
-        $schedule = $stmt->fetch();
-
-        if (!$schedule) return ['success' => false, 'message' => "{$mechName} does not work on {$dayNames[$dow]}."];
-
-        $slotKey = 'slot_' . ($newSlot + 1);
-        if (!$schedule[$slotKey]) return ['success' => false, 'message' => "{$mechName} is not scheduled for that time slot."];
-
-        $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_overrides WHERE mechanic_id = ? AND override_date = ?");
-        $stmt->execute([$newMechId, $newDate]);
-        $override = $stmt->fetch();
-        if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$mechName} has a schedule override blocking that slot."];
-
-        return ['success' => false, 'message' => "{$mechName} already has an appointment at that date and time."];
-    }
+    $validation = validateSlotAssignment((int)$appt['mechanic_id'], $newDate, $newSlot);
+    if (!$validation['success']) return $validation;
 
     $stmt = $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ? WHERE id = ?");
     $stmt->execute([$newDate, $newSlot, $appointmentId]);
@@ -328,37 +357,13 @@ function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot
 function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): array {
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
-    $stmt->execute([$newMechanicId]);
-    $mech = $stmt->fetch();
-    $name = $mech ? $mech['name'] : "Mechanic #{$newMechanicId}";
-
-    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id FROM appointments WHERE id = ? AND status = 'scheduled'");
+    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id FROM appointments WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     $appt = $stmt->fetch();
     if (!$appt) return ['success' => false, 'message' => 'Appointment not found or no longer scheduled.'];
 
-    if ((int)$appt['mechanic_id'] === $newMechanicId) return ['success' => false, 'message' => 'That is already their mechanic.'];
-
-    $dow = (int)date('w', strtotime($appt['appointment_date']));
-    $dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-
-    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
-    $stmt->execute([$newMechanicId, $dow]);
-    $schedule = $stmt->fetch();
-    if (!$schedule) return ['success' => false, 'message' => "{$name} does not work on {$dayNames[$dow]}."];
-
-    $slotKey = 'slot_' . ((int)$appt['slot_index'] + 1);
-    if (!$schedule[$slotKey]) return ['success' => false, 'message' => "{$name} is not scheduled for that time slot."];
-
-    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_overrides WHERE mechanic_id = ? AND override_date = ?");
-    $stmt->execute([$newMechanicId, $appt['appointment_date']]);
-    $override = $stmt->fetch();
-    if ($override && !$override[$slotKey]) return ['success' => false, 'message' => "{$name} has a schedule override blocking that slot on this date."];
-
-    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != 'cancelled' AND id != ?");
-    $stmt->execute([$newMechanicId, $appt['appointment_date'], $appt['slot_index'], $appointmentId]);
-    if ($stmt->fetchColumn() > 0) return ['success' => false, 'message' => "{$name} already has an appointment at that date and time."];
+    $validation = validateSlotAssignment($newMechanicId, $appt['appointment_date'], (int)$appt['slot_index'], $appointmentId);
+    if (!$validation['success']) return $validation;
 
     $stmt = $db->prepare("UPDATE appointments SET mechanic_id = ? WHERE id = ?");
     $stmt->execute([$newMechanicId, $appointmentId]);
@@ -366,7 +371,7 @@ function updateAppointmentMechanic(int $appointmentId, int $newMechanicId): arra
 }
 
 function cancelAppointment(int $appointmentId): bool {
-    $stmt = getDB()->prepare("UPDATE appointments SET status = 'cancelled', cancelled_at = NOW() WHERE id = ? AND status = 'scheduled'");
+    $stmt = getDB()->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$appointmentId]);
     return $stmt->rowCount() > 0;
 }
@@ -383,7 +388,7 @@ function validateAppointmentInput(array $data): array {
     elseif (!preg_match('/^[a-zA-Z0-9]+$/', $data['engine_no'])) $errors[] = 'Engine number must be alphanumeric.';
 
     if (empty($data['date'] ?? '')) $errors[] = 'Appointment date is required.';
-    elseif (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date'])) $errors[] = 'Invalid date format.';
+    elseif (!preg_match(DATE_REGEX, $data['date'])) $errors[] = 'Invalid date format.';
     elseif ($data['date'] < date('Y-m-d')) $errors[] = 'Appointment date cannot be in the past.';
 
     if (!isset($data['mechanic_id']) || !$data['mechanic_id']) $errors[] = 'Please select a mechanic.';
@@ -395,7 +400,7 @@ function validateAppointmentInput(array $data): array {
 }
 
 function getAllMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
 }
 
 function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null, string $theme = 'default'): int {
@@ -424,6 +429,14 @@ function fireMechanic(int $id): void {
 function restoreMechanic(int $id): void {
     $stmt = getDB()->prepare("UPDATE mechanics SET is_active = 1 WHERE id = ?");
     $stmt->execute([$id]);
+}
+
+function removeMechanic(int $id): void {
+    $db = getDB();
+    $db->prepare("DELETE FROM mechanic_schedule WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanic_vacations WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanic_overrides WHERE mechanic_id = ?")->execute([$id]);
+    $db->prepare("DELETE FROM mechanics WHERE id = ?")->execute([$id]);
 }
 
 function getMechanicSchedule(int $id): array {
@@ -471,4 +484,244 @@ function isMechanicOnVacation(int $mechanicId, string $date): bool {
     $stmt = getDB()->prepare("SELECT COUNT(*) FROM mechanic_vacations WHERE mechanic_id = ? AND start_date <= ? AND end_date >= ?");
     $stmt->execute([$mechanicId, $date, $date]);
     return $stmt->fetchColumn() > 0;
+}
+
+function flashAndRedirect(string $msg, string $type = 'success'): never {
+    $_SESSION['flash_msg'] = $msg;
+    $_SESSION['flash_type'] = $type;
+    header('Location: admin.php');
+    exit;
+}
+
+// --- Action handlers (dispatched from admin.php) ---
+
+function handleRemoveAllCancelled(): never {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
+    $stmt->execute();
+    flashAndRedirect($stmt->rowCount() . ' cancelled appointment(s) removed.');
+}
+
+function handleRemove(): never {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
+    $stmt->execute([(int)$_GET['remove']]);
+    $ok = $stmt->rowCount() > 0;
+    flashAndRedirect($ok ? 'Appointment removed.' : 'Appointment not found or not cancellable.', $ok ? 'success' : 'error');
+}
+
+function handleCancel(): never {
+    $id = (int)$_GET['cancel'];
+    if (cancelAppointment($id)) {
+        flashAndRedirect('Appointment cancelled.');
+    } else {
+        flashAndRedirect('Could not cancel — appointment may already be in progress or completed.', 'error');
+    }
+}
+
+function handleFire(): never {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['fire']]);
+    $m = $stmt->fetch();
+    fireMechanic((int)$_GET['fire']);
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been fired!');
+}
+
+function handleRestore(): never {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['restore']]);
+    $m = $stmt->fetch();
+    restoreMechanic((int)$_GET['restore']);
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!');
+}
+
+function handleRemoveMechanic(): never {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([(int)$_GET['remove_mechanic']]);
+    $m = $stmt->fetch();
+    removeMechanic((int)$_GET['remove_mechanic']);
+    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been removed permanently.');
+}
+
+function handleUnblock(): never {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
+    $stmt->execute([(int)$_GET['unblock']]);
+    $ok = $stmt->rowCount() > 0;
+    flashAndRedirect($ok ? 'Override removed.' : 'Override not found.', $ok ? 'success' : 'error');
+}
+
+function handleRemoveVacation(): never {
+    removeMechanicVacation((int)$_GET['remove_vacation']);
+    flashAndRedirect('Vacation removed.');
+}
+
+function handleUpdateDate(): never {
+    if (($_POST['admin_pw'] ?? '') !== ADMIN_PW) {
+        flashAndRedirect('Invalid password.', 'error');
+    }
+    $id = (int)$_POST['appointment_id'];
+    $newDate = $_POST['new_date'] ?? '';
+    $newSlot = (int)($_POST['new_slot'] ?? 0);
+    $result = updateAppointmentDate($id, $newDate, $newSlot);
+    flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
+}
+
+function handleUpdateMechanic(): never {
+    if (($_POST['admin_pw'] ?? '') !== ADMIN_PW) {
+        flashAndRedirect('Invalid password.', 'error');
+    }
+    $id = (int)$_POST['appointment_id'];
+    $newMech = (int)$_POST['new_mechanic'];
+    $result = updateAppointmentMechanic($id, $newMech);
+    flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
+}
+
+function handleSimToggle(): never {
+    $db = getDB();
+    $useSim = (int)(isset($_POST['use_sim']));
+    $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
+    $stmt->execute([$useSim]);
+    flashAndRedirect($useSim ? 'Simulated time activated.' : 'Real time restored.');
+}
+
+function handleToggleSim(): never {
+    $db = getDB();
+    $simDt = $_POST['sim_datetime'] ?? null;
+    if ($simDt) {
+        $ts = strtotime($simDt);
+        if ($ts) {
+            $simDt = date('Y-m-d H:i:s', $ts);
+        }
+        $stmt = $db->prepare("UPDATE sim_config SET simulated_datetime = ? WHERE id = 1");
+        $stmt->execute([$simDt]);
+    }
+    flashAndRedirect('Simulated time updated.');
+}
+
+function handleAddMechanic(): never {
+    $name = trim($_POST['mech_name'] ?? '');
+    $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
+    $quote = trim($_POST['mech_quote'] ?? '') ?: null;
+    $specialties = trim($_POST['mech_specialties'] ?? '');
+    $years = (int)($_POST['mech_years'] ?? 0);
+    if ($name) {
+        addMechanic($name, $nickname, $specialties, $years, $quote);
+        flashAndRedirect(htmlspecialchars($name) . ' has been hired!');
+    }
+    header('Location: admin.php');
+    exit;
+}
+
+function handleUpdateMechanicInfo(): never {
+    $id = (int)$_POST['mech_id'];
+    $name = trim($_POST['mech_name'] ?? '');
+    $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
+    $quote = trim($_POST['mech_quote'] ?? '') ?: null;
+    $specialties = trim($_POST['mech_specialties'] ?? '');
+    $years = (int)($_POST['mech_years'] ?? 0);
+    if ($name && $id) {
+        updateMechanic($id, $name, $nickname, $specialties, $years, $quote);
+        flashAndRedirect('Mechanic updated.');
+    }
+    header('Location: admin.php');
+    exit;
+}
+
+function handleUpdateSchedule(): never {
+    $mechId = (int)$_POST['mech_id'];
+    $schedule = [];
+    $dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
+    for ($d = 0; $d <= 6; $d++) {
+        $key = 'dow_' . $d;
+        $slots = isset($_POST[$key]) ? array_map('intval', (array)$_POST[$key]) : [];
+        $slotFlags = [];
+        for ($s = 0; $s < SLOT_COUNT; $s++) {
+            $slotFlags[] = in_array($s, $slots);
+        }
+        if (in_array(true, $slotFlags)) {
+            $schedule[$d] = $slotFlags;
+        }
+    }
+    updateMechanicSchedule($mechId, $schedule);
+    flashAndRedirect('Schedule updated.');
+}
+
+function handleAddVacation(): never {
+    $mechId = (int)$_POST['vac_mech_id'];
+    $start = $_POST['vac_start'] ?? '';
+    $end = $_POST['vac_end'] ?? '';
+    $reason = trim($_POST['vac_reason'] ?? '') ?: null;
+    if ($mechId && $start && $end && $start <= $end) {
+        addMechanicVacation($mechId, $start, $end, $reason);
+        $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
+        $stmt->execute([$mechId]);
+        $m = $stmt->fetch();
+        flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . $start . ' to ' . $end . '.');
+    } else {
+        flashAndRedirect('Invalid vacation dates.', 'error');
+    }
+}
+
+function handleOverrideSlot(): never {
+    $db = getDB();
+    $mechId = (int)$_POST['override_mechanic'];
+    $date = $_POST['override_date'];
+    $slots = $_POST['slots'] ?? [];
+    $reason = trim($_POST['reason'] ?? '');
+
+    $dow = (int)date('w', strtotime($date));
+    $dayNames = $GLOBALS['DAY_NAMES_FULL'];
+
+    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt->execute([$mechId]);
+    $mech = $stmt->fetch();
+    $mechName = $mech ? $mech['name'] : "Mechanic #{$mechId}";
+
+    $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
+    $stmt->execute([$mechId, $dow]);
+    $schedule = $stmt->fetch();
+
+    if (!$schedule) {
+        flashAndRedirect("{$mechName} does not work on {$dayNames[$dow]} — no override needed.", 'error');
+    }
+
+    $invalidSlots = [];
+    foreach ($slots as $s) {
+        $slotKey = 'slot_' . ((int)$s + 1);
+        if (!$schedule[$slotKey]) {
+            $invalidSlots[] = (int)$s + 1;
+        }
+    }
+    if (!empty($invalidSlots)) {
+        flashAndRedirect("{$mechName} is not scheduled for slot(s) " . implode(', ', $invalidSlots) . " on {$dayNames[$dow]} — cannot block them.", 'error');
+    }
+
+    $stmt = $db->prepare("SELECT a.id, a.slot_index, c.name AS client_name FROM appointments a JOIN clients c ON c.id = a.client_id WHERE a.mechanic_id = ? AND a.appointment_date = ? AND a.status NOT IN ('" . STATUS_CANCELLED . "','" . STATUS_COMPLETED . "')");
+    $stmt->execute([$mechId, $date]);
+    $conflicts = [];
+    foreach ($stmt->fetchAll() as $a) {
+        if (in_array((int)$a['slot_index'], $slots)) {
+            $conflicts[] = $a;
+        }
+    }
+
+    if (!empty($conflicts)) {
+        $_SESSION['flash_conflicts'] = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (slot ' . ((int)$c['slot_index'] + 1) . ')', $conflicts);
+    } else {
+        $slotFlags = [];
+        for ($i = 0; $i < SLOT_COUNT; $i++) {
+            $slotFlags['slot_' . ($i + 1)] = in_array($i, $slots) ? 0 : 1;
+        }
+        $stmt = $db->prepare("INSERT INTO mechanic_overrides (mechanic_id, override_date, slot_1, slot_2, slot_3, slot_4, reason)
+                              VALUES (?, ?, ?, ?, ?, ?, ?)
+                              ON DUPLICATE KEY UPDATE slot_1=VALUES(slot_1), slot_2=VALUES(slot_2), slot_3=VALUES(slot_3), slot_4=VALUES(slot_4), reason=VALUES(reason)");
+        $stmt->execute([$mechId, $date, $slotFlags['slot_1'], $slotFlags['slot_2'], $slotFlags['slot_3'], $slotFlags['slot_4'], $reason]);
+        flashAndRedirect('Schedule override saved.');
+    }
+    header('Location: admin.php');
+    exit;
 }

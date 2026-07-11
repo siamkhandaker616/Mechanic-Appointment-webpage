@@ -4,7 +4,7 @@ require_once __DIR__ . '/functions.php';
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
 $date = $_GET['date'] ?? '';
 
-if (!$mechanicId || !$date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+if (!$mechanicId || !$date || !preg_match(DATE_REGEX, $date)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid parameters.']);
     exit;

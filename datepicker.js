@@ -1,3 +1,44 @@
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var DAY_HEADERS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+var DPM = {
+    openPickers: new Set(),
+    onScroll: function () {
+        DPM.openPickers.forEach(function (p) {
+            if (p.popup && !p.popup.classList.contains('hidden')) p.positionPopup();
+        });
+    },
+    onResize: function () {
+        DPM.openPickers.forEach(function (p) {
+            if (p.popup && !p.popup.classList.contains('hidden')) p.positionPopup();
+        });
+    },
+    onClick: function (e) {
+        DPM.openPickers.forEach(function (p) {
+            if (p.popup && !p.popup.classList.contains('hidden') &&
+                !p.wrapper.contains(e.target) && !p.popup.contains(e.target)) {
+                p.close();
+            }
+        });
+    },
+    register: function (picker) {
+        DPM.openPickers.add(picker);
+        if (DPM.openPickers.size === 1) {
+            window.addEventListener('scroll', DPM.onScroll);
+            window.addEventListener('resize', DPM.onResize);
+            document.addEventListener('click', DPM.onClick);
+        }
+    },
+    unregister: function (picker) {
+        DPM.openPickers.delete(picker);
+        if (DPM.openPickers.size === 0) {
+            window.removeEventListener('scroll', DPM.onScroll);
+            window.removeEventListener('resize', DPM.onResize);
+            document.removeEventListener('click', DPM.onClick);
+        }
+    },
+};
+
 class DatePicker {
     constructor(input) {
         this.input = input;
@@ -24,28 +65,16 @@ class DatePicker {
         this.input.parentNode.insertBefore(this.wrapper, this.input);
         this.wrapper.appendChild(this.input);
 
-        if (this.isDateTime) {
-            this.display = document.createElement('div');
-            this.display.className = 'datepicker-display datepicker-display--dt';
-        } else {
-            this.display = document.createElement('input');
-            this.display.type = 'text';
-            this.display.className = 'datepicker-display';
-            this.display.readOnly = true;
-            this.display.placeholder = this.input.placeholder || 'Pick a date';
-        }
+        this.display = document.createElement('input');
+        this.display.type = 'text';
+        this.display.className = 'datepicker-display' + (this.isDateTime ? ' datepicker-display--dt' : '');
+        this.display.readOnly = true;
+        this.display.placeholder = this.input.placeholder || (this.isDateTime ? 'Pick date & time' : 'Pick a date');
         this.wrapper.appendChild(this.display);
 
         if (this.input.value) {
-            var parts = this.input.value.split('T');
-            var ymd = parts[0].split('-');
-            var formatted = ymd[2] + '-' + ymd[1] + '-' + ymd[0];
-            if (parts[1]) formatted += ' ' + parts[1];
-            if (this.isDateTime) {
-                this.display.textContent = formatted.replace(' ', '\n');
-            } else {
-                this.display.value = formatted;
-            }
+            var formatted = this._formatDisplay(this.input.value);
+            this.display.value = formatted;
         }
 
         this.input.style.display = 'none';
@@ -58,6 +87,18 @@ class DatePicker {
         this.render();
     }
 
+    _formatDisplay(isoStr) {
+        var parts = isoStr.split('T');
+        var ymd = parts[0].split('-');
+        var year = ymd[0];
+        var monthIndex = parseInt(ymd[1], 10) - 1;
+        var monthStr = MONTHS[monthIndex] || '';
+        var day = parseInt(ymd[2], 10);
+        var display = day + ' ' + monthStr + ' ' + year;
+        if (parts[1]) display += ' • ' + parts[1];
+        return display;
+    }
+
     render() {
         var year = this.viewDate.getFullYear();
         var month = this.viewDate.getMonth();
@@ -66,14 +107,11 @@ class DatePicker {
         var daysInMonth = new Date(year, month + 1, 0).getDate();
         var today = new Date();
 
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        var dayHeaders = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-
         var html = '';
 
         html += '<div class="dp-header">';
         html += '<button type="button" class="dp-nav" data-action="prev">◀</button>';
-        html += '<span class="dp-title">' + months[month] + ' ' + year + '</span>';
+        html += '<span class="dp-title">' + MONTHS[month] + ' ' + year + '</span>';
         html += '<button type="button" class="dp-nav" data-action="next">▶</button>';
         html += '</div>';
 
@@ -83,8 +121,8 @@ class DatePicker {
         }
 
         html += '<div class="dp-days-header">';
-        for (var i = 0; i < dayHeaders.length; i++) {
-            html += '<span class="dp-dow">' + dayHeaders[i] + '</span>';
+        for (var i = 0; i < DAY_HEADERS.length; i++) {
+            html += '<span class="dp-dow">' + DAY_HEADERS[i] + '</span>';
         }
         html += '</div>';
 
@@ -166,18 +204,6 @@ class DatePicker {
             self.toggle();
         });
 
-        window.addEventListener('scroll', function () {
-            if (!self.popup.classList.contains('hidden')) {
-                self.positionPopup();
-            }
-        });
-
-        window.addEventListener('resize', function () {
-            if (!self.popup.classList.contains('hidden')) {
-                self.positionPopup();
-            }
-        });
-
         this.popup.addEventListener('click', function (e) {
             e.stopPropagation();
             var target = e.target;
@@ -228,14 +254,6 @@ class DatePicker {
                 }
             }
         });
-
-        document.addEventListener('click', function (e) {
-            if (self.popup && !self.popup.classList.contains('hidden') &&
-                !self.wrapper.contains(e.target) &&
-                !self.popup.contains(e.target)) {
-                self.close();
-            }
-        });
     }
 
     toggle() {
@@ -247,14 +265,12 @@ class DatePicker {
     }
 
     open() {
-        var pickers = document.querySelectorAll('.datepicker-popup');
-        for (var i = 0; i < pickers.length; i++) {
-            pickers[i].classList.add('hidden');
-        }
+        var self = this;
+        DPM.openPickers.forEach(function (p) { if (p !== self) p.close(); });
         this.viewDate = this.date ? new Date(this.date) : new Date();
         this.render();
         this.popup.classList.remove('hidden');
-        var self = this;
+        DPM.register(this);
         requestAnimationFrame(function () {
             self.positionPopup();
         });
@@ -262,6 +278,7 @@ class DatePicker {
 
     close() {
         this.popup.classList.add('hidden');
+        DPM.unregister(this);
     }
 
     updateValue() {
@@ -276,12 +293,11 @@ class DatePicker {
             var h = this.popup.querySelector('.dp-hour').value.padStart(2, '0');
             var m = this.popup.querySelector('.dp-min').value.padStart(2, '0');
             value = y + '-' + mo + '-' + d + 'T' + h + ':' + m;
-            this.display.textContent = d + '-' + mo + '-' + y + '\n' + h + ':' + m;
         } else {
             value = y + '-' + mo + '-' + d;
-            this.display.value = d + '-' + mo + '-' + y;
         }
 
+        this.display.value = this._formatDisplay(value);
         this.input.value = value;
         this.input.dispatchEvent(new Event('change', { bubbles: true }));
     }

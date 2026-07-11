@@ -59,6 +59,10 @@
     --dot-pink: rgba(214, 51, 132, 0.15);
     --panel-border: 4px solid var(--ink);
     --shadow-offset: 6px;
+    --border: 3px solid var(--ink);
+    --shadow-sm: 3px 3px 0 var(--ink);
+    --shadow-md: 4px 4px 0 var(--ink);
+    --shadow-lg: 5px 5px 0 var(--ink);
 
     --font-display: 'Bangers', 'Luckiest Guy', 'Permanent Marker', cursive;
     --font-sub: 'Luckiest Guy', cursive;
@@ -209,6 +213,7 @@ header::after {
     transition: transform 0.15s ease;
     outline: 1px solid transparent;
     transform-style: preserve-3d;
+    animation: popIn 0.3s ease-out;
 }
 
 .panel:nth-child(even of .panel) {
@@ -301,7 +306,7 @@ header::after {
 .bubble {
     position: relative;
     background: var(--cyan-light);
-    border: 3px solid var(--ink);
+    border: var(--border);
     padding: 18px 22px;
     margin: 18px 0;
     font-size: 0.92rem;
@@ -335,7 +340,7 @@ header::after {
 .jagged-bubble {
     position: relative;
     background: var(--cyan-light);
-    border: 3px solid var(--ink);
+    border: var(--border);
     padding: 18px 22px;
     margin: 18px 0;
 }
@@ -365,6 +370,7 @@ header::after {
     line-height: 1;
     transform: rotate(-8deg);
     letter-spacing: 4px;
+    animation: float 6s ease-in-out infinite;
 }
 
 .omg-right {
@@ -374,6 +380,7 @@ header::after {
     font-size: 12rem;
     color: var(--pink);
     opacity: 0.07;
+    animation: float 6s ease-in-out infinite reverse;
 }
 
 .omg-left {
@@ -418,7 +425,7 @@ label {
 input, select, textarea {
     width: 100%;
     padding: 10px 12px;
-    border: 3px solid var(--ink);
+    border: var(--border);
     background: var(--cyan-light);
     font-family: var(--font-body);
     font-size: 1rem;
@@ -443,7 +450,7 @@ input[type="checkbox"] {
     cursor: pointer;
     flex-shrink: 0;
     background: var(--cyan-light);
-    border: 3px solid var(--ink);
+    border: var(--border);
     position: relative;
     vertical-align: middle;
     transition: background 0.1s, border-color 0.1s;
@@ -490,7 +497,7 @@ textarea {
 .btn {
     display: inline-block;
     padding: 12px 32px;
-    border: 3px solid var(--ink);
+    border: var(--border);
     background: var(--teal);
     color: var(--gold);
     font-family: var(--font-display);
@@ -498,7 +505,7 @@ textarea {
     text-transform: uppercase;
     letter-spacing: 1px;
     cursor: pointer;
-    box-shadow: 5px 5px 0 var(--ink);
+    box-shadow: var(--shadow-lg);
     transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
     position: static;
     white-space: nowrap;
@@ -517,13 +524,13 @@ textarea {
 
 .btn:active {
     transform: translate(2px, 2px);
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-sm);
 }
 
 .btn-outline {
     background: transparent;
     color: var(--ink);
-    box-shadow: 4px 4px 0 var(--ink);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-outline:hover {
@@ -565,14 +572,14 @@ textarea {
 /* === MECHANIC CARDS === */
 
 .mechanic-card {
-    border: 3px solid var(--ink);
+    border: var(--border);
     padding: 16px 18px;
     margin-bottom: 10px;
     background: var(--cyan-light);
     cursor: pointer;
     transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
     position: relative;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-sm);
 }
 
 .mechanic-card:hover {
@@ -632,6 +639,16 @@ textarea {
     margin-top: 6px;
 }
 
+.status-badge.vacation-badge {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    font-size: 0.65rem;
+    padding: 5px 12px;
+    letter-spacing: 1px;
+    animation: vacay-pop 1s infinite;
+}
+
 .work-days {
     display: flex;
     gap: 4px;
@@ -655,9 +672,9 @@ textarea {
 }
 
 .work-day.off {
-    background: transparent;
-    color: #999;
-    border-color: #ddd;
+    background: #e8e8e8;
+    color: #888;
+    border-color: #bbb;
 }
 
 /* === SLOT GRID === */
@@ -671,20 +688,20 @@ textarea {
 
 .slot-chip {
     padding: 10px 20px;
-    border: 3px solid var(--ink);
+    border: var(--border);
     background: var(--cyan-light);
     font-family: var(--font-sub);
     font-size: 0.85rem;
     cursor: pointer;
     transition: background 0.1s, box-shadow 0.1s, transform 0.1s;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-sm);
 }
 
 .slot-chip:hover {
     background: var(--teal);
     color: var(--gold);
     transform: translate(-1px, -1px);
-    box-shadow: 4px 4px 0 var(--ink);
+    box-shadow: var(--shadow-md);
 }
 
 .slot-chip.taken {
@@ -693,17 +710,13 @@ textarea {
 
 .slot-chip.taken:hover {
     opacity: 0.85;
-    background: var(--teal);
-    color: var(--gold);
-    transform: translate(-1px, -1px);
-    box-shadow: 4px 4px 0 var(--ink);
 }
 
 .slot-chip.selected {
     background: var(--pink);
     color: var(--gold);
     border-color: var(--ink);
-    box-shadow: 4px 4px 0 var(--ink);
+    box-shadow: var(--shadow-md);
     transform: translate(-1px, -1px);
 }
 
@@ -716,7 +729,7 @@ textarea {
     padding: 16px 22px;
     font-family: var(--font-body);
     color: var(--ink);
-    box-shadow: 5px 5px 0 var(--ink);
+    box-shadow: var(--shadow-lg);
     max-width: 400px;
     width: auto;
     line-height: 1.5;
@@ -765,10 +778,6 @@ textarea {
     font-family: var(--font-display);
     font-size: 1.1rem;
     color: var(--pink);
-}
-.slot-tooltip .tt-sub {
-    margin-top: 6px;
-    font-size: 0.85rem;
 }
 .slot-tooltip .tt-section {
     font-family: var(--font-display);
@@ -872,35 +881,20 @@ textarea {
     border-top-color: var(--gold);
 }
 
-/* Right positioning arrow */
-.quote-tooltip.right::before {
-    right: 100%;
-    top: calc(50% - 12px);
-    border-width: 12px 12px 12px 0;
-    border-right-color: var(--ink);
-}
-
-.quote-tooltip.right::after {
-    right: calc(100% - 2px);
-    top: calc(50% - 10px);
-    border-width: 10px 10px 10px 0;
-    border-right-color: var(--gold);
-}
-
 /* === SUGGESTION CHIPS === */
 
 .suggestion-chip {
     display: inline-block;
     padding: 10px 16px;
     margin: 5px;
-    border: 3px solid var(--ink);
+    border: var(--border);
     background: var(--cyan-light);
     cursor: pointer;
     font-family: var(--font-body);
     font-size: 0.82rem;
     font-weight: bold;
     transition: transform 0.12s, box-shadow 0.12s;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-sm);
 }
 
 .suggestion-chip:hover {
@@ -920,13 +914,13 @@ textarea {
 /* === FLASH MESSAGES === */
 
 .flash-msg {
-    border: 3px solid var(--ink);
+    border: var(--border);
     padding: 14px 18px;
     margin-bottom: 20px;
     font-weight: bold;
     font-family: var(--font-sub);
     text-transform: uppercase;
-    box-shadow: 4px 4px 0 var(--ink);
+    box-shadow: var(--shadow-md);
 }
 
 .flash-msg.success {
@@ -951,7 +945,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
-    border: 3px solid var(--ink);
+    border: var(--border);
 }
 
 thead {
@@ -1018,14 +1012,31 @@ tr:last-child td {
     justify-content: space-between;
     gap: 16px;
     align-items: center;
-    border: 3px solid var(--ink);
-    box-shadow: 4px 4px 0 var(--ink);
+    border: var(--border);
+    box-shadow: var(--shadow-md);
 }
 
 .sim-group {
     display: inline-flex;
-    gap: 6px;
-    align-items: center;
+    align-items: stretch;
+    gap: 0;
+}
+
+.sim-group .datepicker-wrap {
+    display: inline-flex;
+}
+
+.sim-group .datepicker-display {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right-width: 0;
+}
+
+.sim-group .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    margin: 0;
+    height: auto;
 }
 
 .sim-bar > * {
@@ -1055,7 +1066,7 @@ tr:last-child td {
     border: 2px solid var(--ink);
     padding: 8px 14px;
     background: var(--cyan-light);
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-sm);
 }
 
 .help-section summary {
@@ -1133,10 +1144,6 @@ tr:last-child td {
     margin: 20px auto;
 }
 
-.panel {
-    animation: popIn 0.3s ease-out;
-}
-
 /* === ANIMATIONS === */
 
 @keyframes popIn {
@@ -1148,6 +1155,11 @@ tr:last-child td {
 @keyframes burst-pop {
     0%, 49.99% { background: var(--burst); }
     50%, 100% { background: var(--pop); }
+}
+
+@keyframes vacay-pop {
+    0%, 49.99% { background: var(--rust-alt); }
+    50%, 100% { background: var(--pink); }
 }
 
 @keyframes float {
@@ -1164,14 +1176,6 @@ tr:last-child td {
     0% { transform: scale(0.6) rotate(0deg); opacity: 0.5; }
     60% { transform: scale(1.4) rotate(12deg); opacity: 0.8; }
     100% { transform: scale(1) rotate(-5deg); opacity: 0.9; }
-}
-
-.omg {
-    animation: float 6s ease-in-out infinite;
-}
-
-.omg-right {
-    animation: float 6s ease-in-out infinite reverse;
 }
 
 /* === SVG DOODLE PLACEHOLDERS === */
@@ -1193,7 +1197,13 @@ tr:last-child td {
 @media (max-width: 768px) {
     h1 { font-size: 2rem; }
     h2 { font-size: 1.4rem; }
-    .panel { padding: 18px; transform: none !important; }
+    .panel,
+    .panel:nth-child(odd of .panel),
+    .panel:nth-child(even of .panel),
+    .panel:first-of-type {
+        padding: 18px;
+        transform: none;
+    }
     .omg { display: none; }
     .row { flex-direction: column; }
     .col { min-width: 0; }
@@ -1237,8 +1247,8 @@ tr:last-child td {
 }
 
 .msg-box {
-    border: 3px solid var(--ink);
-    box-shadow: 4px 4px 0 var(--ink);
+    border: var(--border);
+    box-shadow: var(--shadow-md);
     transform: none;
     padding: 28px;
 }
@@ -1299,18 +1309,8 @@ tr:last-child td {
 }
 
 .datepicker-display--dt {
-    width: 102%;
-    max-width: 320px;
-    white-space: pre-line;
-    line-height: 1.4;
-    padding: 10px 12px;
-    min-height: 48px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-sizing: border-box;
-    border: 3px solid var(--ink);
-    color: var(--ink);
+    width: 185px;
+    max-width: none;
 }
 
 .datepicker-popup {
