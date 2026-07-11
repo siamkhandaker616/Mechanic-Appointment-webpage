@@ -343,7 +343,7 @@ function addMechanic(string $name, ?string $nickname, ?string $specialties, int 
     $stmt->execute([$name, $nickname, $quote, $theme, $specialties, $years]);
     $id = (int)$db->lastInsertId();
 
-    $insert = $db->prepare("INSERT INTO mechanic_schedule (mechanic_id, day_of_week, slot_1, slot_2, slot_3, slot_4) VALUES (?, ?, 1, 1, 1, 1)");
+    $insert = $db->prepare("INSERT INTO mechanic_schedule (mechanic_id, day_of_week, slot_1, slot_2, slot_3, slot_4) VALUES (?, ?, 0, 0, 0, 0)");
     for ($dow = 0; $dow <= 6; $dow++) {
         $insert->execute([$id, $dow]);
     }

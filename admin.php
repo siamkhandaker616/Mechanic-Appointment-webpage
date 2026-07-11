@@ -337,11 +337,11 @@ $effectiveTime = getEffectiveTime();
         <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
             <div>
                 <label>Name</label>
-                <input type="text" name="mech_name" required>
+                <input type="text" name="mech_name" placeholder="e.g. John Doe" required>
             </div>
             <div>
                 <label>Nickname</label>
-                <input type="text" name="mech_nickname">
+                <input type="text" name="mech_nickname" placeholder="e.g. Sparky">
             </div>
             <div>
                 <label>Catchphrase</label>

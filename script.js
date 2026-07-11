@@ -86,7 +86,8 @@ function updateQuotePosition(card) {
     var cardLeftInDoc = rect.left + window.scrollX;
     var cardWidth = rect.width;
     qt.style.top = (cardTopInDoc - tooltipHeight - 12) + 'px';
-    qt.style.left = Math.max(10, Math.min(cardLeftInDoc + cardWidth - tooltipWidth + 180, window.innerWidth - tooltipWidth - 10)) + 'px';
+    var anchorX = cardLeftInDoc + cardWidth - 150;
+    qt.style.left = Math.max(10, Math.min(anchorX - 35, window.innerWidth - tooltipWidth - 10)) + 'px';
 }
 
 function selectMechanic(id) {
