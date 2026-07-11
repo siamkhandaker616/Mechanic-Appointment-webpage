@@ -54,7 +54,7 @@
     --gold: #f5c518;
     --burst: #e524e2;
     --pop: #25a9f0;
-    --cyan-light: #d8ecec;
+    --cyan: #caeded;
     --dot-blue: rgba(26, 26, 46, 0.15);
     --dot-pink: rgba(214, 51, 132, 0.15);
     --panel-border: 4px solid var(--ink);
@@ -64,12 +64,11 @@
     --shadow-md: 4px 4px 0 var(--ink);
     --shadow-lg: 5px 5px 0 var(--ink);
 
-    --font-display: 'Bangers', 'Luckiest Guy', 'Permanent Marker', cursive;
-    --font-sub: 'Luckiest Guy', cursive;
-    --font-marker: 'Permanent Marker', cursive;
+    --font-display: 'Bangers';
+    --font-sub: 'Luckiest Guy';
+    --font-marker: 'Permanent Marker';
     --font-action: 'Action Man Bold';
     --font-hand: 'Walter Turncoat';
-    --font-body: 'Walter Turncoat', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
@@ -97,7 +96,7 @@
 }
 
 body {
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     background-color: var(--paper);
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E"),
@@ -117,7 +116,7 @@ h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
 
 .tagline {
     position: absolute;
-    opacity: 0.85;
+    filter: saturate(1.1);
     z-index: 10;
     width: 130px;
     height: auto;
@@ -225,6 +224,10 @@ header::after {
     border-top: 4px dashed var(--pink);
 }
 
+.booking-panel {
+    border-top: none !important;
+}
+
 #overrides-panel[style*="display: none"] ~ .panel:last-of-type,
 #overrides-panel[style*="display:none"] ~ .panel:last-of-type {
     border-top: 4px solid var(--ink);
@@ -305,7 +308,7 @@ header::after {
 
 .bubble {
     position: relative;
-    background: var(--cyan-light);
+    background: var(--cyan);
     border: var(--border);
     padding: 18px 22px;
     margin: 18px 0;
@@ -331,7 +334,7 @@ header::after {
     left: 39px;
     width: 0; height: 0;
     border: 8px solid transparent;
-    border-top-color: var(--cyan-light);
+    border-top-color: var(--cyan);
     border-width: 9px 8px 0 8px;
 }
 
@@ -339,21 +342,59 @@ header::after {
 
 .jagged-bubble {
     position: relative;
-    background: var(--cyan-light);
+    background: var(--cyan);
     border: var(--border);
-    padding: 18px 22px;
-    margin: 18px 0;
+    padding: 24px 22px;
+    margin: 24px 0;
+    border-radius: 10px;
+    color: var(--rust);
+    font-weight: bold;
+    box-shadow: 4px 4px 0 var(--ink);
 }
 
 .jagged-bubble::before {
     content: "";
     position: absolute;
+    bottom: -19px;
+    left: 37px;
+    width: 26px; height: 19px;
+    background: var(--ink);
+    clip-path: polygon(0% 0%, 100% 0%, 40% 100%, 50% 0%);
+}
+
+.jagged-bubble::after {
+    content: "";
+    position: absolute;
     bottom: -16px;
     left: 40px;
     width: 20px; height: 16px;
-    background: var(--cyan-light);
+    background: var(--cyan);
     clip-path: polygon(0% 0%, 100% 0%, 40% 100%, 50% 0%);
-    border-right: 3px solid var(--ink);
+}
+
+
+.jagged-bubble.top::before {
+    content: "";
+    position: absolute;
+    top: -19px;
+    left: 37px;
+    width: 26px; height: 19px;
+    background: var(--ink);
+    clip-path: polygon(0% 100%, 100% 100%, 40% 0%, 50% 100%);
+}
+
+.jagged-bubble.top::after {
+    content: "";
+    position: absolute;
+    top: -16px;
+    left: 40px;
+    width: 20px; height: 16px;
+    background: var(--cyan);
+    clip-path: polygon(0% 100%, 100% 100%, 40% 0%, 50% 100%);
+}
+
+.jagged-bubble.shaky-pop {
+    animation: shakyPop 0.5s ease-out forwards;
 }
 
 /* === ONOMATOPOEIA WATERMARKS === */
@@ -426,8 +467,8 @@ input, select, textarea {
     width: 100%;
     padding: 10px 12px;
     border: var(--border);
-    background: var(--cyan-light);
-    font-family: var(--font-body);
+    background: var(--cyan);
+    font-family: var(--font-hand);
     font-size: 1rem;
     line-height: normal;
     color: var(--ink);
@@ -449,7 +490,7 @@ input[type="checkbox"] {
     margin: 0;
     cursor: pointer;
     flex-shrink: 0;
-    background: var(--cyan-light);
+    background: var(--cyan);
     border: var(--border);
     position: relative;
     vertical-align: middle;
@@ -575,7 +616,7 @@ textarea {
     border: var(--border);
     padding: 16px 18px;
     margin-bottom: 10px;
-    background: var(--cyan-light);
+    background: var(--cyan);
     cursor: pointer;
     transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
     position: relative;
@@ -590,7 +631,7 @@ textarea {
 .mechanic-card.selected {
     border-color: var(--pink);
     box-shadow: 5px 5px 0 var(--pink);
-    background: linear-gradient(135deg, var(--cyan-light) 0%, #d0e8f0 100%);
+    background: linear-gradient(135deg, var(--cyan) 0%, #d0e8f0 100%);
 }
 
 .mechanic-card.selected::before {
@@ -607,7 +648,7 @@ textarea {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     font-size: 0.8rem;
     font-weight: bold;
     line-height: 24px;
@@ -667,7 +708,7 @@ textarea {
 
 .work-day.on {
     background: var(--teal);
-    color: white;
+    color: #eeeeaa;
     border-color: var(--teal);
 }
 
@@ -675,6 +716,31 @@ textarea {
     background: #e8e8e8;
     color: #888;
     border-color: #bbb;
+}
+
+.exp-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    border: 2px solid var(--ink);
+    padding: 4px 10px;
+    text-align: center;
+    background: rgba(51, 214, 56, 0.25);
+    font-size: 0.7rem;
+    line-height: 1.3;
+}
+.exp-label {
+    display: block;
+    font-family: var(--font-sub);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+}
+.exp-value {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
 }
 
 /* === SLOT GRID === */
@@ -689,7 +755,7 @@ textarea {
 .slot-chip {
     padding: 10px 20px;
     border: var(--border);
-    background: var(--cyan-light);
+    background: var(--cyan);
     font-family: var(--font-sub);
     font-size: 0.85rem;
     cursor: pointer;
@@ -723,11 +789,11 @@ textarea {
 .slot-tooltip {
     position: fixed;
     z-index: 9999;
-    background: var(--cyan-light);
+    background: var(--cyan);
     border: 3px solid var(--pink);
     border-radius: 18px;
     padding: 16px 22px;
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     color: var(--ink);
     box-shadow: var(--shadow-lg);
     max-width: 400px;
@@ -756,7 +822,7 @@ textarea {
     width: 0; height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-top: 14px solid var(--cyan-light);
+    border-top: 14px solid var(--cyan);
 }
 /* Tail below — transforms the whole tail group so the arrow melts in seamlessly */
 .slot-tooltip.below {
@@ -772,7 +838,7 @@ textarea {
     top: auto;
     bottom: calc(100% - 2px);
     border-top: none;
-    border-bottom: 14px solid var(--cyan-light);
+    border-bottom: 14px solid var(--cyan);
 }
 .slot-tooltip .tt-title {
     font-family: var(--font-display);
@@ -803,7 +869,6 @@ textarea {
     z-index: 9998;
     background: var(--gold);
     border: 4px solid var(--ink);
-    border-radius: 28px;
     padding: 18px 24px;
     max-width: 460px;
     font-family: var(--font-sub);
@@ -811,8 +876,7 @@ textarea {
     box-shadow: 6px 6px 0 var(--ink);
     line-height: 1.4;
     pointer-events: none;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
+    outline: 1px solid transparent;
 }
 
 .quote-tooltip.hidden {
@@ -822,23 +886,6 @@ textarea {
 .quote-tooltip.comic-pop {
     animation: comicPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     transform-origin: 42px 100%;
-}
-
-@keyframes comicPop {
-    0% {
-        opacity: 0;
-        transform: scale(0.3) rotate(-12deg);
-    }
-    55% {
-        transform: scale(1.1) rotate(4deg);
-    }
-    75% {
-        transform: scale(0.96) rotate(-2deg);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1) rotate(-1deg);
-    }
 }
 
 .quote-tooltip .qt-text {
@@ -856,29 +903,24 @@ textarea {
     color: var(--rust);
 }
 
-.quote-tooltip::before,
+.quote-tooltip::before {
+    content: "";
+    position: absolute;
+    bottom: -24px;
+    left: 35px;
+    width: 34px; height: 25px;
+    background: var(--ink);
+    clip-path: polygon(0% 0%, 100% 0%, 40% 100%, 50% 0%);
+}
+
 .quote-tooltip::after {
     content: "";
     position: absolute;
-    width: 0; height: 0;
-    border: solid transparent;
-}
-
-/* Default (above) pointing arrow - left aligned */
-.quote-tooltip.above::before {
-    top: 100%;
-    left: 40px;
-    right: auto;
-    border-width: 14px 14px 0 14px;
-    border-top-color: var(--ink);
-}
-
-.quote-tooltip.above::after {
-    top: calc(100% - 2px);
-    left: 42px;
-    right: auto;
-    border-width: 11px 11px 0 11px;
-    border-top-color: var(--gold);
+    bottom: -21px;
+    left: 38px;
+    width: 28px; height: 22px;
+    background: var(--gold);
+    clip-path: polygon(0% 0%, 100% 0%, 40% 100%, 50% 0%);
 }
 
 /* === SUGGESTION CHIPS === */
@@ -888,9 +930,9 @@ textarea {
     padding: 10px 16px;
     margin: 5px;
     border: var(--border);
-    background: var(--cyan-light);
+    background: var(--cyan);
     cursor: pointer;
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     font-size: 0.82rem;
     font-weight: bold;
     transition: transform 0.12s, box-shadow 0.12s;
@@ -907,8 +949,8 @@ textarea {
     display: block;
     font-size: 0.7rem;
     font-weight: normal;
-    color: #666;
-    font-family: var(--font-body);
+    color: var(--navy);
+    font-family: var(--font-hand);
 }
 
 /* === FLASH MESSAGES === */
@@ -935,7 +977,7 @@ textarea {
 
 .flash-msg ul {
     margin-left: 20px;
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     text-transform: none;
 }
 
@@ -967,11 +1009,11 @@ th {
 td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--ink);
-    background: var(--cyan-light);
+    background: var(--cyan);
 }
 
-tr:nth-child(even) td {
-    background: #cce4e4;
+tr.stripe-even td {
+    background: #c6dddd;
 }
 
 tr:last-child td {
@@ -1065,7 +1107,7 @@ tr:last-child td {
     margin-bottom: 10px;
     border: 2px solid var(--ink);
     padding: 8px 14px;
-    background: var(--cyan-light);
+    background: var(--cyan);
     box-shadow: var(--shadow-sm);
 }
 
@@ -1146,6 +1188,23 @@ tr:last-child td {
 
 /* === ANIMATIONS === */
 
+@keyframes comicPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.3) rotate(-12deg);
+    }
+    55% {
+        transform: scale(1.1) rotate(4deg);
+    }
+    75% {
+        transform: scale(0.96) rotate(-2deg);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(-1deg);
+    }
+}
+
 @keyframes popIn {
     0% { transform: scale(0.9); opacity: 0; }
     60% { transform: scale(1.02); }
@@ -1177,6 +1236,17 @@ tr:last-child td {
     60% { transform: scale(1.4) rotate(12deg); opacity: 0.8; }
     100% { transform: scale(1) rotate(-5deg); opacity: 0.9; }
 }
+
+@keyframes shakyPop {
+    0%   { transform: scale(0.2) rotate(-8deg); opacity: 0; }
+    30%  { transform: scale(1.15) rotate(4deg);  opacity: 1; }
+    50%  { transform: scale(0.93) rotate(-4deg); }
+    65%  { transform: scale(1.04) rotate(2deg);  }
+    80%  { transform: scale(0.97) rotate(-1deg); }
+    100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+}
+
+
 
 /* === SVG DOODLE PLACEHOLDERS === */
 
@@ -1304,7 +1374,7 @@ tr:last-child td {
 
 .datepicker-display {
     cursor: pointer;
-    background: var(--cyan-light);
+    background: var(--cyan);
     max-width: 160px;
 }
 
@@ -1391,7 +1461,7 @@ tr:last-child td {
     font-size: 1rem;
     cursor: pointer;
     padding: 4px 10px;
-    font-family: var(--font-body);
+    font-family: var(--font-hand);
     color: var(--ink);
     transition: background 0.1s;
 }

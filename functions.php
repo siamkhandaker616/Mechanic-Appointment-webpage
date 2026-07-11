@@ -44,6 +44,7 @@ function getMechanicsForSelect(): array {
 }
 
 function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
+    if ($slotIndex < 0 || $slotIndex >= SLOT_COUNT) return false;
     $db = getDB();
     $dow = (int)date('w', strtotime($date));
 
@@ -67,16 +68,6 @@ function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     if (isMechanicOnVacation($mechanicId, $date)) return false;
 
     return true;
-}
-
-function getAvailableSlotsForMechanic(int $mechanicId, string $date): array {
-    $available = [];
-    for ($i = 0; $i < SLOT_COUNT; $i++) {
-        if (isSlotAvailable($mechanicId, $date, $i)) {
-            $available[] = $i;
-        }
-    }
-    return $available;
 }
 
 function getAdjacentSlotForMechanic(int $mechanicId, string $date, int $slotIndex): ?int {
@@ -123,20 +114,6 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     return $result;
 }
 
-function getAllMechanicsAvailability(string $date): array {
-    $mechs = getMechanics();
-    $result = [];
-    foreach ($mechs as $m) {
-        $slots = getAvailableSlotsForMechanic($m['id'], $date);
-        $result[] = [
-            'mechanic' => $m,
-            'available_slots' => $slots,
-            'available_count' => count($slots),
-        ];
-    }
-    return $result;
-}
-
 function isCarBookedOnDate(int $carId, string $date): bool {
     $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$carId, $date]);
@@ -178,49 +155,6 @@ function createAppointment(int $clientId, int $carId, int $mechanicId, string $d
     $stmt = $db->prepare("INSERT INTO appointments (client_id, car_id, mechanic_id, appointment_date, slot_index) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$clientId, $carId, $mechanicId, $date, $slotIndex]);
     return (int)$db->lastInsertId();
-}
-
-function suggestAlternatives(int $mechanicId, string $date, int $slotIndex): array {
-    $suggestions = [];
-
-    $sameDaySlots = getAvailableSlotsForMechanic($mechanicId, $date);
-    foreach ($sameDaySlots as $slot) {
-        if ($slot !== $slotIndex) {
-            $suggestions[] = [
-                'mechanic_id' => $mechanicId,
-                'slot_index' => $slot,
-                'type' => 'same_mechanic',
-            ];
-        }
-    }
-
-    $stmt = getDB()->prepare("SELECT specialties FROM mechanics WHERE id = ?");
-    $stmt->execute([$mechanicId]);
-    $targetMech = $stmt->fetch();
-    $targetKeywords = $targetMech ? array_map('trim', explode(',', $targetMech['specialties'])) : [];
-
-    $mechs = getMechanics();
-    foreach ($mechs as $m) {
-        if ((int)$m['id'] === $mechanicId) continue;
-        if (isSlotAvailable((int)$m['id'], $date, $slotIndex)) {
-            $keywords = array_map('trim', explode(',', $m['specialties']));
-            $matchCount = count(array_intersect($keywords, $targetKeywords));
-            $suggestions[] = [
-                'mechanic_id' => (int)$m['id'],
-                'slot_index' => $slotIndex,
-                'type' => $matchCount > 0 ? 'similar_mechanic' : 'other_mechanic',
-                'match_score' => $matchCount,
-            ];
-        }
-    }
-
-    usort($suggestions, function ($a, $b) {
-        $aScore = $a['type'] === 'same_mechanic' ? 100 : ($a['match_score'] ?? 0);
-        $bScore = $b['type'] === 'same_mechanic' ? 100 : ($b['match_score'] ?? 0);
-        return $bScore <=> $aScore;
-    });
-
-    return $suggestions;
 }
 
 function getEffectiveTime(): DateTime {
@@ -381,7 +315,7 @@ function validateAppointmentInput(array $data): array {
 
     if (empty(trim($data['name'] ?? ''))) $errors[] = 'Name is required.';
     if (empty(trim($data['phone'] ?? ''))) $errors[] = 'Phone number is required.';
-    elseif (!preg_match('/^[\d\s\-\+\(\)]+$/', $data['phone'])) $errors[] = 'Phone must contain only digits.';
+    elseif (!preg_match('/^[\d\s\-\+\(\)]+$/', $data['phone'])) $errors[] = 'Phone must contain only digits, spaces, +, -, and parentheses.';
 
     if (empty(trim($data['license_no'] ?? ''))) $errors[] = 'Car license number is required.';
     if (empty(trim($data['engine_no'] ?? ''))) $errors[] = 'Car engine number is required.';
@@ -563,9 +497,10 @@ function handleUpdateDate(): never {
     if (($_POST['admin_pw'] ?? '') !== ADMIN_PW) {
         flashAndRedirect('Invalid password.', 'error');
     }
-    $id = (int)$_POST['appointment_id'];
+    $id = (int)($_POST['appointment_id'] ?? 0);
     $newDate = $_POST['new_date'] ?? '';
     $newSlot = (int)($_POST['new_slot'] ?? 0);
+    if (!preg_match(DATE_REGEX, $newDate)) flashAndRedirect('Invalid date format.', 'error');
     $result = updateAppointmentDate($id, $newDate, $newSlot);
     flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
 }
@@ -574,8 +509,8 @@ function handleUpdateMechanic(): never {
     if (($_POST['admin_pw'] ?? '') !== ADMIN_PW) {
         flashAndRedirect('Invalid password.', 'error');
     }
-    $id = (int)$_POST['appointment_id'];
-    $newMech = (int)$_POST['new_mechanic'];
+    $id = (int)($_POST['appointment_id'] ?? 0);
+    $newMech = (int)($_POST['new_mechanic'] ?? 0);
     $result = updateAppointmentMechanic($id, $newMech);
     flashAndRedirect($result['message'], $result['success'] ? 'success' : 'error');
 }
@@ -617,7 +552,7 @@ function handleAddMechanic(): never {
 }
 
 function handleUpdateMechanicInfo(): never {
-    $id = (int)$_POST['mech_id'];
+    $id = (int)($_POST['mech_id'] ?? 0);
     $name = trim($_POST['mech_name'] ?? '');
     $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
     $quote = trim($_POST['mech_quote'] ?? '') ?: null;
@@ -632,9 +567,8 @@ function handleUpdateMechanicInfo(): never {
 }
 
 function handleUpdateSchedule(): never {
-    $mechId = (int)$_POST['mech_id'];
+    $mechId = (int)($_POST['mech_id'] ?? 0);
     $schedule = [];
-    $dayNames = ['sun','mon','tue','wed','thu','fri','sat'];
     for ($d = 0; $d <= 6; $d++) {
         $key = 'dow_' . $d;
         $slots = isset($_POST[$key]) ? array_map('intval', (array)$_POST[$key]) : [];
@@ -651,10 +585,13 @@ function handleUpdateSchedule(): never {
 }
 
 function handleAddVacation(): never {
-    $mechId = (int)$_POST['vac_mech_id'];
+    $mechId = (int)($_POST['vac_mech_id'] ?? 0);
     $start = $_POST['vac_start'] ?? '';
     $end = $_POST['vac_end'] ?? '';
     $reason = trim($_POST['vac_reason'] ?? '') ?: null;
+    if (!preg_match(DATE_REGEX, $start) || !preg_match(DATE_REGEX, $end)) {
+        flashAndRedirect('Invalid date format.', 'error');
+    }
     if ($mechId && $start && $end && $start <= $end) {
         addMechanicVacation($mechId, $start, $end, $reason);
         $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
@@ -668,8 +605,9 @@ function handleAddVacation(): never {
 
 function handleOverrideSlot(): never {
     $db = getDB();
-    $mechId = (int)$_POST['override_mechanic'];
-    $date = $_POST['override_date'];
+    $mechId = (int)($_POST['override_mechanic'] ?? 0);
+    $date = $_POST['override_date'] ?? '';
+    if (!preg_match(DATE_REGEX, $date)) flashAndRedirect('Invalid date format.', 'error');
     $slots = $_POST['slots'] ?? [];
     $reason = trim($_POST['reason'] ?? '');
 

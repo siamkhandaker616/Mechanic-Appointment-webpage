@@ -43,6 +43,7 @@ foreach ($allMechs as $m) {
 }
 
 $slotIndex = isset($_GET['slot_index']) ? (int)$_GET['slot_index'] : null;
+if ($slotIndex !== null && ($slotIndex < 0 || $slotIndex >= SLOT_COUNT)) $slotIndex = null;
 
 $response = [
     'mechanic_id' => $mechanicId,

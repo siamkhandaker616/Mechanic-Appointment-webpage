@@ -22,8 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isCarBookedOnDate($carId, $_POST['date'])) {
             $errors[] = 'This car already has an appointment on this date.';
         } elseif (!isSlotAvailable((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
-            $suggestions = suggestAlternatives((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
-            $errors[] = 'slot_taken';
+            $errors[] = 'Sorry, that slot was just taken. Pick another slot or mechanic above.';
         } else {
             createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
             $success = true;
@@ -34,11 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $selectedMechId = (int)($_POST['mechanic_id'] ?? 0);
 $selectedDate = $_POST['date'] ?? '';
 $selectedSlot = $_POST['slot_index'] ?? '';
-$suggestions = [];
-if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $selectedDate && $selectedSlot !== '') {
-    $suggestions = suggestAlternatives($selectedMechId, $selectedDate, (int)$selectedSlot);
-    $errors = array_filter($errors, fn($e) => $e !== 'slot_taken');
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,13 +66,13 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
         Your car is in good hands. We'll see you at
         <strong><?= htmlspecialchars(fmtDate($_POST['date'])) ?></strong>,
         slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$_POST['slot_index']] ?? '') ?></strong>
-        with <strong><?= htmlspecialchars(getMechanicById((int)$_POST['mechanic_id'])['name'] ?? '') ?></strong>.
+        with <strong><?= htmlspecialchars((getMechanicById((int)$_POST['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
     </div>
     <a href="index.php" class="btn btn-pink">Book Another</a>
 </div>
 <?php else: ?>
 
-<div class="panel">
+<div class="panel booking-panel">
     <div class="burst burst-right">BOOK!</div>
     <h2>Book a Time</h2>
     <p style="margin-bottom:16px;">Tell us about yourself and your car, then pick your mechanic and slot.</p>
@@ -129,7 +123,7 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             <div class="col" style="max-width:320px;">
                 <div class="form-group">
                     <label for="date">Appointment Date</label>
-                    <input type="date" id="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" min="<?= date('Y-m-d') ?>" required onchange="fetchAvailability()">
+                    <input type="date" id="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" required onchange="fetchAvailability()">
                 </div>
             </div>
         </div>
@@ -139,16 +133,19 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
             <div id="mechanic-list">
                 <?php foreach ($mechanics as $m): ?>
                 <?php $sched = $mechSchedules[$m['id']] ?? []; ?>
-                <?php $onVacation = isMechanicOnVacation((int)$m['id'], $selectedDate ?: date('Y-m-d')); ?>
                 <div class="mechanic-card <?= $selectedMechId === (int)$m['id'] ? 'selected' : '' ?>" data-quote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" onclick="selectMechanic(<?= $m['id'] ?>)">
                     <input type="radio" name="mechanic_id" value="<?= $m['id'] ?>" <?= $selectedMechId === (int)$m['id'] ? 'checked' : '' ?> style="display:none;">
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
-                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?> &bull; <?= htmlspecialchars($m['experience']) ?> exp</div>
+                    <div class="specialties"><?= htmlspecialchars($m['specialties']) ?></div>
                     <div class="work-days">
                         <?php for ($d = 0; $d <= 6; $d++): ?>
                         <span class="work-day <?= isset($sched[$d]) ? 'on' : 'off' ?>"><?= $GLOBALS['DAY_NAMES_ABBR'][$d] ?></span>
                         <?php endfor; ?>
+                    </div>
+                    <div class="exp-badge">
+                        <span class="exp-label">Experience:</span>
+                        <span class="exp-value"><?= (int)$m['experience'] > 0 ? (int)$m['experience'] . ' yr' . ((int)$m['experience'] !== 1 ? 's' : '') : '< 1 yr' ?></span>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -196,317 +193,13 @@ if (!empty($errors) && in_array('slot_taken', $errors) && $selectedMechId && $se
 <script>
 var SLOT_LABELS = <?= json_encode($SLOT_LABELS) ?>;
 var SLOT_NAMES = <?= json_encode($SLOT_NAMES) ?>;
-var MECHANIC_NAMES = <?= json_encode(getMechanicsForSelect()) ?>;
-var VACATION_DATA = <?= json_encode($mechVacations) ?>;
+var VACATION_DATA = <?= json_encode($mechVacations, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+var TODAY = '<?= date('Y-m-d') ?>';
 var initialMechId = <?= $selectedMechId ?: '0' ?>;
 var initialDate = <?= json_encode($selectedDate) ?>;
-var initialSlot = <?= json_encode($selectedSlot !== '' ? (int)$selectedSlot : 'null') ?>;
-
-function htmlspecialchars(s) {
-    var d = document.createElement('div');
-    d.appendChild(document.createTextNode(s));
-    return d.innerHTML;
-}
-
-function isOnVacation(mechId, date) {
-    var vacs = VACATION_DATA[mechId] || [];
-    for (var i = 0; i < vacs.length; i++) {
-        if (vacs[i].start_date <= date && vacs[i].end_date >= date) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function updateVacationBadges(date) {
-    var checkDate = date || new Date().toISOString().slice(0, 10);
-
-    document.querySelectorAll('.vacation-badge').forEach(function(b) { b.remove(); });
-
-    document.querySelectorAll('.mechanic-card').forEach(function(card) {
-        var mechId = parseInt(card.querySelector('input[name="mechanic_id"]').value);
-        if (isOnVacation(mechId, checkDate)) {
-            var badge = document.createElement('span');
-            badge.className = 'status-badge status-cancelled vacation-badge';
-            badge.textContent = 'ON VACATION';
-            card.appendChild(badge);
-        }
-    });
-}
-
-function updateQuotePosition(card) {
-    var qt = document.getElementById('quote-tooltip');
-    if (!qt || qt.classList.contains('hidden')) return;
-
-    var quote = card.getAttribute('data-quote');
-    var name = card.querySelector('h3')?.textContent || '';
-    if (!quote) {
-        qt.classList.add('hidden');
-        return;
-    }
-
-    qt.innerHTML = '<span class="qt-text">"' + htmlspecialchars(quote) + '"</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
-
-    var rect = card.getBoundingClientRect();
-    var tooltipWidth = qt.offsetWidth;
-    var tooltipHeight = qt.offsetHeight;
-
-    var cardTopInDoc = rect.top + window.scrollY;
-    var cardLeftInDoc = rect.left + window.scrollX;
-    var cardWidth = rect.width;
-
-    var top = cardTopInDoc - tooltipHeight - 12;
-    var left = cardLeftInDoc + cardWidth - tooltipWidth + 180;
-
-    qt.style.top = top + 'px';
-    qt.style.left = Math.max(10, Math.min(left, window.innerWidth - tooltipWidth - 10)) + 'px';
-}
-
-function selectMechanic(id) {
-    var selectedCard = null;
-    document.querySelectorAll('.mechanic-card').forEach(c => c.classList.remove('selected'));
-    document.querySelectorAll('input[name="mechanic_id"]').forEach(r => {
-        if (parseInt(r.value) === id) {
-            r.checked = true;
-            selectedCard = r.closest('.mechanic-card');
-            selectedCard.classList.add('selected');
-        }
-    });
-
-    var qt = document.getElementById('quote-tooltip');
-    if (!qt) {
-        qt = document.createElement('div');
-        qt.id = 'quote-tooltip';
-        qt.className = 'quote-tooltip above hidden';
-        document.body.appendChild(qt);
-    }
-
-    if (selectedCard) {
-        qt.classList.remove('hidden');
-        updateQuotePosition(selectedCard);
-
-        // Re-trigger springy comic pop animation
-        qt.classList.remove('comic-pop');
-        void qt.offsetHeight;
-        qt.classList.add('comic-pop');
-    } else {
-        qt.classList.add('hidden');
-        qt.classList.remove('comic-pop');
-    }
-
-    fetchAvailability();
-}
-
-function hideTooltip() {
-    var t = document.getElementById('slot-tooltip');
-    if (t) t.classList.add('hidden');
-}
-
-function showTooltip(el) {
-    var slotIndex = parseInt(el.dataset.slot);
-    var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
-    var currentMechId = parseInt(mechIdEl.value);
-    var date = document.getElementById('date').value;
-
-    var t = document.getElementById('slot-tooltip');
-    if (!t) {
-        t = document.createElement('div');
-        t.id = 'slot-tooltip';
-        t.className = 'slot-tooltip';
-        document.body.appendChild(t);
-    }
-
-    var params = new URLSearchParams({ mechanic_id: currentMechId, date: date, slot_index: slotIndex });
-    fetch('availability.php?' + params).then(function(r) { return r.json(); }).then(function(data) {
-        var html = '<div class="tt-title">' + data.mechanic_first_name + ' is unavailable at that time. But here are some close alternatives for you:</div>';
-
-        var hasMechSlots = (data.adjacent_slot !== null || data.nearby_prev_date || data.nearby_next_date);
-        var hasOtherSlots = false;
-
-        var otherHtml = '';
-        if (data.all_slots) {
-            Object.keys(data.all_slots).forEach(function(mid) {
-                var id = parseInt(mid);
-                if (id === currentMechId) return;
-                var slots = data.all_slots[mid];
-                for (var i = 0; i < slots.length; i++) {
-                    if (slots[i].available && slots[i].index === slotIndex) {
-                        var name = data.all_names[mid] || ('Mechanic #' + mid);
-                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ')"><strong>' + name + '</strong></button>';
-                        hasOtherSlots = true;
-                        break;
-                    }
-                }
-            });
-        }
-
-        if (hasMechSlots) {
-            html += '<div class="tt-section">If you want to stick with <strong>' + data.mechanic_nickname + '</strong>:</div>';
-            html += '<div class="tt-chips">';
-            if (data.adjacent_slot !== null) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + date + '\', ' + data.adjacent_slot + ')"><span class="chip-label">' + SLOT_LABELS[data.adjacent_slot] + '</span></button>';
-            }
-            if (data.nearby_prev_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date + '\', ' + slotIndex + ')">' + data.nearby_prev_date.split('-').reverse().join('-') + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
-            }
-            if (data.nearby_next_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date + '\', ' + slotIndex + ')">' + data.nearby_next_date.split('-').reverse().join('-') + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
-            }
-            html += '</div>';
-        }
-
-        if (hasOtherSlots) {
-            html += '<div class="tt-section">If you want to stick with the slot:</div>';
-            html += '<div class="tt-chips">' + otherHtml + '</div>';
-        }
-        t.innerHTML = html;
-        t._target = el;
-        t.classList.remove('hidden');
-
-        var rect = el.getBoundingClientRect();
-        var spaceAbove = rect.top;
-        var needsBelow = spaceAbove < t.offsetHeight + 8;
-        var top;
-        if (needsBelow) {
-            top = rect.bottom + 8;
-            t.classList.add('below');
-        } else {
-            top = rect.top - t.offsetHeight - 8;
-            t.classList.remove('below');
-        }
-        var left = rect.left + rect.width - 60;
-        left = Math.min(left, window.innerWidth - t.offsetWidth - 10);
-        t.style.top = Math.max(4, top) + 'px';
-        t.style.left = Math.max(4, left) + 'px';
-    });
-}
-
-function fetchAvailability() {
-    var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
-    var dateEl = document.getElementById('date');
-    var container = document.getElementById('slot-container');
-
-    hideTooltip();
-
-    if (!mechIdEl || !dateEl.value) {
-        container.innerHTML = '<p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>';
-        updateVacationBadges(dateEl.value);
-        return;
-    }
-
-    updateVacationBadges(dateEl.value);
-
-    var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
-
-    fetch('availability.php?' + mechParams).then(function(r) { return r.json(); }).then(function(data) {
-
-        if (data.error) {
-            container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">' + data.error + '</p>';
-            return;
-        }
-
-        var html = '';
-        data.slots.forEach(function(slot) {
-            var taken = slot.available ? '' : 'taken';
-            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
-        });
-        container.innerHTML = html;
-
-        container.querySelectorAll('.slot-chip').forEach(function(chip) {
-            if (chip.classList.contains('taken')) {
-                chip.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var t = document.getElementById('slot-tooltip');
-                    if (t && !t.classList.contains('hidden') && t._target === chip) {
-                        hideTooltip();
-                    } else {
-                        showTooltip(chip);
-                    }
-                });
-            } else {
-                chip.addEventListener('click', function() {
-                    selectSlot(this, parseInt(this.dataset.slot));
-                });
-            }
-        });
-    }).catch(function() {
-        container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>';
-    });
-}
-
-function selectSlot(el, index) {
-    document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
-    document.getElementById('slot_index').value = index;
-}
-
-function fillSuggestion(mechId, date, slotIndex) {
-    hideTooltip();
-    selectMechanic(mechId);
-    document.getElementById('date').value = date;
-    setTimeout(function() {
-        fetchAvailability();
-        setTimeout(function() {
-            var chips = document.querySelectorAll('.slot-chip');
-            chips.forEach(function(c) {
-                if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) {
-                    selectSlot(c, slotIndex);
-                }
-            });
-        }, 300);
-    }, 100);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    document.addEventListener('click', function(e) {
-        var t = document.getElementById('slot-tooltip');
-        if (t && !t.classList.contains('hidden') && !t.contains(e.target) && e.target !== t._target && !e.target.closest('.slot-chip.taken')) {
-            hideTooltip();
-        }
-    });
-
-    window.addEventListener('scroll', function() {
-        var t = document.getElementById('slot-tooltip');
-        if (t && !t.classList.contains('hidden') && t._target) {
-            var rect = t._target.getBoundingClientRect();
-            var spaceAbove = rect.top;
-            var needsBelow = spaceAbove < t.offsetHeight + 8;
-            var top;
-            if (needsBelow) {
-                top = rect.bottom + 8;
-                t.classList.add('below');
-            } else {
-                top = rect.top - t.offsetHeight - 8;
-                t.classList.remove('below');
-            }
-            t.style.top = Math.max(4, top) + 'px';
-            t.style.left = Math.max(4, Math.min(rect.left + rect.width - 60, window.innerWidth - t.offsetWidth - 10)) + 'px';
-        }
-    });
-
-    window.addEventListener('resize', function() {
-        var selectedCard = document.querySelector('.mechanic-card.selected');
-        if (selectedCard) {
-            updateQuotePosition(selectedCard);
-        }
-    });
-
-    if (initialMechId && initialDate) {
-        selectMechanic(initialMechId);
-        if (initialSlot !== null) {
-            setTimeout(function() {
-                document.querySelectorAll('.slot-chip').forEach(function(c) {
-                    if (parseInt(c.dataset.slot) === initialSlot && !c.classList.contains('taken')) {
-                        selectSlot(c, initialSlot);
-                    }
-                });
-            }, 400);
-        }
-    }
-
-    updateVacationBadges(initialDate);
-});
+var initialSlot = <?= $selectedSlot !== '' ? json_encode((int)$selectedSlot) : 'null' ?>;
 </script>
+<script src="script.js"></script>
 <script src="datepicker.js"></script>
 </body>
 </html>

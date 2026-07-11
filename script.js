@@ -1,72 +1,465 @@
-document.addEventListener('DOMContentLoaded', function () {
-    var form = document.getElementById('booking-form');
-    if (!form) return;
+function htmlspecialchars(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
-    var dateInput = document.getElementById('date');
-    var slotInput = document.getElementById('slot_index');
-    var mechanicRadios = document.querySelectorAll('input[name="mechanic_id"]');
+function formatSuggestDate(dateStr) {
+    var parts = dateStr.split('-');
+    var year = parts[0];
+    var monthNum = parseInt(parts[1], 10);
+    var day = parseInt(parts[2], 10);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var monthStr = months[monthNum - 1] || '';
+    return day + ' ' + monthStr + ' ' + year;
+}
 
-    var inputs = ['name', 'phone', 'license_no', 'engine_no']
-        .map(function (id) { return document.getElementById(id); })
-        .filter(Boolean);
+function repositionPastDateMsg() {
+    var el = document.getElementById('past-date-msg');
+    if (!el || el.style.display === 'none') return;
+    var btn = document.querySelector('#booking-form button[type="submit"]');
+    if (btn) {
+        var r = btn.getBoundingClientRect();
+        var left = Math.max(8, Math.min(r.left + r.width / 2 - 45 + 30 + window.scrollX, window.innerWidth - 220));
+        el.style.top = (r.bottom + window.scrollY - 4) + 'px';
+        el.style.left = left + 'px';
+    }
+}
 
-    function validateField(input) {
-        var val = input.value.trim();
-        var rules = (input.dataset.validate || '').split('|');
-        for (var i = 0; i < rules.length; i++) {
-            var rule = rules[i];
-            if (rule === 'required' && !val) return input.dataset.errRequired || 'Required';
-            if (rule === 'phone' && val && !/^[\d\s\-+()]+$/.test(val)) return input.dataset.errPhone || 'Digits only';
-            if (rule === 'alphanumeric' && val && !/^[a-zA-Z0-9]+$/.test(val)) return input.dataset.errAlphanumeric || 'Alphanumeric only';
+function showPastDateMsg() {
+    var el = document.getElementById('past-date-msg');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'past-date-msg';
+        el.className = 'jagged-bubble top';
+        el.textContent = "We can't travel to the past! Pick a present or later date.";
+        el.style.cssText = 'position:absolute;font-size:1.35rem;max-width:400px;pointer-events:auto;z-index:9999;';
+        document.body.appendChild(el);
+    }
+    repositionPastDateMsg();
+    el.style.display = 'block';
+    el.classList.remove('shaky-pop');
+    void el.offsetWidth;
+    el.classList.add('shaky-pop');
+}
+
+function hidePastDateMsg() {
+    var el = document.getElementById('past-date-msg');
+    if (el) el.style.display = 'none';
+}
+
+function isOnVacation(mechId, date) {
+    var vacs = VACATION_DATA[mechId] || [];
+    for (var i = 0; i < vacs.length; i++) {
+        if (vacs[i].start_date <= date && vacs[i].end_date >= date) return true;
+    }
+    return false;
+}
+
+function updateVacationBadges(date) {
+    var checkDate = date || new Date().toISOString().slice(0, 10);
+    document.querySelectorAll('.vacation-badge').forEach(function(b) { b.remove(); });
+    document.querySelectorAll('.mechanic-card').forEach(function(card) {
+        var mechId = parseInt(card.querySelector('input[name="mechanic_id"]').value);
+        if (isOnVacation(mechId, checkDate)) {
+            var badge = document.createElement('span');
+            badge.className = 'status-badge status-cancelled vacation-badge';
+            badge.textContent = 'ON VACATION';
+            card.appendChild(badge);
         }
-        return '';
-    }
-
-    function showError(input, msg) {
-        var parent = input.closest('.form-group');
-        var existing = parent.querySelector('.field-error');
-        if (existing) existing.remove();
-        if (msg) {
-            var err = document.createElement('div');
-            err.className = 'field-error';
-            err.style.cssText = 'color:var(--rust);font-size:0.78rem;font-weight:bold;margin-top:4px;text-transform:uppercase;';
-            err.textContent = msg;
-            parent.appendChild(err);
-        }
-    }
-
-    function clearErrors() {
-        document.querySelectorAll('.field-error').forEach(function (e) { e.remove(); });
-    }
-
-    inputs.forEach(function (input) {
-        input.addEventListener('blur', function () {
-            showError(this, validateField(this));
-        });
     });
+}
 
-    form.addEventListener('submit', function (e) {
-        clearErrors();
-        var valid = true;
+// --- Booking page (index.php) ---
 
-        inputs.forEach(function (input) {
-            var msg = validateField(input);
-            if (msg) { showError(input, msg); valid = false; }
+function updateQuotePosition(card) {
+    var qt = document.getElementById('quote-tooltip');
+    if (!qt || qt.classList.contains('hidden')) return;
+    var quote = card.getAttribute('data-quote');
+    var name = card.querySelector('h3')?.textContent || '';
+    if (!quote) { qt.classList.add('hidden'); return; }
+    qt.innerHTML = '<span class="qt-text">"' + htmlspecialchars(quote) + '"</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
+    var rect = card.getBoundingClientRect();
+    var tooltipWidth = qt.offsetWidth;
+    var tooltipHeight = qt.offsetHeight;
+    var cardTopInDoc = rect.top + window.scrollY;
+    var cardLeftInDoc = rect.left + window.scrollX;
+    var cardWidth = rect.width;
+    qt.style.top = (cardTopInDoc - tooltipHeight - 12) + 'px';
+    qt.style.left = Math.max(10, Math.min(cardLeftInDoc + cardWidth - tooltipWidth + 180, window.innerWidth - tooltipWidth - 10)) + 'px';
+}
+
+function selectMechanic(id) {
+    var selectedCard = null;
+    document.querySelectorAll('.mechanic-card').forEach(function(c) { c.classList.remove('selected'); });
+    document.querySelectorAll('input[name="mechanic_id"]').forEach(function(r) {
+        if (parseInt(r.value) === id) { r.checked = true; selectedCard = r.closest('.mechanic-card'); selectedCard.classList.add('selected'); }
+    });
+    var qt = document.getElementById('quote-tooltip');
+    if (!qt) {
+        qt = document.createElement('div');
+        qt.id = 'quote-tooltip';
+        qt.className = 'quote-tooltip above hidden';
+        document.body.appendChild(qt);
+    }
+    if (selectedCard) {
+        qt.classList.remove('hidden');
+        updateQuotePosition(selectedCard);
+        qt.classList.remove('comic-pop');
+        void qt.offsetHeight;
+        qt.classList.add('comic-pop');
+    } else {
+        qt.classList.add('hidden');
+        qt.classList.remove('comic-pop');
+    }
+    fetchAvailability();
+}
+
+function hideTooltip() {
+    var t = document.getElementById('slot-tooltip');
+    if (t) t.classList.add('hidden');
+}
+
+function showTooltip(el) {
+    var slotIndex = parseInt(el.dataset.slot);
+    var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
+    if (!mechIdEl) return;
+    var currentMechId = parseInt(mechIdEl.value);
+    var date = document.getElementById('date').value;
+    var t = document.getElementById('slot-tooltip');
+    if (!t) { t = document.createElement('div'); t.id = 'slot-tooltip'; t.className = 'slot-tooltip'; document.body.appendChild(t); }
+    var params = new URLSearchParams({ mechanic_id: currentMechId, date: date, slot_index: slotIndex });
+    fetch('availability.php?' + params).then(function(r) { return r.json(); }).then(function(data) {
+        var html = '<div class="tt-title">' + htmlspecialchars(data.mechanic_first_name) + ' is unavailable at that time. But here are some close alternatives for you:</div>';
+        var hasMechSlots = (data.adjacent_slot !== null || data.nearby_prev_date || data.nearby_next_date);
+        var hasOtherSlots = false;
+        var otherHtml = '';
+        if (data.all_slots) {
+            Object.keys(data.all_slots).forEach(function(mid) {
+                var id = parseInt(mid);
+                if (id === currentMechId) return;
+                var slots = data.all_slots[mid];
+                for (var i = 0; i < slots.length; i++) {
+                    if (slots[i].available && slots[i].index === slotIndex) {
+                        var name = data.all_names[mid] || ('Mechanic #' + mid);
+                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ')"><strong>' + htmlspecialchars(name) + '</strong></button>';
+                        hasOtherSlots = true;
+                        break;
+                    }
+                }
+            });
+        }
+        if (hasMechSlots) {
+            html += '<div class="tt-section">If you want to stick with <strong>' + htmlspecialchars(data.mechanic_nickname) + '</strong>:</div>';
+            html += '<div class="tt-chips">';
+            if (data.adjacent_slot !== null) {
+                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + date + '\', ' + data.adjacent_slot + ')"><span class="chip-label">' + SLOT_LABELS[data.adjacent_slot] + '</span></button>';
+            }
+            if (data.nearby_prev_date) {
+                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date + '\', ' + slotIndex + ')">' + formatSuggestDate(data.nearby_prev_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+            }
+            if (data.nearby_next_date) {
+                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date + '\', ' + slotIndex + ')">' + formatSuggestDate(data.nearby_next_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+            }
+            html += '</div>';
+        }
+        if (hasOtherSlots) {
+            html += '<div class="tt-section">If you want to stick with the slot:</div>';
+            html += '<div class="tt-chips">' + otherHtml + '</div>';
+        }
+        t.innerHTML = html;
+        t._target = el;
+        t.classList.remove('hidden');
+        var rect = el.getBoundingClientRect();
+        var spaceAbove = rect.top;
+        var needsBelow = spaceAbove < t.offsetHeight + 8;
+        var top = needsBelow ? rect.bottom + 8 : rect.top - t.offsetHeight - 8;
+        if (needsBelow) t.classList.add('below'); else t.classList.remove('below');
+        var left = Math.min(rect.left + rect.width - 60, window.innerWidth - t.offsetWidth - 10);
+        t.style.top = Math.max(4, top) + 'px';
+        t.style.left = Math.max(4, left) + 'px';
+    }).catch(function() { hideTooltip(); });
+}
+
+function fetchAvailability() {
+    var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
+    var dateEl = document.getElementById('date');
+    var container = document.getElementById('slot-container');
+    hideTooltip();
+    if (!mechIdEl || !dateEl.value) {
+        container.innerHTML = '<p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>';
+        updateVacationBadges(dateEl.value);
+        return;
+    }
+    updateVacationBadges(dateEl.value);
+    var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
+    fetch('availability.php?' + mechParams).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.error) { container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">' + htmlspecialchars(data.error) + '</p>'; return; }
+        var html = '';
+        data.slots.forEach(function(slot) {
+            var taken = slot.available ? '' : 'taken';
+            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('.slot-chip').forEach(function(chip) {
+            if (chip.classList.contains('taken')) {
+                chip.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var t = document.getElementById('slot-tooltip');
+                    if (t && !t.classList.contains('hidden') && t._target === chip) { hideTooltip(); }
+                    else { showTooltip(chip); }
+                });
+            } else {
+                chip.addEventListener('click', function() { selectSlot(this, parseInt(this.dataset.slot)); });
+            }
+        });
+    }).catch(function() { container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>'; });
+}
+
+function selectSlot(el, index) {
+    document.querySelectorAll('.slot-chip').forEach(function(c) { c.classList.remove('selected'); });
+    el.classList.add('selected');
+    document.getElementById('slot_index').value = index;
+}
+
+function fillSuggestion(mechId, date, slotIndex) {
+    hideTooltip();
+    selectMechanic(mechId);
+    document.getElementById('date').value = date;
+    setTimeout(function() {
+        fetchAvailability();
+        setTimeout(function() {
+            document.querySelectorAll('.slot-chip').forEach(function(c) {
+                if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) selectSlot(c, slotIndex);
+            });
+        }, 300);
+    }, 100);
+}
+
+// --- Admin page ---
+
+var _pendingAction = '';
+var _pendingForm = null;
+var _pendingField = null;
+
+function requirePw(actionUrl) {
+    _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; openPwModal();
+}
+function requirePwForForm(form) {
+    _pendingForm = form; _pendingAction = ''; _pendingField = null; openPwModal(); return false;
+}
+function requirePwForField(fieldId) {
+    var field = document.getElementById(fieldId);
+    if (!field.readOnly) return;
+    _pendingField = field; _pendingAction = ''; _pendingForm = null; openPwModal();
+}
+function openPwModal() {
+    document.getElementById('admin-pw-input').value = '';
+    document.getElementById('admin-pw-input').type = 'password';
+    document.getElementById('pw-toggle').innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
+    document.getElementById('pw-error').style.display = 'none';
+    document.getElementById('pw-modal').classList.remove('hidden');
+    document.getElementById('admin-pw-input').focus();
+}
+function togglePwVisibility() {
+    var input = document.getElementById('admin-pw-input');
+    var btn = document.getElementById('pw-toggle');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<img src="images/doodles/eye-open.svg" alt="Hide password" style="display:block;">';
+    } else {
+        input.type = 'password';
+        btn.innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
+    }
+}
+function confirmPw() {
+    var pw = document.getElementById('admin-pw-input').value;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        var resp = JSON.parse(xhr.responseText);
+        if (resp.success) {
+            document.getElementById('pw-modal').classList.add('hidden');
+            if (_pendingField) {
+                ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
+                    var f = document.getElementById(id);
+                    if (f && f.readOnly) { f.readOnly = false; f.style.cursor = 'text'; f.style.backgroundColor = ''; }
+                });
+                _pendingField.focus();
+                _pendingField = null;
+            } else if (_pendingAction) {
+                window.location.href = _pendingAction;
+            } else if (_pendingForm) {
+                var input = document.createElement('input');
+                input.type = 'hidden'; input.name = 'admin_pw'; input.value = pw;
+                _pendingForm.appendChild(input);
+                _pendingForm.submit();
+            }
+        } else {
+            document.getElementById('pw-error').style.display = 'block';
+            document.getElementById('admin-pw-input').focus();
+        }
+    };
+    xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
+}
+function closePwModal() {
+    document.getElementById('pw-modal').classList.add('hidden');
+    _pendingAction = ''; _pendingForm = null; _pendingField = null;
+}
+
+function toggleEdit(id) { document.getElementById('edit-' + id).classList.toggle('show'); }
+function toggleOverrides() {
+    var panel = document.getElementById('overrides-panel');
+    var btn = document.getElementById('overrides-toggle');
+    var open = panel.style.display !== 'none';
+    panel.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
+}
+function openMechModal(btn) {
+    document.getElementById('modal-mech-id').value = btn.dataset.mid;
+    document.getElementById('modal-mech-name').value = btn.dataset.mname;
+    document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
+    document.getElementById('modal-mech-quote').value = btn.dataset.mquote;
+    document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
+    document.getElementById('modal-mech-exp').value = btn.dataset.experience;
+    renderVacations(parseInt(btn.dataset.mid));
+    document.getElementById('mech-modal').classList.remove('hidden');
+}
+function closeMechModal(event) { if (event.target === event.currentTarget) document.getElementById('mech-modal').classList.add('hidden'); }
+function openScheduleModal(id, name) {
+    document.getElementById('schedule-mech-id').value = id;
+    document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
+    var cbs = document.querySelectorAll('#schedule-form .sched-cb');
+    cbs.forEach(function(cb) { cb.checked = false; });
+    var sched = SCHEDULE_DATA[id] || {};
+    cbs.forEach(function(cb) { var dow = parseInt(cb.dataset.dow); var slot = parseInt(cb.dataset.slot); if (sched[dow] && sched[dow][slot]) cb.checked = true; });
+    document.getElementById('schedule-modal').classList.remove('hidden');
+}
+function toggleMechSwapBtn(sel) {
+    var btn = sel.closest('form').querySelector('[name="update_mechanic"]');
+    if (parseInt(sel.value) === parseInt(sel.dataset.current)) { btn.disabled = true; btn.classList.add('disabled'); }
+    else { btn.disabled = false; btn.classList.remove('disabled'); }
+}
+function toggleDateChangeBtn(el) {
+    var form = el.closest('form');
+    var btn = form.querySelector('[name="update_date"]');
+    var dateInput = form.querySelector('[name="new_date"]');
+    var slotSelect = form.querySelector('[name="new_slot"]');
+    var changed = dateInput.value !== dateInput.dataset.originalDate || parseInt(slotSelect.value) !== parseInt(slotSelect.dataset.originalSlot);
+    btn.disabled = !changed;
+    btn.classList.toggle('disabled', !changed);
+}
+function closeScheduleModal(event) { if (event.target === event.currentTarget) document.getElementById('schedule-modal').classList.add('hidden'); }
+function showCancelModal(id) { _pendingAction = '?cancel=' + id; document.getElementById('cancel-modal').classList.remove('hidden'); }
+function closeCancelModal(event) { if (event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
+function showFireModal(id, name) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; document.getElementById('fire-modal').classList.remove('hidden'); }
+function closeFireModal(event) { if (event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
+function showRemoveModal(id) { _pendingAction = '?remove=' + id; document.getElementById('remove-modal').classList.remove('hidden'); }
+function closeRemoveModal(event) { if (event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
+function showUnblockModal(id, name, date) {
+    document.getElementById('unblock-confirm-link').href = '?unblock=' + id;
+    document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
+    document.getElementById('unblock-modal').classList.remove('hidden');
+}
+function closeUnblockModal(event) { if (event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
+function renderVacations(id) {
+    var list = document.getElementById('vacation-list');
+    list.innerHTML = '';
+    var vacs = VACATION_DATA[id] || [];
+    if (vacs.length === 0) {
+        list.innerHTML = '<p style="font-size:0.85rem;opacity:0.7;">No vacations scheduled.</p>';
+    } else {
+        var html = '';
+        vacs.forEach(function(v) {
+            var label = htmlspecialchars(v.start_date + ' to ' + v.end_date);
+            if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
+            html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
+            html += '<span style="flex:1;">' + label + '</span>';
+            html += '<a href="?remove_vacation=' + v.id + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+    }
+}
+function addVacation() {
+    var id = document.getElementById('modal-mech-id').value;
+    var start = document.getElementById('vac-start').value;
+    var end = document.getElementById('vac-end').value;
+    if (!id || !start || !end) return;
+    if (start > end) { alert('Start date must be before end date.'); return; }
+    var reason = document.getElementById('vac-reason').value;
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.style.display = 'none';
+    f.innerHTML = '<input name="add_vacation" value="1"><input name="vac_mech_id" value="' + htmlspecialchars(id) + '"><input name="vac_start" value="' + htmlspecialchars(start) + '"><input name="vac_end" value="' + htmlspecialchars(end) + '"><input name="vac_reason" value="' + htmlspecialchars(reason) + '">';
+    document.body.appendChild(f);
+    f.submit();
+}
+function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
+function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+
+// --- DOMContentLoaded ---
+
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Booking page
+    if (document.getElementById('booking-form')) {
+        document.addEventListener('click', function(e) {
+            var t = document.getElementById('slot-tooltip');
+            if (t && !t.classList.contains('hidden') && !t.contains(e.target) && e.target !== t._target && !e.target.closest('.slot-chip.taken')) hideTooltip();
+        });
+        window.addEventListener('scroll', function() {
+            var t = document.getElementById('slot-tooltip');
+            if (t && !t.classList.contains('hidden') && t._target) {
+                var rect = t._target.getBoundingClientRect();
+                var spaceAbove = rect.top;
+                var needsBelow = spaceAbove < t.offsetHeight + 8;
+                var top = needsBelow ? rect.bottom + 8 : rect.top - t.offsetHeight - 8;
+                if (needsBelow) t.classList.add('below'); else t.classList.remove('below');
+                t.style.top = Math.max(4, top) + 'px';
+                t.style.left = Math.max(4, Math.min(rect.left + rect.width - 60, window.innerWidth - t.offsetWidth - 10)) + 'px';
+            }
+        });
+        window.addEventListener('resize', function() {
+            var selectedCard = document.querySelector('.mechanic-card.selected');
+            if (selectedCard) updateQuotePosition(selectedCard);
+            repositionPastDateMsg();
+        });
+        if (typeof initialMechId !== 'undefined' && initialMechId && initialDate) {
+            selectMechanic(initialMechId);
+            if (initialSlot !== null && typeof initialSlot !== 'undefined') {
+                setTimeout(function() {
+                    document.querySelectorAll('.slot-chip').forEach(function(c) {
+                        if (parseInt(c.dataset.slot) === initialSlot && !c.classList.contains('taken')) selectSlot(c, initialSlot);
+                    });
+                }, 400);
+            }
+        }
+        updateVacationBadges(typeof initialDate !== 'undefined' ? initialDate : '');
+
+        document.getElementById('booking-form').addEventListener('submit', function(e) {
+            var dateVal = document.getElementById('date').value;
+            if (dateVal && dateVal < TODAY) {
+                e.preventDefault();
+                showPastDateMsg();
+            } else {
+                hidePastDateMsg();
+            }
         });
 
-        if (!dateInput.value) {
-            showError(dateInput, 'Select a date');
-            valid = false;
-        }
-        if (!Array.from(mechanicRadios).some(function (r) { return r.checked; })) {
-            alert('Please select a mechanic.');
-            valid = false;
-        }
-        if (slotInput.value === "") {
-            alert('Please select a time slot.');
-            valid = false;
-        }
+        document.getElementById('date').addEventListener('change', function() {
+            var dateVal = document.getElementById('date').value;
+            if (!dateVal || dateVal >= TODAY) hidePastDateMsg();
+        });
+    }
 
-        if (!valid) e.preventDefault();
-    });
+    // Admin page
+    if (document.getElementById('pw-modal')) {
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('pw-modal').classList.contains('hidden')) closePwModal();
+            if (e.key === 'Enter' && !document.getElementById('pw-modal').classList.contains('hidden')) confirmPw();
+        });
+    }
+
 });

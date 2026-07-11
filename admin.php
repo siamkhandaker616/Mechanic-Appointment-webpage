@@ -146,8 +146,9 @@ $effectiveTime = getEffectiveTime();
             <?php if (empty($appointments)): ?>
             <tr><td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td></tr>
             <?php else: ?>
-            <?php foreach ($appointments as $a): ?>
-            <tr>
+            <?php $aRowNum = 0; ?>
+            <?php foreach ($appointments as $a): $aRowNum++; ?>
+            <tr class="<?= $aRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
                 <td><strong><?= fmtNameTwoLines($a['client_name']) ?></strong></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['phone']) ?></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
@@ -171,7 +172,7 @@ $effectiveTime = getEffectiveTime();
                     <div class="edit-inner">
                         <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
-                            <input type="date" name="new_date" value="<?= $a['appointment_date'] ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= $a['appointment_date'] ?>" onchange="toggleDateChangeBtn(this)">
+                            <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleDateChangeBtn(this)">
                             <select name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleDateChangeBtn(this)">
                                 <?php foreach ($SLOT_LABELS as $si => $sl): ?>
                                 <option value="<?= $si ?>" <?= $si === (int)$a['slot_index'] ? 'selected' : '' ?>><?= htmlspecialchars($sl) ?></option>
@@ -258,7 +259,8 @@ $effectiveTime = getEffectiveTime();
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($overrides as $o):
+            <?php $oRowNum = 0; ?>
+            <?php foreach ($overrides as $o): $oRowNum++;
                 $blocked = [];
                 for ($i = 0; $i < SLOT_COUNT; $i++) {
                     $key = 'slot_' . ($i + 1);
@@ -267,7 +269,7 @@ $effectiveTime = getEffectiveTime();
                     }
                 }
             ?>
-            <tr>
+            <tr class="<?= $oRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
                 <td><strong><?= fmtNameTwoLines($o['mechanic_name']) ?></strong></td>
                 <td><?= htmlspecialchars(fmtDate($o['override_date'])) ?></td>
                 <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
@@ -299,9 +301,10 @@ $effectiveTime = getEffectiveTime();
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($allMechanics as $m): ?>
+            <?php $mRowNum = 0; ?>
+            <?php foreach ($allMechanics as $m): $mRowNum++; ?>
             <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], date('Y-m-d')); ?>
-            <tr>
+            <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
                 <td><strong><?= fmtNameTwoLines($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($m['specialties'] ?? '—') ?></td>
@@ -329,7 +332,7 @@ $effectiveTime = getEffectiveTime();
     </table>
     </div>
 
-    <details style="margin-top:16px;border:2px solid var(--ink);padding:12px;background:var(--cyan-light);box-shadow:3px 3px 0 var(--ink);">
+    <details style="margin-top:16px;border:2px solid var(--ink);padding:12px;background:var(--cyan);box-shadow:3px 3px 0 var(--ink);">
         <summary style="font-family:var(--font-sub);text-transform:uppercase;cursor:pointer;font-size:0.9rem;">Register New Mechanic</summary>
         <form method="post" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
             <div>
@@ -549,7 +552,7 @@ $effectiveTime = getEffectiveTime();
 
 <?php if ($msg): ?>
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
-    <div class="modal-box msg-box msg-<?= $msgType ?>">
+    <div class="modal-box msg-box msg-<?= htmlspecialchars($msgType) ?>">
         <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
         <div class="msg-content"><?= htmlspecialchars($msg) ?></div>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
@@ -560,282 +563,10 @@ $effectiveTime = getEffectiveTime();
 <?php endif; ?>
 
 <script>
-var SCHEDULE_DATA = <?= json_encode($scheduleData) ?>;
-var VACATION_DATA = <?= json_encode($vacationData) ?>;
-
-var _pendingAction = '';
-var _pendingForm = null;
-var _pendingField = null;
-
-function requirePw(actionUrl) {
-    _pendingAction = actionUrl;
-    _pendingForm = null;
-    _pendingField = null;
-    openPwModal();
-}
-
-function requirePwForForm(form) {
-    _pendingForm = form;
-    _pendingAction = '';
-    _pendingField = null;
-    openPwModal();
-    return false;
-}
-
-function requirePwForField(fieldId) {
-    var field = document.getElementById(fieldId);
-    if (!field.readOnly) return;
-    _pendingField = field;
-    _pendingAction = '';
-    _pendingForm = null;
-    openPwModal();
-}
-
-function openPwModal() {
-    document.getElementById('admin-pw-input').value = '';
-    document.getElementById('admin-pw-input').type = 'password';
-    document.getElementById('pw-toggle').innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
-    document.getElementById('pw-error').style.display = 'none';
-    document.getElementById('pw-modal').classList.remove('hidden');
-    document.getElementById('admin-pw-input').focus();
-}
-
-function togglePwVisibility() {
-    var input = document.getElementById('admin-pw-input');
-    var btn = document.getElementById('pw-toggle');
-    if (input.type === 'password') {
-        input.type = 'text';
-        btn.innerHTML = '<img src="images/doodles/eye-open.svg" alt="Hide password" style="display:block;">';
-    } else {
-        input.type = 'password';
-        btn.innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
-    }
-}
-
-function confirmPw() {
-    var pw = document.getElementById('admin-pw-input').value;
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '', true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhr.onload = function() {
-        var resp = JSON.parse(xhr.responseText);
-        if (resp.success) {
-            document.getElementById('pw-modal').classList.add('hidden');
-            if (_pendingField) {
-                var fields = ['modal-mech-name', 'modal-mech-exp'];
-                for (var i = 0; i < fields.length; i++) {
-                    var f = document.getElementById(fields[i]);
-                    if (f && f.readOnly) {
-                        f.readOnly = false;
-                        f.style.cursor = 'text';
-                        f.style.backgroundColor = '';
-                    }
-                }
-                _pendingField.focus();
-                _pendingField = null;
-            } else if (_pendingAction) {
-                window.location.href = _pendingAction;
-            } else if (_pendingForm) {
-                var input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'admin_pw';
-                input.value = pw;
-                _pendingForm.appendChild(input);
-                _pendingForm.submit();
-            }
-        } else {
-            document.getElementById('pw-error').style.display = 'block';
-            document.getElementById('admin-pw-input').focus();
-        }
-    };
-    xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
-}
-
-function closePwModal() {
-    document.getElementById('pw-modal').classList.add('hidden');
-    _pendingAction = '';
-    _pendingForm = null;
-    _pendingField = null;
-}
-
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && !document.getElementById('pw-modal').classList.contains('hidden')) {
-        closePwModal();
-    }
-    if (e.key === 'Enter' && !document.getElementById('pw-modal').classList.contains('hidden')) {
-        confirmPw();
-    }
-});
-
-function toggleEdit(id) {
-    var row = document.getElementById('edit-' + id);
-    row.classList.toggle('show');
-}
-
-function toggleOverrides() {
-    var panel = document.getElementById('overrides-panel');
-    var btn = document.getElementById('overrides-toggle');
-    var open = panel.style.display !== 'none';
-    panel.style.display = open ? 'none' : 'block';
-    btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
-}
-
-function openMechModal(btn) {
-    document.getElementById('modal-mech-id').value = btn.dataset.mid;
-    document.getElementById('modal-mech-name').value = btn.dataset.mname;
-    document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
-    document.getElementById('modal-mech-quote').value = btn.dataset.mquote;
-    document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
-    document.getElementById('modal-mech-exp').value = btn.dataset.experience;
-    renderVacations(parseInt(btn.dataset.mid));
-    document.getElementById('mech-modal').classList.remove('hidden');
-}
-
-function closeMechModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('mech-modal').classList.add('hidden');
-    }
-}
-
-function openScheduleModal(id, name) {
-    document.getElementById('schedule-mech-id').value = id;
-    document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
-
-    var cbs = document.querySelectorAll('#schedule-form .sched-cb');
-    cbs.forEach(function(cb) {
-        cb.checked = false;
-    });
-
-    var sched = SCHEDULE_DATA[id] || {};
-    cbs.forEach(function(cb) {
-        var dow = parseInt(cb.dataset.dow);
-        var slot = parseInt(cb.dataset.slot);
-        if (sched[dow] && sched[dow][slot]) {
-            cb.checked = true;
-        }
-    });
-
-    document.getElementById('schedule-modal').classList.remove('hidden');
-}
-
-function toggleMechSwapBtn(sel) {
-    var btn = sel.closest('form').querySelector('[name="update_mechanic"]');
-    if (parseInt(sel.value) === parseInt(sel.dataset.current)) {
-        btn.disabled = true;
-        btn.classList.add('disabled');
-    } else {
-        btn.disabled = false;
-        btn.classList.remove('disabled');
-    }
-}
-
-function toggleDateChangeBtn(el) {
-    var form = el.closest('form');
-    var btn = form.querySelector('[name="update_date"]');
-    var dateInput = form.querySelector('[name="new_date"]');
-    var slotSelect = form.querySelector('[name="new_slot"]');
-    var changed = dateInput.value !== dateInput.dataset.originalDate
-               || parseInt(slotSelect.value) !== parseInt(slotSelect.dataset.originalSlot);
-    btn.disabled = !changed;
-    btn.classList.toggle('disabled', !changed);
-}
-
-function closeScheduleModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('schedule-modal').classList.add('hidden');
-    }
-}
-
-function showCancelModal(id) {
-    _pendingAction = '?cancel=' + id;
-    document.getElementById('cancel-modal').classList.remove('hidden');
-}
-function closeCancelModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('cancel-modal').classList.add('hidden');
-    }
-}
-function showFireModal(id, name) {
-    _pendingAction = '?fire=' + id;
-    document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?';
-    document.getElementById('fire-modal').classList.remove('hidden');
-}
-function closeFireModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('fire-modal').classList.add('hidden');
-    }
-}
-function showRemoveModal(id) {
-    _pendingAction = '?remove=' + id;
-    document.getElementById('remove-modal').classList.remove('hidden');
-}
-function closeRemoveModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('remove-modal').classList.add('hidden');
-    }
-}
-function showUnblockModal(id, name, date) {
-    document.getElementById('unblock-confirm-link').href = '?unblock=' + id;
-    document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
-    document.getElementById('unblock-modal').classList.remove('hidden');
-}
-function closeUnblockModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('unblock-modal').classList.add('hidden');
-    }
-}
-
-function renderVacations(id) {
-    var list = document.getElementById('vacation-list');
-    list.innerHTML = '';
-    var vacs = VACATION_DATA[id] || [];
-    if (vacs.length === 0) {
-        list.innerHTML = '<p style="font-size:0.85rem;opacity:0.7;">No vacations scheduled.</p>';
-    } else {
-        var html = '';
-        vacs.forEach(function(v) {
-            var label = v.start_date + ' to ' + v.end_date;
-            if (v.reason) label += ' (' + v.reason + ')';
-            html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan-light);border:2px solid var(--ink);font-size:0.8rem;">';
-            html += '<span style="flex:1;">' + label + '</span>';
-            html += '<a href="?remove_vacation=' + v.id + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
-            html += '</div>';
-        });
-        list.innerHTML = html;
-    }
-}
-
-function addVacation() {
-    var id = document.getElementById('modal-mech-id').value;
-    var start = document.getElementById('vac-start').value;
-    var end = document.getElementById('vac-end').value;
-    if (!id || !start || !end) return;
-    if (start > end) { alert('Start date must be before end date.'); return; }
-    var reason = document.getElementById('vac-reason').value;
-    var f = document.createElement('form');
-    f.method = 'POST';
-    f.style.display = 'none';
-    f.innerHTML = '<input name="add_vacation" value="1">'
-        + '<input name="vac_mech_id" value="' + id + '">'
-        + '<input name="vac_start" value="' + start + '">'
-        + '<input name="vac_end" value="' + end + '">'
-        + '<input name="vac_reason" value="' + reason.replace(/"/g,'&quot;') + '">';
-    document.body.appendChild(f);
-    f.submit();
-}
-
-function closeConflictModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('conflict-modal').classList.add('hidden');
-    }
-}
-
-function closeMsgModal(event) {
-    if (event.target === event.currentTarget) {
-        document.getElementById('msg-modal').classList.add('hidden');
-    }
-}
+var SCHEDULE_DATA = <?= json_encode($scheduleData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
+<script src="script.js"></script>
 <script src="datepicker.js"></script>
 </body>
 </html>
