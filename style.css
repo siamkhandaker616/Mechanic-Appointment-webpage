@@ -1018,8 +1018,25 @@ tr:last-child td {
 
 .sim-group {
     display: inline-flex;
-    gap: 6px;
-    align-items: center;
+    align-items: stretch;
+    gap: 0;
+}
+
+.sim-group .datepicker-wrap {
+    display: inline-flex;
+}
+
+.sim-group .datepicker-display {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right-width: 0;
+}
+
+.sim-group .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    margin: 0;
+    height: auto;
 }
 
 .sim-bar > * {
@@ -1292,18 +1309,8 @@ tr:last-child td {
 }
 
 .datepicker-display--dt {
-    width: 100%;
-    max-width: 360px;
-    white-space: pre-line;
-    line-height: 1.4;
-    padding: 10px 12px;
-    min-height: 48px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-sizing: border-box;
-    border: var(--border);
-    color: var(--ink);
+    width: 185px;
+    max-width: none;
 }
 
 .datepicker-popup {

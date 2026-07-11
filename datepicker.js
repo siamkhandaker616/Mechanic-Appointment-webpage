@@ -65,25 +65,16 @@ class DatePicker {
         this.input.parentNode.insertBefore(this.wrapper, this.input);
         this.wrapper.appendChild(this.input);
 
-        if (this.isDateTime) {
-            this.display = document.createElement('div');
-            this.display.className = 'datepicker-display datepicker-display--dt';
-        } else {
-            this.display = document.createElement('input');
-            this.display.type = 'text';
-            this.display.className = 'datepicker-display';
-            this.display.readOnly = true;
-            this.display.placeholder = this.input.placeholder || 'Pick a date';
-        }
+        this.display = document.createElement('input');
+        this.display.type = 'text';
+        this.display.className = 'datepicker-display' + (this.isDateTime ? ' datepicker-display--dt' : '');
+        this.display.readOnly = true;
+        this.display.placeholder = this.input.placeholder || (this.isDateTime ? 'Pick date & time' : 'Pick a date');
         this.wrapper.appendChild(this.display);
 
         if (this.input.value) {
             var formatted = this._formatDisplay(this.input.value);
-            if (this.isDateTime) {
-                this.display.textContent = formatted.replace(' ', '\n');
-            } else {
-                this.display.value = formatted;
-            }
+            this.display.value = formatted;
         }
 
         this.input.style.display = 'none';
@@ -99,8 +90,12 @@ class DatePicker {
     _formatDisplay(isoStr) {
         var parts = isoStr.split('T');
         var ymd = parts[0].split('-');
-        var display = ymd[2] + '-' + ymd[1] + '-' + ymd[0];
-        if (parts[1]) display += ' ' + parts[1];
+        var year = ymd[0];
+        var monthIndex = parseInt(ymd[1], 10) - 1;
+        var monthStr = MONTHS[monthIndex] || '';
+        var day = parseInt(ymd[2], 10);
+        var display = day + ' ' + monthStr + ' ' + year;
+        if (parts[1]) display += ' • ' + parts[1];
         return display;
     }
 
@@ -298,12 +293,11 @@ class DatePicker {
             var h = this.popup.querySelector('.dp-hour').value.padStart(2, '0');
             var m = this.popup.querySelector('.dp-min').value.padStart(2, '0');
             value = y + '-' + mo + '-' + d + 'T' + h + ':' + m;
-            this.display.textContent = this._formatDisplay(value).replace(' ', '\n');
         } else {
             value = y + '-' + mo + '-' + d;
-            this.display.value = this._formatDisplay(value);
         }
 
+        this.display.value = this._formatDisplay(value);
         this.input.value = value;
         this.input.dispatchEvent(new Event('change', { bubbles: true }));
     }
