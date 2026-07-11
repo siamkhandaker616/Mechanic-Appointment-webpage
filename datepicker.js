@@ -149,9 +149,9 @@ class DatePicker {
             html += '<div class="dp-time">';
             html += '<span class="dp-time-label">Time</span>';
             html += '<div class="dp-time-inputs">';
-            html += '<input type="number" class="dp-hour" value="' + h + '" min="0" max="23" step="1">';
+            html += '<input type="number" class="dp-hour" value="' + h + '" min="0" max="23" step="1" data-stepper data-stepper-wrap data-stepper-pad="2">';
             html += '<span class="dp-time-sep">:</span>';
-            html += '<input type="number" class="dp-min" value="' + m + '" min="0" max="59" step="5">';
+            html += '<input type="number" class="dp-min" value="' + m + '" min="0" max="55" step="5" data-stepper data-stepper-wrap data-stepper-pad="2">';
             html += '</div>';
             html += '</div>';
             html += '</div>';
@@ -171,6 +171,7 @@ class DatePicker {
         html += '</div>';
 
         this.popup.innerHTML = html;
+        this.popup.querySelectorAll('input[data-stepper]').forEach(initNumStepper);
     }
 
     positionPopup() {

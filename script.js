@@ -240,6 +240,120 @@ function fillSuggestion(mechId, date, slotIndex) {
 
 var _pendingAction = '';
 var _pendingForm = null;
+function initNumStepper(input) {
+    var _isInput = input.dataset.stepper === 'edit';
+    var _setting = false;
+    var _wrap = input.dataset.stepperWrap !== undefined;
+    var _padLen = parseInt(input.dataset.stepperPad, 10) || 0;
+    function pad(v) { return _padLen ? String(parseInt(v, 10) || 0).padStart(_padLen, '0') : String(v); }
+
+    var val = _isInput ? document.createElement('input') : document.createElement('span');
+    val.className = 'num-step-value';
+    if (_isInput) { val.type = 'text'; val.inputMode = 'numeric'; val.value = input.value; }
+    else { val.textContent = input.value; }
+    var _val = pad(input.value);
+    Object.defineProperty(input, 'value', {
+        get: function() { return _val; },
+        set: function(v) {
+            _val = pad(v);
+            if (!val) return;
+            if (_isInput) { if (!_setting) { _setting = true; val.value = _val; _setting = false; } }
+            else { val.textContent = _val; }
+        },
+        configurable: true
+    });
+
+    var btns = document.createElement('div');
+    btns.className = 'num-step-btns';
+
+    function clickBtn(dir) {
+        if (input.readOnly || input.disabled) {
+            if (input.onclick) input.onclick.call(input);
+            return;
+        }
+        var step = parseFloat(input.step) || 1;
+        var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+        var max = input.max !== '' ? parseFloat(input.max) : Infinity;
+        var v = parseFloat(input.value) || 0;
+        v = v + dir * step;
+        if (_wrap) {
+            if (v > max) v = min;
+            if (v < min) v = max;
+        } else {
+            v = Math.max(min, Math.min(max, v));
+        }
+        input.value = v;
+        var evt = new Event('change', { bubbles: true });
+        input.dispatchEvent(evt);
+    }
+
+    var up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'num-step-btn';
+    up.innerHTML = '▲';
+    up.onclick = function() { clickBtn(1); };
+
+    var down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'num-step-btn';
+    down.innerHTML = '▼';
+    down.onclick = function() { clickBtn(-1); };
+
+    btns.appendChild(up);
+    btns.appendChild(down);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'num-stepper';
+    wrap.appendChild(val);
+    wrap.appendChild(btns);
+
+    input._stepperWrap = wrap;
+    input.style.display = 'none';
+    input.parentNode.insertBefore(wrap, input.nextSibling);
+
+    if (_isInput) {
+        val.addEventListener('input', function() {
+            if (_setting) return;
+            var n = parseFloat(val.value);
+            if (!isNaN(n) && val.value !== '') {
+                var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+                var max = input.max !== '' ? parseFloat(input.max) : Infinity;
+                n = Math.max(min, Math.min(max, n));
+                if (n !== parseFloat(input.value)) { input.value = n; }
+            }
+        });
+        val.addEventListener('blur', function() {
+            var n = parseFloat(val.value);
+            if (isNaN(n) || val.value === '') {
+                n = input.min !== '' ? parseFloat(input.min) : 0;
+            }
+            var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+            var max = input.max !== '' ? parseFloat(input.max) : Infinity;
+            n = Math.max(min, Math.min(max, n));
+            input.value = n;
+        });
+        val.addEventListener('focus', function() {
+            if (input.readOnly && input.onclick) input.onclick.call(input);
+        });
+        val.addEventListener('wheel', function(e) { e.preventDefault(); clickBtn(e.deltaY > 0 ? -1 : 1); });
+    }
+    val.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowUp') { e.preventDefault(); clickBtn(1); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); clickBtn(-1); }
+    });
+    if (!_isInput) val.tabIndex = 0;
+}
+
+function updateStepperBg(input) {
+    var wrap = input._stepperWrap;
+    if (!wrap) return;
+    var ro = input.readOnly;
+    var bg = ro ? 'var(--paper)' : 'var(--cyan)';
+    wrap.style.background = bg;
+    var v = wrap.querySelector('.num-step-value');
+    if (v) { v.style.background = bg; v.readOnly = ro; }
+}
+
 var _pendingField = null;
 
 function requirePw(actionUrl) {
@@ -284,9 +398,12 @@ function confirmPw() {
             if (_pendingField) {
                 ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
                     var f = document.getElementById(id);
-                    if (f && f.readOnly) { f.readOnly = false; f.style.cursor = 'text'; f.style.backgroundColor = ''; }
+                    if (f && f.readOnly) { f.readOnly = false; f.style.cursor = 'text'; f.style.backgroundColor = ''; updateStepperBg(f); }
                 });
-                _pendingField.focus();
+                var tgt = _pendingField._stepperWrap
+                    ? _pendingField._stepperWrap.querySelector('.num-step-value')
+                    : _pendingField;
+                if (tgt) tgt.focus();
                 _pendingField = null;
             } else if (_pendingAction) {
                 window.location.href = _pendingAction;
@@ -319,7 +436,7 @@ function toggleOverrides() {
 function openMechModal(btn) {
     ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
         var f = document.getElementById(id);
-        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; }
+        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
     });
     document.getElementById('modal-mech-id').value = btn.dataset.mid;
     document.getElementById('modal-mech-name').value = btn.dataset.mname;
@@ -334,7 +451,7 @@ function closeMechModal(event) {
     if (event.target === event.currentTarget) {
         ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
             var f = document.getElementById(id);
-            if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; }
+            if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
         });
         document.getElementById('mech-modal').classList.add('hidden');
     }
@@ -431,6 +548,8 @@ function closeMsgModal(event) { if (event.target === event.currentTarget) docume
 // --- DOMContentLoaded ---
 
 document.addEventListener('DOMContentLoaded', function() {
+
+    document.querySelectorAll('input[data-stepper]').forEach(initNumStepper);
 
     // Booking page
     if (document.getElementById('booking-form')) {

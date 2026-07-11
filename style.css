@@ -47,7 +47,7 @@
     --teal-light: #3a9b9b;
     --teal-dark: #1a4a4a;
     --rust: #a0453b;
-    --rust-alt: #126f20;
+    --jade: #126f20;
     --navy: #16213e;
     --pink: #d63384;
     --pink-glow: rgba(214, 51, 132, 0.3);
@@ -574,23 +574,28 @@ textarea {
     box-shadow: var(--shadow-md);
 }
 
-.btn-outline:hover {
+.btn-outline:hover, 
+.btn-recruit:hover {
     background: var(--gold);
     color: var(--ink);
+    animation: none;
 }
 
 .btn-pink {
     background: var(--pink);
 }
 
-
+.btn-recruit {
+    animation: recflic 1s steps(1) infinite;
+}
 
 .btn-rust {
     background: var(--rust);
 }
 
 .btn-rust:hover {
-    background: var(--rust-alt);
+    background: var(--gold);
+    color: var(--rust);
 }
 
 .btn-sm {
@@ -1095,6 +1100,60 @@ tr:last-child td {
     color: var(--gold);
 }
 
+/* === RECRUITMENT DETAILS === */
+
+.recruitment-details {
+    position: relative;
+    margin-top: 30px;
+    border: 3px solid var(--ink);
+    padding: 24px 16px 16px;
+    background: var(--cyan);
+    box-shadow: 4px 4px 0 var(--ink);
+}
+
+.recruitment-details summary {
+    list-style: none;
+    outline: none;
+}
+.recruitment-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.recruitment-details summary {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-action);
+    font-size: 1rem;
+    letter-spacing: -1px;
+    cursor: pointer;
+    background: var(--pink);
+    color: var(--gold);
+    border: 3px solid var(--ink);
+    padding: 6px 16px;
+    position: absolute;
+    top: -20px;
+    left: 16px;
+    transform: rotate(-1.5deg);
+    box-shadow: 4px 4px 0 var(--ink);
+    user-select: none;
+    transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.recruitment-details summary:hover {
+    transform: rotate(-1.5deg) scale(1.05);
+    background: var(--rust);
+}
+
+.recruitment-details summary::after {
+    content: " ◀";
+    font-size: 0.75rem;
+    margin-left: 8px;
+}
+
+.recruitment-details[open] summary::after {
+    content: " ▼";
+}
+
 /* === HELP SECTION === */
 
 .help-section {
@@ -1186,6 +1245,8 @@ tr:last-child td {
     margin: 20px auto;
 }
 
+
+
 /* === ANIMATIONS === */
 
 @keyframes comicPop {
@@ -1216,8 +1277,15 @@ tr:last-child td {
     50%, 100% { background: var(--pop); }
 }
 
+
+@keyframes recflic {
+    0%, 49.99% { background: var(--jade); }
+    50%, 100% { background: var(--teal-light); }
+}
+
+
 @keyframes vacay-pop {
-    0%, 49.99% { background: var(--rust-alt); }
+    0%, 49.99% { background: var(--jade); }
     50%, 100% { background: var(--pink); }
 }
 
@@ -1556,6 +1624,15 @@ tr:last-child td {
     font-size: 1.2rem;
 }
 
+.dp-time-inputs .num-stepper .num-step-value {
+    min-width: 30px;
+    font-size: 0.85rem;
+}
+
+.dp-time-inputs .num-stepper {
+    background: transparent;
+}
+
 .dp-footer {
     display: flex;
     gap: 8px;
@@ -1568,5 +1645,84 @@ tr:last-child td {
 .dp-footer .btn {
     padding: 6px 14px;
     font-size: 0.8rem;
+}
+
+/* === CUSTOM NUMBER STEPPER === */
+
+.num-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    border: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--cyan);
+    height: 45px;
+    box-sizing: border-box;
+}
+
+.num-step-value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 50px;
+    padding: 0 10px;
+    font-family: var(--font-action);
+    font-size: 1rem;
+    color: var(--ink);
+    border: none;
+    outline: none;
+    background: transparent;
+    border-right: 3px solid var(--ink);
+    cursor: text;
+}
+
+.num-step-value:focus {
+    outline: none;
+    box-shadow: none;
+    border-right-color: var(--ink);
+}
+
+.num-step-btns {
+    display: flex;
+    flex-direction: column;
+}
+
+.num-step-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex: 1;
+    font-family: inherit;
+}
+
+.num-step-btn:hover {
+    background: var(--teal);
+    color: var(--cream);
+}
+
+.num-step-btn:active {
+    background: var(--teal-dark);
+}
+
+.num-step-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.num-step-btn:disabled:hover {
+    background: var(--cream);
+    color: var(--ink);
+}
+
+.num-step-btn + .num-step-btn {
+    border-top: 2px solid var(--ink);
 }
 

@@ -332,9 +332,9 @@ $effectiveTime = getEffectiveTime();
     </table>
     </div>
 
-    <details style="margin-top:16px;border:2px solid var(--ink);padding:12px;background:var(--cyan);box-shadow:3px 3px 0 var(--ink);">
-        <summary style="font-family:var(--font-sub);text-transform:uppercase;cursor:pointer;font-size:0.9rem;">Register New Mechanic</summary>
-        <form method="post" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+    <details class="recruitment-details">
+        <summary>Register New Mechanic</summary>
+        <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
             <div>
                 <label>Name</label>
                 <input type="text" name="mech_name" required>
@@ -353,9 +353,9 @@ $effectiveTime = getEffectiveTime();
             </div>
             <div>
                 <label>Experience</label>
-                <input type="number" name="mech_years" value="0" style="width:80px;">
+                <input type="number" name="mech_years" value="0" style="width:80px;" data-stepper="edit">
             </div>
-            <button type="submit" name="add_mechanic" class="btn btn-sm">Hire</button>
+            <button type="submit" name="add_mechanic" class="btn btn-sm btn-recruit">Recruit!</button>
         </form>
     </details>
 </div>
@@ -390,7 +390,7 @@ $effectiveTime = getEffectiveTime();
                     </div>
                     <div class="form-group">
                         <label>Experience</label>
-                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')">
+                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')" data-stepper="edit">
                     </div>
                     <div style="display:flex;gap:12px;margin-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
