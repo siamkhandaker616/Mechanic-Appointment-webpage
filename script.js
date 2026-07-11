@@ -317,6 +317,10 @@ function toggleOverrides() {
     btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
 }
 function openMechModal(btn) {
+    ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
+        var f = document.getElementById(id);
+        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; }
+    });
     document.getElementById('modal-mech-id').value = btn.dataset.mid;
     document.getElementById('modal-mech-name').value = btn.dataset.mname;
     document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
@@ -326,7 +330,15 @@ function openMechModal(btn) {
     renderVacations(parseInt(btn.dataset.mid));
     document.getElementById('mech-modal').classList.remove('hidden');
 }
-function closeMechModal(event) { if (event.target === event.currentTarget) document.getElementById('mech-modal').classList.add('hidden'); }
+function closeMechModal(event) {
+    if (event.target === event.currentTarget) {
+        ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
+            var f = document.getElementById(id);
+            if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; }
+        });
+        document.getElementById('mech-modal').classList.add('hidden');
+    }
+}
 function openScheduleModal(id, name) {
     document.getElementById('schedule-mech-id').value = id;
     document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
@@ -383,11 +395,28 @@ function renderVacations(id) {
     }
 }
 function addVacation() {
+    var err = document.getElementById('vac-error');
+    if (err) err.style.display = 'none';
     var id = document.getElementById('modal-mech-id').value;
     var start = document.getElementById('vac-start').value;
     var end = document.getElementById('vac-end').value;
     if (!id || !start || !end) return;
-    if (start > end) { alert('Start date must be before end date.'); return; }
+    if (!err) {
+        err = document.createElement('div');
+        err.id = 'vac-error';
+        err.className = 'field-error';
+        document.getElementById('vac-end').parentNode.appendChild(err);
+    }
+    if (start < TODAY) {
+        err.textContent = 'Vacation cannot start in the past.';
+        err.style.display = 'block';
+        return;
+    }
+    if (start > end) {
+        err.textContent = 'Start date must be before end date.';
+        err.style.display = 'block';
+        return;
+    }
     var reason = document.getElementById('vac-reason').value;
     var f = document.createElement('form');
     f.method = 'POST';

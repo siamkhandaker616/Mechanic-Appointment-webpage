@@ -390,11 +390,11 @@ $effectiveTime = getEffectiveTime();
                     </div>
                     <div class="form-group">
                         <label>Experience</label>
-                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:100px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')">
+                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')">
                     </div>
                     <div style="display:flex;gap:12px;margin-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('mech-modal').classList.add('hidden')">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="closeMechModal(event)">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -413,7 +413,7 @@ $effectiveTime = getEffectiveTime();
                     </div>
                     <div>
                         <label style="font-size:0.75rem;">Reason (Optional)</label>
-                        <input type="text" id="vac-reason" placeholder="Outside commitments" style="width: 200px;font-size:0.8rem;">
+                        <textarea id="vac-reason" placeholder="Outside commitments" rows="1" style="width:200px;font-size:0.8rem;resize:none;"></textarea>
                     </div>
                     <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;">Send On Vacation</button>
                 </div>
@@ -563,6 +563,7 @@ $effectiveTime = getEffectiveTime();
 <?php endif; ?>
 
 <script>
+var TODAY = '<?= date('Y-m-d') ?>';
 var SCHEDULE_DATA = <?= json_encode($scheduleData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>

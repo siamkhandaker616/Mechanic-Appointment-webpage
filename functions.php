@@ -592,6 +592,9 @@ function handleAddVacation(): never {
     if (!preg_match(DATE_REGEX, $start) || !preg_match(DATE_REGEX, $end)) {
         flashAndRedirect('Invalid date format.', 'error');
     }
+    if ($start < date('Y-m-d')) {
+        flashAndRedirect('Vacation cannot start in the past.', 'error');
+    }
     if ($mechId && $start && $end && $start <= $end) {
         addMechanicVacation($mechId, $start, $end, $reason);
         $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
