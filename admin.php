@@ -1,4 +1,5 @@
 <?php
+/* === SETUP === */
 session_start();
 require_once __DIR__ . '/functions.php';
 
@@ -6,14 +7,14 @@ $msg = '';
 $msgType = '';
 $conflictList = [];
 
-// --- AJAX password verification ---
+/* === AJAX PASSWORD VERIFICATION === */
 if (isset($_POST['verify_pw'])) {
     header('Content-Type: application/json');
     echo json_encode(['success' => ($_POST['admin_pw'] ?? '') === ADMIN_PW]);
     exit;
 }
 
-// --- GET action handlers (redirect after) ---
+/* === GET ACTION HANDLERS === */
 
 if (isset($_GET['remove_all_cancelled'])) handleRemoveAllCancelled();
 if (isset($_GET['remove']))             handleRemove();
@@ -24,7 +25,7 @@ if (isset($_GET['remove_mechanic']))    handleRemoveMechanic();
 if (isset($_GET['unblock']))            handleUnblock();
 if (isset($_GET['remove_vacation']))    handleRemoveVacation();
 
-// --- POST action handlers (redirect after) ---
+/* === POST ACTION HANDLERS === */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_date']))       handleUpdateDate();
@@ -38,9 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['override_slot']))     handleOverrideSlot();
 }
 
-// --- Read flash messages for display (only reached on GET) ---
-$msg = $_SESSION['flash_msg'] ?? '';
-$msgType = $_SESSION['flash_type'] ?? '';
+/* === FLASH MESSAGES & DATA FETCHING === */
+
+$msg = $_SESSION['flash_msg'] ?? $_GET['msg'] ?? '';
+$msgType = $_SESSION['flash_type'] ?? ($_GET['msg'] ?? '' ? 'success' : '');
 $conflictList = $_SESSION['flash_conflicts'] ?? [];
 unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_conflicts']);
 
@@ -72,12 +74,12 @@ $useSim = $simConfig && $simConfig['use_simulated_time'];
 $simDt = $simConfig ? $simConfig['simulated_datetime'] : null;
 $effectiveTime = getEffectiveTime();
 ?>
+<!-- === HTML === -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Mayhem Mobility — Admin Panel</title>
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -100,6 +102,7 @@ $effectiveTime = getEffectiveTime();
 
 <div class="container">
 
+<!-- === SIMULATED TIME === -->
 <div class="panel">
     <div class="burst burst-right">TIME!</div>
     <h2>Simulated Time</h2>
@@ -125,11 +128,12 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
+<!-- === ALL APPOINTMENTS === -->
 <div class="panel">
     <div class="burst burst-right">LIST!</div>
     <h2>All Appointments</h2>
     <div style="overflow-x:auto;">
-    <table>
+    <table id="appt-table">
         <thead>
             <tr>
                 <th>Client</th>
@@ -202,6 +206,7 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
+<!-- === SCHEDULE OVERRIDE === -->
 <div class="panel">
     <div class="burst burst-right">LOCK!</div>
     <h2>Schedule Override</h2>
@@ -244,6 +249,7 @@ $effectiveTime = getEffectiveTime();
 </div>
 
 <?php if (!empty($overrides)): ?>
+<!-- === ACTIVE OVERRIDES === -->
 <div class="panel" id="overrides-panel" style="display: none;">
     <div class="burst burst-right" style="background:var(--rust);">HELD!</div>
     <h2>Active Overrides</h2>
@@ -255,7 +261,7 @@ $effectiveTime = getEffectiveTime();
                 <th>Date</th>
                 <th>Blocked Slots</th>
                 <th>Reason</th>
-                <th></th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -273,7 +279,7 @@ $effectiveTime = getEffectiveTime();
                 <td><strong><?= fmtNameTwoLines($o['mechanic_name']) ?></strong></td>
                 <td><?= htmlspecialchars(fmtDate($o['override_date'])) ?></td>
                 <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
-                <td><?= htmlspecialchars($o['reason'] ?? '—') ?></td>
+                <td><?= htmlspecialchars($o['reason'] ?: '—') ?></td>
                 <td>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showUnblockModal(<?= (int)$o['id'] ?>, '<?= htmlspecialchars($o['mechanic_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars(fmtDate($o['override_date'])) ?>')">Unblock</button>
                 </td>
@@ -285,6 +291,7 @@ $effectiveTime = getEffectiveTime();
 </div>
 <?php endif; ?>
 
+<!-- === MECHANICS === -->
 <div class="panel">
     <div class="burst burst-right">HIRE!</div>
     <h2>Mechanics</h2>
@@ -319,10 +326,9 @@ $effectiveTime = getEffectiveTime();
                 <td style="white-space:nowrap;">
                     <?php if ($m['is_active']): ?>
                     <button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="<?= $m['id'] ?>" data-mname="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" data-mnick="<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>" data-mquote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-mspec="<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>" data-experience="<?= (int)$m['experience'] ?>">Edit</button>
-                    <button class="btn btn-sm btn-outline" onclick="openScheduleModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Schedule</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
                     <?php else: ?>
-                    <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Restore</a>
+                    <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Rehire</a>
                     <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_mechanic=<?= $m['id'] ?>');return false;">Remove</a>
                     <?php endif; ?>
                 </td>
@@ -344,10 +350,6 @@ $effectiveTime = getEffectiveTime();
                 <input type="text" name="mech_nickname" placeholder="e.g. Sparky">
             </div>
             <div>
-                <label>Catchphrase</label>
-                <input type="text" name="mech_quote" placeholder="e.g. I'll fix it fast!">
-            </div>
-            <div>
                 <label>Specialties</label>
                 <input type="text" name="mech_specialties" placeholder="e.g. Engine, Transmission">
             </div>
@@ -355,12 +357,14 @@ $effectiveTime = getEffectiveTime();
                 <label>Experience</label>
                 <input type="number" name="mech_years" value="0" style="width:80px;" data-stepper="edit">
             </div>
-            <button type="submit" name="add_mechanic" class="btn btn-sm btn-recruit">Recruit!</button>
+            <button type="submit" name="add_mechanic" class="btn btn-sm btn-recruit" style="margin-left:auto;">Recruit!</button>
         </form>
     </details>
 </div>
 
 </div>
+
+<!-- === MODALS === -->
 
 <div class="modal-overlay hidden" id="mech-modal" onclick="closeMechModal(event)">
     <div class="modal-box" onclick="event.stopPropagation()" style="max-width:650px;">
@@ -370,6 +374,7 @@ $effectiveTime = getEffectiveTime();
             <div style="flex:1;">
                 <form method="post" id="mech-modal-form">
                     <input type="hidden" name="mech_id" id="modal-mech-id">
+                    <input type="hidden" name="_new_hire_name" id="new-hire-name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
                     <div style="display:flex;gap:12px;">
                         <div class="form-group" style="flex:1;">
                             <label>Name</label>
@@ -388,13 +393,14 @@ $effectiveTime = getEffectiveTime();
                         <label>Specialties</label>
                         <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="e.g. Engine, Transmission">
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
                         <label>Experience</label>
                         <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')" data-stepper="edit">
+                        <button type="button" class="btn btn-sm" style="margin-left:auto;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
                     </div>
-                    <div style="display:flex;gap:12px;margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
-                        <button type="button" class="btn btn-sm btn-outline" onclick="closeMechModal(event)">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-rust" onclick="closeMechModal(event)">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -429,6 +435,12 @@ $effectiveTime = getEffectiveTime();
         <p style="margin-bottom:12px;font-size:0.85rem;">Toggle which slots this mechanic works each day.</p>
         <form method="post" id="schedule-form">
             <input type="hidden" name="mech_id" id="schedule-mech-id">
+            <input type="hidden" name="mech_name" id="sched-mech-name">
+            <input type="hidden" name="mech_nickname" id="sched-mech-nickname">
+            <input type="hidden" name="mech_quote" id="sched-mech-quote">
+            <input type="hidden" name="mech_specialties" id="sched-mech-specialties">
+            <input type="hidden" name="mech_years" id="sched-mech-years">
+            <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
             <table style="font-size:0.8rem;">
                 <thead>
                     <tr>
@@ -562,7 +574,26 @@ $effectiveTime = getEffectiveTime();
 </div>
 <?php endif; ?>
 
+<!-- === INLINE SCRIPT === -->
 <script>
+<?php if (isset($_GET['new_mechanic'])): 
+    $__nmId = (int)$_GET['new_mechanic'];
+    $__nm = null;
+    foreach ($allMechanics as $__m) { if ((int)$__m['id'] === $__nmId) { $__nm = $__m; break; } }
+    if ($__nm):
+?>
+window._newHireName = <?= json_encode($_GET['hire_name'] ?? '') ?>;
+window.addEventListener('DOMContentLoaded', function() {
+    openMechModalById(
+        <?= $__nm['id'] ?>,
+        <?= json_encode($__nm['name']) ?>,
+        <?= json_encode($__nm['nickname'] ?? '') ?>,
+        <?= json_encode($__nm['quote'] ?? '') ?>,
+        <?= json_encode($__nm['specialties'] ?? '') ?>,
+        <?= (int)$__nm['experience'] ?>
+    );
+});
+<?php endif; endif; ?>
 var TODAY = '<?= date('Y-m-d') ?>';
 var SCHEDULE_DATA = <?= json_encode($scheduleData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

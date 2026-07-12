@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+/* === FORMATTING HELPERS === */
+
 function fmtDate(string $date): string {
     $ts = strtotime($date);
     return $ts ? date('j M Y', $ts) : $date;
@@ -24,6 +26,8 @@ function slotIndexFromHour(int $hour): int {
     return intdiv($hour, 2) - 5;
 }
 
+/* === MECHANIC QUERIES === */
+
 function getMechanics(): array {
     return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
@@ -42,6 +46,8 @@ function getMechanicsForSelect(): array {
     }
     return $result;
 }
+
+/* === SLOT AVAILABILITY === */
 
 function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     if ($slotIndex < 0 || $slotIndex >= SLOT_COUNT) return false;
@@ -114,6 +120,8 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     return $result;
 }
 
+/* === BOOKING === */
+
 function isCarBookedOnDate(int $carId, string $date): bool {
     $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE car_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
     $stmt->execute([$carId, $date]);
@@ -156,6 +164,8 @@ function createAppointment(int $clientId, int $carId, int $mechanicId, string $d
     $stmt->execute([$clientId, $carId, $mechanicId, $date, $slotIndex]);
     return (int)$db->lastInsertId();
 }
+
+/* === TIME MANAGEMENT === */
 
 function getEffectiveTime(): DateTime {
     $stmt = getDB()->prepare("SELECT use_simulated_time, simulated_datetime FROM sim_config WHERE id = 1");
@@ -217,6 +227,8 @@ function advanceAppointmentStatuses(): void {
     }
 }
 
+/* === APPOINTMENT QUERIES === */
+
 function getAppointments(?string $status = null): array {
     $db = getDB();
     $sql = "SELECT a.id, a.mechanic_id, a.appointment_date, a.slot_index, a.status, a.created_at,
@@ -273,6 +285,8 @@ function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?
     return ['success' => true];
 }
 
+/* === APPOINTMENT MUTATIONS === */
+
 function updateAppointmentDate(int $appointmentId, string $newDate, int $newSlot): array {
     $db = getDB();
     $stmt = $db->prepare("SELECT car_id, mechanic_id FROM appointments WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
@@ -310,6 +324,8 @@ function cancelAppointment(int $appointmentId): bool {
     return $stmt->rowCount() > 0;
 }
 
+/* === INPUT VALIDATION === */
+
 function validateAppointmentInput(array $data): array {
     $errors = [];
 
@@ -332,6 +348,8 @@ function validateAppointmentInput(array $data): array {
 
     return $errors;
 }
+
+/* === MECHANIC MANAGEMENT === */
 
 function getAllMechanics(): array {
     return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
@@ -373,6 +391,8 @@ function removeMechanic(int $id): void {
     $db->prepare("DELETE FROM mechanics WHERE id = ?")->execute([$id]);
 }
 
+/* === SCHEDULE MANAGEMENT === */
+
 function getMechanicSchedule(int $id): array {
     $db = getDB();
     $stmt = $db->prepare("SELECT day_of_week, slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ?");
@@ -398,6 +418,8 @@ function updateMechanicSchedule(int $id, array $schedule): void {
     }
 }
 
+/* === VACATION MANAGEMENT === */
+
 function getMechanicVacations(int $mechanicId): array {
     $stmt = getDB()->prepare("SELECT id, start_date, end_date, reason FROM mechanic_vacations WHERE mechanic_id = ? ORDER BY start_date ASC");
     $stmt->execute([$mechanicId]);
@@ -420,6 +442,8 @@ function isMechanicOnVacation(int $mechanicId, string $date): bool {
     return $stmt->fetchColumn() > 0;
 }
 
+/* === FLASH MESSAGING === */
+
 function flashAndRedirect(string $msg, string $type = 'success'): never {
     $_SESSION['flash_msg'] = $msg;
     $_SESSION['flash_type'] = $type;
@@ -427,7 +451,7 @@ function flashAndRedirect(string $msg, string $type = 'success'): never {
     exit;
 }
 
-// --- Action handlers (dispatched from admin.php) ---
+/* === ACTION HANDLERS === */
 
 function handleRemoveAllCancelled(): never {
     $db = getDB();
@@ -490,7 +514,13 @@ function handleUnblock(): never {
 
 function handleRemoveVacation(): never {
     removeMechanicVacation((int)$_GET['remove_vacation']);
-    flashAndRedirect('Vacation removed.');
+    $name = trim($_GET['mech_name'] ?? '');
+    $firstName = $name ? explode(' ', $name)[0] : '';
+    if ($firstName) {
+        flashAndRedirect(htmlspecialchars($firstName) . ' has been called back in early from vacation.');
+    } else {
+        flashAndRedirect('Vacation removed.');
+    }
 }
 
 function handleUpdateDate(): never {
@@ -540,12 +570,12 @@ function handleToggleSim(): never {
 function handleAddMechanic(): never {
     $name = trim($_POST['mech_name'] ?? '');
     $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
-    $quote = trim($_POST['mech_quote'] ?? '') ?: null;
     $specialties = trim($_POST['mech_specialties'] ?? '');
     $years = (int)($_POST['mech_years'] ?? 0);
     if ($name) {
-        addMechanic($name, $nickname, $specialties, $years, $quote);
-        flashAndRedirect(htmlspecialchars($name) . ' has been hired!');
+        $id = addMechanic($name, $nickname, $specialties, $years);
+        header('Location: admin.php?new_mechanic=' . $id . '&hire_name=' . urlencode($name));
+        exit;
     }
     header('Location: admin.php');
     exit;
@@ -558,9 +588,14 @@ function handleUpdateMechanicInfo(): never {
     $quote = trim($_POST['mech_quote'] ?? '') ?: null;
     $specialties = trim($_POST['mech_specialties'] ?? '');
     $years = (int)($_POST['mech_years'] ?? 0);
+    $newHireName = trim($_POST['_new_hire_name'] ?? '');
     if ($name && $id) {
         updateMechanic($id, $name, $nickname, $specialties, $years, $quote);
-        flashAndRedirect('Mechanic updated.');
+        if ($newHireName) {
+            flashAndRedirect($newHireName . ' has been hired!');
+        }
+        $firstName = explode(' ', $name)[0];
+        flashAndRedirect(htmlspecialchars($firstName) . "'s info updated.");
     }
     header('Location: admin.php');
     exit;
@@ -580,8 +615,20 @@ function handleUpdateSchedule(): never {
             $schedule[$d] = $slotFlags;
         }
     }
+    $newHireName = trim($_POST['_new_hire_name'] ?? '');
+    $mechName = trim($_POST['mech_name'] ?? '');
+    $mechNickname = trim($_POST['mech_nickname'] ?? '') ?: null;
+    $mechQuote = trim($_POST['mech_quote'] ?? '') ?: null;
+    $mechSpecialties = trim($_POST['mech_specialties'] ?? '');
+    $mechYears = (int)($_POST['mech_years'] ?? 0);
+    if ($mechId && $mechName) {
+        updateMechanic($mechId, $mechName, $mechNickname, $mechSpecialties, $mechYears, $mechQuote);
+    }
     updateMechanicSchedule($mechId, $schedule);
-    flashAndRedirect('Schedule updated.');
+    if ($newHireName) {
+        flashAndRedirect($newHireName . ' has been hired!');
+    }
+    flashAndRedirect(htmlspecialchars($mechName) . "'s schedule has been updated.");
 }
 
 function handleAddVacation(): never {
@@ -595,8 +642,12 @@ function handleAddVacation(): never {
     if ($start < date('Y-m-d')) {
         flashAndRedirect('Vacation cannot start in the past.', 'error');
     }
+    $newHireName = trim($_POST['_new_hire_name'] ?? '');
     if ($mechId && $start && $end && $start <= $end) {
         addMechanicVacation($mechId, $start, $end, $reason);
+        if ($newHireName) {
+            flashAndRedirect($newHireName . ' has been hired!');
+        }
         $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
         $stmt->execute([$mechId]);
         $m = $stmt->fetch();

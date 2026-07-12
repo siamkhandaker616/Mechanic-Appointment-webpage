@@ -1,3 +1,5 @@
+/* === FONTS === */
+
 @font-face {
     font-family: 'Action Man Bold';
     src: url('fonts/Action Man Bold.ttf') format('truetype');
@@ -38,6 +40,8 @@
     font-display: block;
 }
 
+/* === VARIABLES === */
+
 :root {
     --ink: #1a1a2e;
     --ink-alt: #78a1f5;
@@ -71,6 +75,8 @@
     --font-hand: 'Walter Turncoat';
 }
 
+/* === RESET & SCROLLBARS === */
+
 * {
     margin: 0;
     padding: 0;
@@ -79,7 +85,6 @@
     scrollbar-color: var(--ink) transparent;
 }
 
-/* === CUSTOM RETRO COMIC SCROLLBARS === */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -94,6 +99,8 @@
 ::-webkit-scrollbar-corner {
     background: transparent;
 }
+
+/* === BASE === */
 
 body {
     font-family: var(--font-hand);
@@ -112,17 +119,9 @@ body {
     overflow-x: hidden;
 }
 
-h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
+/* === TYPOGRAPHY === */
 
-.tagline {
-    position: absolute;
-    filter: saturate(1.1);
-    z-index: 10;
-    width: 130px;
-    height: auto;
-    transform: rotate(15deg);
-    animation: whamFlash 3s infinite;
-}
+h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
 
 h1 {
     font-family: var(--font-display);
@@ -166,6 +165,16 @@ h3 {
     font-size: 1.2rem;
 }
 
+.tagline {
+    position: absolute;
+    filter: saturate(1.1);
+    z-index: 10;
+    width: 130px;
+    height: auto;
+    transform: rotate(15deg);
+    animation: whamFlash 3s infinite;
+}
+
 .subtitle {
     font-family: var(--font-sub);
     font-size: 0.95rem;
@@ -194,13 +203,23 @@ header::after {
     border-radius: 2px;
 }
 
+/* === LAYOUT === */
+
 .container {
-    max-width: 1100px;
+    max-width: 980px;
     margin: 0 auto;
     padding: 0 20px 40px;
 }
 
-/* === COMIC PANELS === */
+.row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.col { flex: 1; min-width: 220px; }
+
+/* === PANELS === */
 
 .panel {
     border: var(--panel-border);
@@ -259,7 +278,7 @@ header::after {
     transform: rotate(-0.6deg);
 }
 
-/* === STAR BURST DECORATION === */
+/* === BURST DECORATION === */
 
 .burst {
     position: absolute;
@@ -303,8 +322,7 @@ header::after {
     animation: pow-pop 1.3s ease-out infinite alternate;
 }
 
-
-/* === SPEECH BUBBLE === */
+/* === SPEECH BUBBLES === */
 
 .bubble {
     position: relative;
@@ -338,8 +356,6 @@ header::after {
     border-width: 9px 8px 0 8px;
 }
 
-/* === JAGGED THOUGHT BUBBLE === */
-
 .jagged-bubble {
     position: relative;
     background: var(--cyan);
@@ -372,7 +388,6 @@ header::after {
     clip-path: polygon(0% 0%, 100% 0%, 40% 100%, 50% 0%);
 }
 
-
 .jagged-bubble.top::before {
     content: "";
     position: absolute;
@@ -397,7 +412,7 @@ header::after {
     animation: shakyPop 0.5s ease-out forwards;
 }
 
-/* === ONOMATOPOEIA WATERMARKS === */
+/* === WATERMARKS === */
 
 .omg {
     position: fixed;
@@ -445,14 +460,6 @@ header::after {
 .form-group {
     margin-bottom: 18px;
 }
-
-.row {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.col { flex: 1; min-width: 220px; }
 
 label {
     display: block;
@@ -574,7 +581,7 @@ textarea {
     box-shadow: var(--shadow-md);
 }
 
-.btn-outline:hover, 
+.btn-outline:hover,
 .btn-recruit:hover {
     background: var(--gold);
     color: var(--ink);
@@ -808,7 +815,6 @@ textarea {
 .slot-tooltip.hidden {
     display: none;
 }
-/* Tail above (default) — points down from bottom */
 .slot-tooltip::before {
     content: "";
     position: absolute;
@@ -829,7 +835,6 @@ textarea {
     border-right: 10px solid transparent;
     border-top: 14px solid var(--cyan);
 }
-/* Tail below — transforms the whole tail group so the arrow melts in seamlessly */
 .slot-tooltip.below {
     transform-origin: 38px top;
 }
@@ -1025,6 +1030,16 @@ tr:last-child td {
     border-bottom: none;
 }
 
+#appt-table {
+    font-size: 0.78rem;
+}
+#appt-table th {
+    font-size: 0.7rem;
+}
+#appt-table td {
+    padding: 8px 10px;
+}
+
 .status-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -1036,7 +1051,7 @@ tr:last-child td {
     font-family: var(--font-sub);
 }
 
-.status-scheduled { background: var(--teal-light); color: var(--gold); }
+.status-scheduled { background: var(--teal); color: var(--gold); }
 .status-in_progress { background: var(--pink); color: var(--gold); }
 .status-completed {
     font-family: var(--font-marker);
@@ -1100,7 +1115,7 @@ tr:last-child td {
     color: var(--gold);
 }
 
-/* === RECRUITMENT DETAILS === */
+/* === RECRUITMENT === */
 
 .recruitment-details {
     position: relative;
@@ -1141,7 +1156,7 @@ tr:last-child td {
 
 .recruitment-details summary:hover {
     transform: rotate(-1.5deg) scale(1.05);
-    background: var(--rust);
+    background: var(--jade);
 }
 
 .recruitment-details summary::after {
@@ -1245,8 +1260,6 @@ tr:last-child td {
     margin: 20px auto;
 }
 
-
-
 /* === ANIMATIONS === */
 
 @keyframes comicPop {
@@ -1277,12 +1290,10 @@ tr:last-child td {
     50%, 100% { background: var(--pop); }
 }
 
-
 @keyframes recflic {
     0%, 49.99% { background: var(--jade); }
     50%, 100% { background: var(--teal-light); }
 }
-
 
 @keyframes vacay-pop {
     0%, 49.99% { background: var(--jade); }
@@ -1314,9 +1325,7 @@ tr:last-child td {
     100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
 }
 
-
-
-/* === SVG DOODLE PLACEHOLDERS === */
+/* === DOODLES === */
 
 .doodle {
     position: absolute;
@@ -1328,30 +1337,6 @@ tr:last-child td {
     display: block;
     max-width: 100%;
     height: auto;
-}
-
-/* === Mobile === */
-
-@media (max-width: 768px) {
-    h1 { font-size: 2rem; }
-    h2 { font-size: 1.4rem; }
-    .panel,
-    .panel:nth-child(odd of .panel),
-    .panel:nth-child(even of .panel),
-    .panel:first-of-type {
-        padding: 18px;
-        transform: none;
-    }
-    .omg { display: none; }
-    .row { flex-direction: column; }
-    .col { min-width: 0; }
-    .admin-nav { flex-direction: column; }
-    .sim-bar { flex-direction: column; align-items: stretch; }
-    .sim-group { width: 100%; }
-    .sim-group input { width: 100%; }
-    .inline-form { flex-direction: column; align-items: stretch; }
-    .inline-form select,
-    .inline-form input { width: 100%; }
 }
 
 /* === MODAL === */
@@ -1407,7 +1392,7 @@ tr:last-child td {
     text-transform: uppercase;
     font-size: 1rem;
     text-align: center;
-    margin-top: 40px; 
+    margin-top: 40px;
 }
 
 .modal-close {
@@ -1647,7 +1632,7 @@ tr:last-child td {
     font-size: 0.8rem;
 }
 
-/* === CUSTOM NUMBER STEPPER === */
+/* === NUMBER STEPPER === */
 
 .num-stepper {
     display: inline-flex;
@@ -1726,3 +1711,55 @@ tr:last-child td {
     border-top: 2px solid var(--ink);
 }
 
+/* === MOBILE === */
+
+@media (max-width: 768px) {
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.4rem; }
+    .panel,
+    .panel:nth-child(odd of .panel),
+    .panel:nth-child(even of .panel),
+    .panel:first-of-type {
+        padding: 18px;
+        transform: none;
+    }
+    .omg { display: none; }
+    .row { flex-direction: column; }
+    .col { min-width: 0; }
+    .admin-nav { flex-direction: column; }
+    .sim-bar { flex-direction: column; align-items: stretch; }
+    .sim-group { width: 100%; }
+    .sim-group input { width: 100%; }
+    .inline-form { flex-direction: column; align-items: stretch; }
+    .inline-form select,
+    .inline-form input { width: 100%; }
+    .tagline { display: none; }
+    #mech-modal .modal-box {
+        max-width: 95vw !important;
+    }
+    #mech-modal input,
+    #mech-modal textarea {
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+    #mech-modal form > div[style*="display:flex"] {
+        flex-direction: column !important;
+    }
+    #mech-modal form > div[style*="display:flex"] .form-group {
+        flex: none !important;
+        width: 100% !important;
+    }
+    #mech-modal input[type="date"] {
+        width: 100% !important;
+    }
+    #mech-modal textarea {
+        width: 100% !important;
+    }
+    #mech-modal div[style*="flex-wrap:wrap"][style*="align-items:end"] button {
+        width: 100%;
+    }
+    #schedule-modal .modal-box {
+        max-width: 95vw !important;
+        overflow-x: auto;
+    }
+}

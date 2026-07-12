@@ -1,4 +1,5 @@
 <?php
+/* === SETUP & VALIDATION === */
 require_once __DIR__ . '/functions.php';
 
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
@@ -44,6 +45,8 @@ foreach ($allMechs as $m) {
 
 $slotIndex = isset($_GET['slot_index']) ? (int)$_GET['slot_index'] : null;
 if ($slotIndex !== null && ($slotIndex < 0 || $slotIndex >= SLOT_COUNT)) $slotIndex = null;
+
+/* === BUILD RESPONSE === */
 
 $response = [
     'mechanic_id' => $mechanicId,

@@ -1,5 +1,9 @@
+/* === CONSTANTS === */
+
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var DAY_HEADERS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+/* === PICKER MANAGER === */
 
 var DPM = {
     openPickers: new Set(),
@@ -38,6 +42,8 @@ var DPM = {
         }
     },
 };
+
+/* === DATE PICKER CLASS === */
 
 class DatePicker {
     constructor(input) {
@@ -303,6 +309,8 @@ class DatePicker {
         this.input.dispatchEvent(new Event('change', { bubbles: true }));
     }
 }
+
+/* === INIT === */
 
 document.addEventListener('DOMContentLoaded', function () {
     var inputs = document.querySelectorAll('input[type="date"], input[type="datetime-local"]');

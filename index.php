@@ -1,4 +1,5 @@
 <?php
+/* === SETUP === */
 require_once __DIR__ . '/functions.php';
 
 $mechanics = getMechanics();
@@ -10,6 +11,8 @@ foreach ($mechanics as $m) {
 }
 $errors = [];
 $success = false;
+
+/* === FORM HANDLING === */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = validateAppointmentInput($_POST);
@@ -34,6 +37,7 @@ $selectedMechId = (int)($_POST['mechanic_id'] ?? 0);
 $selectedDate = $_POST['date'] ?? '';
 $selectedSlot = $_POST['slot_index'] ?? '';
 ?>
+<!-- === HTML === -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,6 +63,7 @@ $selectedSlot = $_POST['slot_index'] ?? '';
 <div class="container">
 
 <?php if ($success): ?>
+<!-- === CONFIRMATION === -->
 <div class="panel confirm-box">
     <img src="images/icons/pow.png" alt="POW!" class="pow-burst">
     <h2>APPOINTMENT CONFIRMED!</h2>
@@ -72,6 +77,7 @@ $selectedSlot = $_POST['slot_index'] ?? '';
 </div>
 <?php else: ?>
 
+<!-- === BOOKING FORM === -->
 <div class="panel booking-panel">
     <div class="burst burst-right">BOOK!</div>
     <h2>Book a Time</h2>
@@ -190,6 +196,7 @@ $selectedSlot = $_POST['slot_index'] ?? '';
 </div>
 <?php endif; ?>
 
+<!-- === INLINE SCRIPT === -->
 <script>
 var SLOT_LABELS = <?= json_encode($SLOT_LABELS) ?>;
 var SLOT_NAMES = <?= json_encode($SLOT_NAMES) ?>;

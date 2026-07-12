@@ -1,3 +1,5 @@
+/* === UTILITIES === */
+
 function htmlspecialchars(s) {
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(s));
@@ -48,6 +50,8 @@ function hidePastDateMsg() {
     if (el) el.style.display = 'none';
 }
 
+/* === VACATION BADGES === */
+
 function isOnVacation(mechId, date) {
     var vacs = VACATION_DATA[mechId] || [];
     for (var i = 0; i < vacs.length; i++) {
@@ -70,7 +74,7 @@ function updateVacationBadges(date) {
     });
 }
 
-// --- Booking page (index.php) ---
+/* === BOOKING PAGE === */
 
 function updateQuotePosition(card) {
     var qt = document.getElementById('quote-tooltip');
@@ -237,10 +241,13 @@ function fillSuggestion(mechId, date, slotIndex) {
     }, 100);
 }
 
-// --- Admin page ---
+/* === ADMIN === */
 
 var _pendingAction = '';
 var _pendingForm = null;
+
+/* === STEPPER === */
+
 function initNumStepper(input) {
     var _isInput = input.dataset.stepper === 'edit';
     var _setting = false;
@@ -253,10 +260,12 @@ function initNumStepper(input) {
     if (_isInput) { val.type = 'text'; val.inputMode = 'numeric'; val.value = input.value; }
     else { val.textContent = input.value; }
     var _val = pad(input.value);
+    var _nativeValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
     Object.defineProperty(input, 'value', {
         get: function() { return _val; },
         set: function(v) {
             _val = pad(v);
+            _nativeValueSetter.call(input, _val);
             if (!val) return;
             if (_isInput) { if (!_setting) { _setting = true; val.value = _val; _setting = false; } }
             else { val.textContent = _val; }
@@ -357,6 +366,8 @@ function updateStepperBg(input) {
 
 var _pendingField = null;
 
+/* === PASSWORD MODAL === */
+
 function requirePw(actionUrl) {
     _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; openPwModal();
 }
@@ -426,6 +437,8 @@ function closePwModal() {
     _pendingAction = ''; _pendingForm = null; _pendingField = null;
 }
 
+/* === TOGGLES === */
+
 function toggleEdit(id) { document.getElementById('edit-' + id).classList.toggle('show'); }
 function toggleOverrides() {
     var panel = document.getElementById('overrides-panel');
@@ -434,6 +447,8 @@ function toggleOverrides() {
     panel.style.display = open ? 'none' : 'block';
     btn.textContent = open ? 'Show All Blocks' : 'Hide All Blocks';
 }
+/* === MECHANIC MODAL === */
+
 function openMechModal(btn) {
     ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
         var f = document.getElementById(id);
@@ -445,7 +460,21 @@ function openMechModal(btn) {
     document.getElementById('modal-mech-quote').value = btn.dataset.mquote;
     document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
     document.getElementById('modal-mech-exp').value = btn.dataset.experience;
-    renderVacations(parseInt(btn.dataset.mid));
+    renderVacations(parseInt(btn.dataset.mid), btn.dataset.mname);
+    document.getElementById('mech-modal').classList.remove('hidden');
+}
+function openMechModalById(id, name, nickname, quote, specialties, experience) {
+    ['modal-mech-name', 'modal-mech-exp'].forEach(function(fid) {
+        var f = document.getElementById(fid);
+        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
+    });
+    document.getElementById('modal-mech-id').value = id;
+    document.getElementById('modal-mech-name').value = name;
+    document.getElementById('modal-mech-nickname').value = nickname;
+    document.getElementById('modal-mech-quote').value = quote;
+    document.getElementById('modal-mech-specialties').value = specialties;
+    document.getElementById('modal-mech-exp').value = experience;
+    renderVacations(parseInt(id), name);
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function closeMechModal(event) {
@@ -455,11 +484,23 @@ function closeMechModal(event) {
             if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
         });
         document.getElementById('mech-modal').classList.add('hidden');
+        if (window._newHireName) {
+            var n = window._newHireName;
+            window._newHireName = null;
+            window.location.href = 'admin.php?msg=' + encodeURIComponent(n + ' has been hired!');
+        }
     }
 }
+/* === SCHEDULE MODAL === */
+
 function openScheduleModal(id, name) {
     document.getElementById('schedule-mech-id').value = id;
     document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
+    document.getElementById('sched-mech-name').value = document.getElementById('modal-mech-name').value;
+    document.getElementById('sched-mech-nickname').value = document.getElementById('modal-mech-nickname').value;
+    document.getElementById('sched-mech-quote').value = document.getElementById('modal-mech-quote').value;
+    document.getElementById('sched-mech-specialties').value = document.getElementById('modal-mech-specialties').value;
+    document.getElementById('sched-mech-years').value = document.getElementById('modal-mech-exp').value;
     var cbs = document.querySelectorAll('#schedule-form .sched-cb');
     cbs.forEach(function(cb) { cb.checked = false; });
     var sched = SCHEDULE_DATA[id] || {};
@@ -481,6 +522,9 @@ function toggleDateChangeBtn(el) {
     btn.classList.toggle('disabled', !changed);
 }
 function closeScheduleModal(event) { if (event.target === event.currentTarget) document.getElementById('schedule-modal').classList.add('hidden'); }
+
+/* === CONFIRMATION MODALS === */
+
 function showCancelModal(id) { _pendingAction = '?cancel=' + id; document.getElementById('cancel-modal').classList.remove('hidden'); }
 function closeCancelModal(event) { if (event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
 function showFireModal(id, name) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; document.getElementById('fire-modal').classList.remove('hidden'); }
@@ -493,7 +537,9 @@ function showUnblockModal(id, name, date) {
     document.getElementById('unblock-modal').classList.remove('hidden');
 }
 function closeUnblockModal(event) { if (event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
-function renderVacations(id) {
+/* === VACATIONS === */
+
+function renderVacations(id, mechName) {
     var list = document.getElementById('vacation-list');
     list.innerHTML = '';
     var vacs = VACATION_DATA[id] || [];
@@ -506,7 +552,7 @@ function renderVacations(id) {
             if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
             html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
             html += '<span style="flex:1;">' + label + '</span>';
-            html += '<a href="?remove_vacation=' + v.id + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
+            html += '<a href="?remove_vacation=' + v.id + '&mech_name=' + encodeURIComponent(mechName || '') + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
             html += '</div>';
         });
         list.innerHTML = html;
@@ -536,23 +582,24 @@ function addVacation() {
         return;
     }
     var reason = document.getElementById('vac-reason').value;
+    var newHireName = window._newHireName || '';
     var f = document.createElement('form');
     f.method = 'POST';
     f.style.display = 'none';
-    f.innerHTML = '<input name="add_vacation" value="1"><input name="vac_mech_id" value="' + htmlspecialchars(id) + '"><input name="vac_start" value="' + htmlspecialchars(start) + '"><input name="vac_end" value="' + htmlspecialchars(end) + '"><input name="vac_reason" value="' + htmlspecialchars(reason) + '">';
+    f.innerHTML = '<input name="add_vacation" value="1"><input name="vac_mech_id" value="' + htmlspecialchars(id) + '"><input name="vac_start" value="' + htmlspecialchars(start) + '"><input name="vac_end" value="' + htmlspecialchars(end) + '"><input name="vac_reason" value="' + htmlspecialchars(reason) + '">' + (newHireName ? '<input name="_new_hire_name" value="' + htmlspecialchars(newHireName) + '">' : '');
     document.body.appendChild(f);
     f.submit();
 }
 function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
 function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
 
-// --- DOMContentLoaded ---
+/* === DOMCONTENTLOADED === */
 
 document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('input[data-stepper]').forEach(initNumStepper);
 
-    // Booking page
+    /* Booking page */
     if (document.getElementById('booking-form')) {
         document.addEventListener('click', function(e) {
             var t = document.getElementById('slot-tooltip');
@@ -603,12 +650,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Admin page
+    /* Admin page */
     if (document.getElementById('pw-modal')) {
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && !document.getElementById('pw-modal').classList.contains('hidden')) closePwModal();
             if (e.key === 'Enter' && !document.getElementById('pw-modal').classList.contains('hidden')) confirmPw();
         });
+
     }
 
 });
