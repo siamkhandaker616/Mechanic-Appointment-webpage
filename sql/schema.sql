@@ -1,11 +1,11 @@
--- Mystery Motors — Database Schema
+-- Mayhem Mobility — Database Schema
 -- CSE 391 Assignment 3
 
-CREATE DATABASE IF NOT EXISTS mystery_motors
+CREATE DATABASE IF NOT EXISTS mayhem_mobility
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE mystery_motors;
+USE mayhem_mobility;
 
 CREATE TABLE mechanics (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -24,10 +24,10 @@ CREATE TABLE mechanic_schedule (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mechanic_id INT NOT NULL,
     day_of_week TINYINT NOT NULL COMMENT '0=Sun, 1=Mon ... 6=Sat',
-    slot_1 BOOLEAN DEFAULT TRUE COMMENT '08:00-10:00',
-    slot_2 BOOLEAN DEFAULT TRUE COMMENT '10:00-12:00',
-    slot_3 BOOLEAN DEFAULT TRUE COMMENT '12:00-14:00',
-    slot_4 BOOLEAN DEFAULT TRUE COMMENT '14:00-16:00',
+    slot_1 BOOLEAN DEFAULT TRUE COMMENT '10:00-12:00',
+    slot_2 BOOLEAN DEFAULT TRUE COMMENT '12:00-14:00',
+    slot_3 BOOLEAN DEFAULT TRUE COMMENT '14:00-16:00',
+    slot_4 BOOLEAN DEFAULT TRUE COMMENT '16:00-18:00',
     UNIQUE KEY uq_mech_day (mechanic_id, day_of_week),
     FOREIGN KEY (mechanic_id) REFERENCES mechanics(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

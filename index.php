@@ -1,6 +1,14 @@
 <?php
 /* === SETUP === */
+session_start();
 require_once __DIR__ . '/functions.php';
+
+/* === AJAX PASSWORD VERIFICATION === */
+if (isset($_POST['verify_pw'])) {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => ($_POST['admin_pw'] ?? '') === ADMIN_PW]);
+    exit;
+}
 
 $mechanics = getMechanics();
 $mechSchedules = [];
@@ -10,7 +18,7 @@ foreach ($mechanics as $m) {
     $mechVacations[$m['id']] = getMechanicVacations((int)$m['id']);
 }
 $errors = [];
-$success = false;
+$confirmed = null;
 
 /* === FORM HANDLING === */
 
@@ -28,14 +36,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Sorry, that slot was just taken. Pick another slot or mechanic above.';
         } else {
             createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
-            $success = true;
+            $_SESSION['confirmed'] = [
+                'date' => $_POST['date'],
+                'slot_index' => (int)$_POST['slot_index'],
+                'mechanic_id' => (int)$_POST['mechanic_id'],
+            ];
+            header('Location: index.php?confirmed=1');
+            exit;
         }
     }
 }
 
-$selectedMechId = (int)($_POST['mechanic_id'] ?? 0);
-$selectedDate = $_POST['date'] ?? '';
-$selectedSlot = $_POST['slot_index'] ?? '';
+if (isset($_GET['confirmed'])) {
+    $confirmed = $_SESSION['confirmed'] ?? null;
+    unset($_SESSION['confirmed']);
+}
+
+$selectedMechId = (int)($_POST['mechanic_id'] ?? ($confirmed['mechanic_id'] ?? 0));
+$selectedDate = $_POST['date'] ?? ($confirmed['date'] ?? '');
+$selectedSlot = $_POST['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 ?>
 <!-- === HTML === -->
 <!DOCTYPE html>
@@ -62,16 +81,16 @@ $selectedSlot = $_POST['slot_index'] ?? '';
 
 <div class="container">
 
-<?php if ($success): ?>
+<?php if ($confirmed): ?>
 <!-- === CONFIRMATION === -->
 <div class="panel confirm-box">
     <img src="images/icons/pow.png" alt="POW!" class="pow-burst">
     <h2>APPOINTMENT CONFIRMED!</h2>
     <div class="bubble">
         Your car is in good hands. We'll see you at
-        <strong><?= htmlspecialchars(fmtDate($_POST['date'])) ?></strong>,
-        slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$_POST['slot_index']] ?? '') ?></strong>
-        with <strong><?= htmlspecialchars((getMechanicById((int)$_POST['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
+        <strong><?= htmlspecialchars(fmtDate($confirmed['date'])) ?></strong>,
+        slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$confirmed['slot_index']] ?? '') ?></strong>
+        with <strong><?= htmlspecialchars((getMechanicById((int)$confirmed['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
     </div>
     <a href="index.php" class="btn btn-pink">Book Another</a>
 </div>
@@ -166,7 +185,10 @@ $selectedSlot = $_POST['slot_index'] ?? '';
             <input type="hidden" name="slot_index" id="slot_index" value="">
         </div>
 
-        <button type="submit" class="btn btn-pink">Book Appointment</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <button type="submit" class="btn btn-pink">Book Appointment</button>
+            <a href="#" class="btn btn-sm btn-outline" onclick="requirePw('admin.php');return false;">Admin Panel</a>
+        </div>
     </form>
 </div>
 
@@ -208,5 +230,24 @@ var initialSlot = <?= $selectedSlot !== '' ? json_encode((int)$selectedSlot) : '
 </script>
 <script src="script.js"></script>
 <script src="datepicker.js"></script>
+
+<div class="modal-overlay hidden" id="pw-modal" onclick="closePwModal(event)">
+    <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right" style="font-size:0.6rem;">LOCKED!</div>
+        <h2>Enter Admin Password</h2>
+        <p style="margin:8px 0 16px;font-size:0.85rem;">This action requires admin authorization.</p>
+        <div style="position:relative;">
+            <input type="password" id="admin-pw-input" placeholder="Password" style="width:100%;font-size:1rem;padding-right:44px;">
+            <button type="button" id="pw-toggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;line-height:1;" onclick="togglePwVisibility()">
+                <img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">
+            </button>
+        </div>
+        <p id="pw-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink" onclick="confirmPw()">Confirm</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="closePwModal()">Cancel</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

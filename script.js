@@ -186,6 +186,7 @@ function showTooltip(el) {
     }).catch(function() { hideTooltip(); });
 }
 
+var _fetchId = 0;
 function fetchAvailability() {
     var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
     var dateEl = document.getElementById('date');
@@ -198,7 +199,9 @@ function fetchAvailability() {
     }
     updateVacationBadges(dateEl.value);
     var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
-    fetch('availability.php?' + mechParams).then(function(r) { return r.json(); }).then(function(data) {
+    var reqId = ++_fetchId;
+    return fetch('availability.php?' + mechParams).then(function(r) { return r.json(); }).then(function(data) {
+        if (reqId !== _fetchId) return;
         if (data.error) { container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">' + htmlspecialchars(data.error) + '</p>'; return; }
         var html = '';
         data.slots.forEach(function(slot) {
@@ -218,7 +221,7 @@ function fetchAvailability() {
                 chip.addEventListener('click', function() { selectSlot(this, parseInt(this.dataset.slot)); });
             }
         });
-    }).catch(function() { container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>'; });
+    }).catch(function() { if (reqId === _fetchId) container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>'; });
 }
 
 function selectSlot(el, index) {
@@ -229,16 +232,13 @@ function selectSlot(el, index) {
 
 function fillSuggestion(mechId, date, slotIndex) {
     hideTooltip();
-    selectMechanic(mechId);
     document.getElementById('date').value = date;
+    selectMechanic(mechId);
     setTimeout(function() {
-        fetchAvailability();
-        setTimeout(function() {
-            document.querySelectorAll('.slot-chip').forEach(function(c) {
-                if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) selectSlot(c, slotIndex);
-            });
-        }, 300);
-    }, 100);
+        document.querySelectorAll('.slot-chip').forEach(function(c) {
+            if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) selectSlot(c, slotIndex);
+        });
+    }, 0);
 }
 
 /* === ADMIN === */
@@ -420,6 +420,12 @@ function confirmPw() {
             } else if (_pendingAction) {
                 window.location.href = _pendingAction;
             } else if (_pendingForm) {
+                var btn = _pendingForm.querySelector('button[type="submit"][name]');
+                if (btn) {
+                    var h = document.createElement('input');
+                    h.type = 'hidden'; h.name = btn.name; h.value = '';
+                    _pendingForm.appendChild(h);
+                }
                 var input = document.createElement('input');
                 input.type = 'hidden'; input.name = 'admin_pw'; input.value = pw;
                 _pendingForm.appendChild(input);
@@ -507,21 +513,34 @@ function openScheduleModal(id, name) {
     cbs.forEach(function(cb) { var dow = parseInt(cb.dataset.dow); var slot = parseInt(cb.dataset.slot); if (sched[dow] && sched[dow][slot]) cb.checked = true; });
     document.getElementById('schedule-modal').classList.remove('hidden');
 }
-function toggleMechSwapBtn(sel) {
-    var btn = sel.closest('form').querySelector('[name="update_mechanic"]');
-    if (parseInt(sel.value) === parseInt(sel.dataset.current)) { btn.disabled = true; btn.classList.add('disabled'); }
-    else { btn.disabled = false; btn.classList.remove('disabled'); }
-}
-function toggleDateChangeBtn(el) {
+function toggleUpdateApptBtn(el) {
     var form = el.closest('form');
-    var btn = form.querySelector('[name="update_date"]');
+    var btn = form.querySelector('[name="update_appointment"]');
     var dateInput = form.querySelector('[name="new_date"]');
     var slotSelect = form.querySelector('[name="new_slot"]');
-    var changed = dateInput.value !== dateInput.dataset.originalDate || parseInt(slotSelect.value) !== parseInt(slotSelect.dataset.originalSlot);
+    var mechSelect = form.querySelector('[name="new_mechanic"]');
+    var changed = dateInput.value !== dateInput.dataset.originalDate
+               || parseInt(slotSelect.value) !== parseInt(slotSelect.dataset.originalSlot)
+               || parseInt(mechSelect.value) !== parseInt(mechSelect.dataset.originalMechanic);
     btn.disabled = !changed;
     btn.classList.toggle('disabled', !changed);
 }
 function closeScheduleModal(event) { if (event.target === event.currentTarget) document.getElementById('schedule-modal').classList.add('hidden'); }
+function validateOverrideForm() {
+    var err = document.getElementById('override-error');
+    var mech = document.querySelector('[name="override_mechanic"]').value;
+    var date = document.querySelector('[name="override_date"]').value;
+    var slots = document.querySelectorAll('[name="slots[]"]:checked');
+    if (!mech) { err.textContent = 'Select a mechanic first.'; err.style.display = 'block'; return false; }
+    if (!date) { err.textContent = 'Select a date first.'; err.style.display = 'block'; return false; }
+    if (date < TODAY) { err.textContent = 'Date cannot be in the past.'; err.style.display = 'block'; return false; }
+    if (slots.length === 0) { err.textContent = 'Block at least one slot.'; err.style.display = 'block'; return false; }
+    err.style.display = 'none';
+    return true;
+}
+function clearOverrideError() {
+    document.getElementById('override-error').style.display = 'none';
+}
 
 /* === CONFIRMATION MODALS === */
 

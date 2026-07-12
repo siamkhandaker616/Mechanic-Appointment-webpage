@@ -2,6 +2,8 @@
 /* === SETUP & VALIDATION === */
 require_once __DIR__ . '/functions.php';
 
+header('Content-Type: application/json');
+
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
 $date = $_GET['date'] ?? '';
 
@@ -19,12 +21,13 @@ if (!$mechanic) {
 }
 
 global $SLOT_LABELS;
+$slotAvailability = getMechanicSlotsAvailability($mechanicId, $date);
 $slots = [];
 for ($i = 0; $i < SLOT_COUNT; $i++) {
     $slots[] = [
         'index' => $i,
         'label' => $SLOT_LABELS[$i] ?? "Slot " . ($i + 1),
-        'available' => isSlotAvailable($mechanicId, $date, $i),
+        'available' => $slotAvailability[$i],
     ];
 }
 
@@ -34,10 +37,11 @@ $allSlots = [];
 foreach ($allMechs as $m) {
     $allNames[$m['id']] = $m['name'];
     $mechSlots = [];
+    $mechAvail = getMechanicSlotsAvailability((int)$m['id'], $date);
     for ($i = 0; $i < SLOT_COUNT; $i++) {
         $mechSlots[] = [
             'index' => $i,
-            'available' => isSlotAvailable((int)$m['id'], $date, $i),
+            'available' => $mechAvail[$i],
         ];
     }
     $allSlots[(int)$m['id']] = $mechSlots;

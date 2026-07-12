@@ -28,8 +28,7 @@ if (isset($_GET['remove_vacation']))    handleRemoveVacation();
 /* === POST ACTION HANDLERS === */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_date']))       handleUpdateDate();
-    if (isset($_POST['update_mechanic']))   handleUpdateMechanic();
+    if (isset($_POST['update_appointment'])) handleUpdateAppointment();
     if (isset($_POST['sim_toggle']) && !isset($_POST['toggle_sim'])) handleSimToggle();
     if (isset($_POST['toggle_sim']))        handleToggleSim();
     if (isset($_POST['add_mechanic']))      handleAddMechanic();
@@ -142,8 +141,8 @@ $effectiveTime = getEffectiveTime();
                 <th>Date</th>
                 <th>Slot</th>
                 <th>Mechanic</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align:center">Status</th>
+                <th style="text-align:center">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -157,7 +156,7 @@ $effectiveTime = getEffectiveTime();
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['phone']) ?></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars(fmtDate($a['appointment_date'])) ?></td>
-                <td><?= htmlspecialchars([0 => 'Morning', 1 => 'Noon', 2 => 'Afternoon', 3 => 'Evening'][(int)$a['slot_index']] ?? '') ?></td>
+                <td><?= htmlspecialchars($SLOT_NAMES[(int)$a['slot_index']] ?? '') ?></td>
                 <td><strong><?= fmtNameTwoLines($a['mechanic_name']) ?></strong></td>
                 <td style="white-space:nowrap;"><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
                 <td style="white-space:nowrap;">
@@ -176,22 +175,18 @@ $effectiveTime = getEffectiveTime();
                     <div class="edit-inner">
                         <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
-                            <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleDateChangeBtn(this)">
-                            <select name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleDateChangeBtn(this)">
+                            <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleUpdateApptBtn(this)">
+                            <select name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleUpdateApptBtn(this)">
                                 <?php foreach ($SLOT_LABELS as $si => $sl): ?>
                                 <option value="<?= $si ?>" <?= $si === (int)$a['slot_index'] ? 'selected' : '' ?>><?= htmlspecialchars($sl) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <button type="submit" name="update_date" class="btn btn-sm disabled" disabled>Change Date</button>
-                        </form>
-                        <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
-                            <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
-                            <select name="new_mechanic" data-current="<?= (int)$a['mechanic_id'] ?>" onchange="toggleMechSwapBtn(this)">
+                            <select name="new_mechanic" data-original-mechanic="<?= (int)$a['mechanic_id'] ?>" onchange="toggleUpdateApptBtn(this)">
                                 <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
                                 <option value="<?= $mid ?>" <?= $mid === (int)$a['mechanic_id'] ? 'selected' : '' ?>><?= htmlspecialchars($mname) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <button type="submit" name="update_mechanic" class="btn btn-sm disabled" disabled>Change Mechanic</button>
+                            <button type="submit" name="update_appointment" class="btn btn-sm disabled" disabled>Update Appointment</button>
                         </form>
                     </div>
                 </td>
@@ -211,11 +206,11 @@ $effectiveTime = getEffectiveTime();
     <div class="burst burst-right">LOCK!</div>
     <h2>Schedule Override</h2>
     <p style="margin-bottom:12px;font-size:0.9rem;">Block specific slots for a mechanic on a given date (days off, early leave).</p>
-    <form method="post" style="display:flex;flex-direction:column;gap:12px;">
+    <form method="post" style="display:flex;flex-direction:column;gap:12px;" onsubmit="return validateOverrideForm()">
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
             <div>
                 <label>Mechanic</label>
-                <select name="override_mechanic" required>
+                <select name="override_mechanic" onchange="clearOverrideError()">
                     <option value="">— Select —</option>
                     <?php foreach ($mechanics as $m): ?>
                     <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
@@ -224,7 +219,7 @@ $effectiveTime = getEffectiveTime();
             </div>
             <div>
                 <label>Date</label>
-                <input type="date" name="override_date" required min="<?= date('Y-m-d') ?>">
+                <input type="date" name="override_date" onchange="clearOverrideError()">
             </div>
             <div>
                 <label style="font-size:0.9rem;">Blocked Slots</label>
@@ -239,8 +234,9 @@ $effectiveTime = getEffectiveTime();
                 <input type="text" name="reason" placeholder="e.g. sick day" style="width:100%;max-width:526px;">
             </div>
         </div>
-        <div style="display:flex;gap:12px;justify-content:space-between;">
-            <button type="submit" name="override_slot" class="btn btn-sm btn-rust">Save Override</button>
+        <div style="display:flex;gap:12px;justify-content:space-between;position:relative;">
+            <div id="override-error" class="field-error" style="display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;white-space:nowrap;"></div>
+            <button type="submit" name="override_slot" class="btn btn-rust">Save Override</button>
             <?php if (!empty($overrides)): ?>
             <button type="button" class="btn btn-sm btn-outline" onclick="toggleOverrides()" id="overrides-toggle">Show All Blocks</button>
             <?php endif; ?>
@@ -260,8 +256,8 @@ $effectiveTime = getEffectiveTime();
                 <th>Mechanic</th>
                 <th>Date</th>
                 <th>Blocked Slots</th>
-                <th>Reason</th>
-                <th>Action</th>
+                <th style="text-align:center">Reason</th>
+                <th style="text-align:center">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -279,7 +275,7 @@ $effectiveTime = getEffectiveTime();
                 <td><strong><?= fmtNameTwoLines($o['mechanic_name']) ?></strong></td>
                 <td><?= htmlspecialchars(fmtDate($o['override_date'])) ?></td>
                 <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
-                <td><?= htmlspecialchars($o['reason'] ?: '—') ?></td>
+                <td<?= $o['reason'] ? '' : ' style="text-align:center"' ?>><?= htmlspecialchars($o['reason'] ?: '—') ?></td>
                 <td>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showUnblockModal(<?= (int)$o['id'] ?>, '<?= htmlspecialchars($o['mechanic_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars(fmtDate($o['override_date'])) ?>')">Unblock</button>
                 </td>
@@ -303,8 +299,8 @@ $effectiveTime = getEffectiveTime();
                 <th>Nickname</th>
                 <th>Specialties</th>
                 <th>Exp</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align:center">Status</th>
+                <th style="text-align:center">Actions</th>
             </tr>
         </thead>
         <tbody>
