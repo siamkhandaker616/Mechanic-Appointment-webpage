@@ -10,6 +10,12 @@ if (isset($_POST['verify_pw'])) {
     exit;
 }
 
+/* === FLASH MESSAGES === */
+$flashMsg = $_SESSION['flash_msg'] ?? '';
+$flashType = $_SESSION['flash_type'] ?? '';
+$savedPost = $_SESSION['booking_post'] ?? [];
+unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['booking_post']);
+
 $mechanics = getMechanics();
 $mechSchedules = [];
 $mechVacations = [];
@@ -17,7 +23,6 @@ foreach ($mechanics as $m) {
     $mechSchedules[$m['id']] = getMechanicSchedule((int)$m['id']);
     $mechVacations[$m['id']] = getMechanicVacations((int)$m['id']);
 }
-$errors = [];
 $confirmed = null;
 
 /* === FORM HANDLING === */
@@ -45,6 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     }
+
+    if (!empty($errors)) {
+        $_SESSION['flash_msg'] = implode(' ', $errors);
+        $_SESSION['flash_type'] = 'error';
+        $_SESSION['booking_post'] = $_POST;
+        header('Location: index.php');
+        exit;
+    }
 }
 
 if (isset($_GET['confirmed'])) {
@@ -52,9 +65,9 @@ if (isset($_GET['confirmed'])) {
     unset($_SESSION['confirmed']);
 }
 
-$selectedMechId = (int)($_POST['mechanic_id'] ?? ($confirmed['mechanic_id'] ?? 0));
-$selectedDate = $_POST['date'] ?? ($confirmed['date'] ?? '');
-$selectedSlot = $_POST['slot_index'] ?? ($confirmed['slot_index'] ?? '');
+$selectedMechId = (int)($savedPost['mechanic_id'] ?? ($confirmed['mechanic_id'] ?? 0));
+$selectedDate = $savedPost['date'] ?? ($confirmed['date'] ?? '');
+$selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 ?>
 <!-- === HTML === -->
 <!DOCTYPE html>
@@ -84,7 +97,7 @@ $selectedSlot = $_POST['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <?php if ($confirmed): ?>
 <!-- === CONFIRMATION === -->
 <div class="panel confirm-box">
-    <img src="images/icons/pow.png" alt="POW!" class="pow-burst">
+    <img src="images/icons/pow.svg" alt="POW!" class="pow-burst">
     <h2>APPOINTMENT CONFIRMED!</h2>
     <div class="bubble">
         Your car is in good hands. We'll see you at
@@ -102,44 +115,34 @@ $selectedSlot = $_POST['slot_index'] ?? ($confirmed['slot_index'] ?? '');
     <h2>Book a Time</h2>
     <p style="margin-bottom:16px;">Tell us about yourself and your car, then pick your mechanic and slot.</p>
 
-    <?php if (!empty($errors)): ?>
-    <div class="flash-msg error">
-        <ul>
-        <?php foreach ($errors as $e): ?>
-            <li><?= htmlspecialchars($e) ?></li>
-        <?php endforeach; ?>
-        </ul>
-    </div>
-    <?php endif; ?>
-
-    <form method="post" id="booking-form">
+    <form method="post" id="booking-form" novalidate>
         <div class="row">
             <div class="col">
                 <div class="form-group">
                     <label for="name">Your Name</label>
-                    <input type="text" id="name" name="name" data-validate="required" data-err-required="Name is required." value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" required>
+                    <input type="text" id="name" name="name" placeholder="e.g. John Smith" data-validate="required" data-err-required="Name is required." value="<?= htmlspecialchars($savedPost['name'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Digits only." value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
+                    <input type="tel" id="phone" name="phone" placeholder="e.g. 555-0199" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Digits only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="address">Address</label>
-                    <textarea id="address" name="address" required><?= htmlspecialchars($_POST['address'] ?? '') ?></textarea>
+                    <textarea id="address" name="address" placeholder="e.g. 123 Main Street, Metropolis" data-validate="required" data-err-required="Address is required."><?= htmlspecialchars($savedPost['address'] ?? '') ?></textarea>
                 </div>
             </div>
             <div class="col">
                 <div class="form-group">
                     <label for="license_no">Car License Number</label>
-                    <input type="text" id="license_no" name="license_no" data-validate="required" data-err-required="License number is required." value="<?= htmlspecialchars($_POST['license_no'] ?? '') ?>" required>
+                    <input type="text" id="license_no" name="license_no" placeholder="e.g. ABC-1234" data-validate="required" data-err-required="License number is required." value="<?= htmlspecialchars($savedPost['license_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="engine_no">Car Engine Number</label>
-                    <input type="text" id="engine_no" name="engine_no" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($_POST['engine_no'] ?? '') ?>" required>
+                    <input type="text" id="engine_no" name="engine_no" placeholder="e.g. 8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="car_model">Car Model <span style="font-weight:normal;">(optional)</span></label>
-                    <input type="text" id="car_model" name="car_model" value="<?= htmlspecialchars($_POST['car_model'] ?? '') ?>">
+                    <input type="text" id="car_model" name="car_model" placeholder="e.g. Ford Mustang" value="<?= htmlspecialchars($savedPost['car_model'] ?? '') ?>">
                 </div>
             </div>
         </div>
@@ -148,7 +151,7 @@ $selectedSlot = $_POST['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             <div class="col" style="max-width:320px;">
                 <div class="form-group">
                     <label for="date">Appointment Date</label>
-                    <input type="date" id="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" required onchange="fetchAvailability()">
+                    <input type="date" id="date" name="date" placeholder="Pick a date" data-validate="required" data-err-required="Appointment date is required." value="<?= htmlspecialchars($selectedDate) ?>" onchange="fetchAvailability()">
                 </div>
             </div>
         </div>
@@ -227,7 +230,9 @@ var TODAY = '<?= date('Y-m-d') ?>';
 var initialMechId = <?= $selectedMechId ?: '0' ?>;
 var initialDate = <?= json_encode($selectedDate) ?>;
 var initialSlot = <?= $selectedSlot !== '' ? json_encode((int)$selectedSlot) : 'null' ?>;
+var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 </script>
+<script src="spotlight.js"></script>
 <script src="script.js"></script>
 <script src="datepicker.js"></script>
 
@@ -249,5 +254,19 @@ var initialSlot = <?= $selectedSlot !== '' ? json_encode((int)$selectedSlot) : '
         </div>
     </div>
 </div>
+<div id="spotlight-overlay"></div>
+
+<?php if ($flashMsg): ?>
+<div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
+    <div class="modal-box msg-box msg-<?= htmlspecialchars($flashType) ?>">
+        <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
+        <div class="msg-content"><?= htmlspecialchars($flashMsg) ?></div>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 </body>
 </html>

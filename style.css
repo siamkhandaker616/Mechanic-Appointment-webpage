@@ -1711,6 +1711,85 @@ tr:last-child td {
     border-top: 2px solid var(--ink);
 }
 
+/* === SPOTLIGHT OVERLAY (transparent container) === */
+#spotlight-overlay {
+    position: fixed; inset: 0; z-index: 110;
+    pointer-events: none;
+}
+
+/* === DIM CURTAINS (cover everything around the field) === */
+.overlay-curtain {
+    position: absolute; pointer-events: none;
+    background-color: rgba(26, 26, 46, 0.93);
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
+        radial-gradient(rgba(255,255,255,0.04) 1.5px, transparent 1.5px);
+    background-size: 300px 300px, 8px 8px;
+    opacity: 0;
+    transition: opacity 0.35s ease, top 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), left 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.overlay-curtain.active { opacity: 1; }
+
+/* === SPOTLIGHT BEAM (CSS cone) === */
+.spotlight-beam {
+    position: fixed; top: 0; left: 0; z-index: 113;
+    width: 100vw; pointer-events: none;
+    clip-path: polygon(50vw 0, 50vw 0, 50vw 0, 50vw 0);
+    background: linear-gradient(180deg,
+        rgba(255, 230, 100, 0.60) 0%,
+        rgba(255, 230, 100, 0.20) 60%,
+        transparent 100%
+    );
+    transition: all 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* === FIELD GLOW === */
+.spotlight-glow {
+    position: fixed; z-index: 112;
+    pointer-events: none;
+    border: 3px solid rgba(255, 230, 100, 0.8);
+    border-radius: 6px;
+    box-shadow: 0 0 20px rgba(255, 230, 100, 0.5), 0 0 50px rgba(255, 200, 50, 0.3), inset 0 0 15px rgba(255, 230, 100, 0.12);
+    background: transparent;
+    opacity: 0;
+    transition: opacity 0.35s ease, left 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), top 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.spotlight-glow.active { opacity: 1; }
+
+/* === ERROR BURST PNG === */
+@keyframes error-pop {
+    0%   { opacity: 0; transform: scale(0.2) rotate(-16deg); }
+    40%   { opacity: 0.9; transform: scale(0.6) rotate(16deg); }
+    80% { opacity: 0.9; transform: scale(1.0) rotate(0deg); }
+    100% { opacity: 0.9; transform: scale(0.8) rotate(0deg); }
+}
+@keyframes error-fade {
+    0%   { opacity: 0.9; transform: scale(1) rotate(0deg); }
+    100% { opacity: 0; transform: scale(0.5) rotate(8deg); }
+}
+
+.error-burst {
+    position: fixed; z-index: 112;
+    pointer-events: none;
+    background-size: contain; background-repeat: no-repeat; background-position: center;
+    animation: error-pop 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    animation-play-state: paused;
+}
+.error-burst.active {
+    animation-play-state: running;
+}
+.error-burst.fade-out {
+    animation: error-fade 0.8s ease forwards;
+}
+
+.error-burst.burst-blank { background-image: url(images/bursts/blank.svg);  width: 180px; height: 180px; }
+.error-burst.burst-zilch { background-image: url(images/bursts/zilch.svg);  width: 180px; height: 180px; }
+.error-burst.burst-nada  { background-image: url(images/bursts/nada.svg);   width: 180px; height: 180px; }
+.error-burst.burst-bzzt  { background-image: url(images/bursts/bzzt.svg);   width: 190px; height: 190px; }
+.error-burst.burst-nope  { background-image: url(images/bursts/nope.svg);   width: 180px; height: 180px; }
+
+.error-burst.scroll-hide { opacity: 0 !important; animation: none !important; }
+
 /* === MOBILE === */
 
 @media (max-width: 768px) {

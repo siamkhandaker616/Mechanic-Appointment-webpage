@@ -28,16 +28,16 @@ function repositionPastDateMsg() {
     }
 }
 
-function showPastDateMsg() {
+function showPastDateMsg(msg) {
     var el = document.getElementById('past-date-msg');
     if (!el) {
         el = document.createElement('div');
         el.id = 'past-date-msg';
         el.className = 'jagged-bubble top';
-        el.textContent = "We can't travel to the past! Pick a present or later date.";
         el.style.cssText = 'position:absolute;font-size:1.35rem;max-width:400px;pointer-events:auto;z-index:9999;';
         document.body.appendChild(el);
     }
+    el.textContent = msg || "Pick a valid date.";
     repositionPastDateMsg();
     el.style.display = 'block';
     el.classList.remove('shaky-pop');
@@ -147,7 +147,7 @@ function showTooltip(el) {
                 for (var i = 0; i < slots.length; i++) {
                     if (slots[i].available && slots[i].index === slotIndex) {
                         var name = data.all_names[mid] || ('Mechanic #' + mid);
-                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ')"><strong>' + htmlspecialchars(name) + '</strong></button>';
+                        otherHtml += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + mid + ', \'' + date + '\', ' + slotIndex + ', true)"><strong>' + htmlspecialchars(name) + '</strong></button>';
                         hasOtherSlots = true;
                         break;
                     }
@@ -230,10 +230,14 @@ function selectSlot(el, index) {
     document.getElementById('slot_index').value = index;
 }
 
-function fillSuggestion(mechId, date, slotIndex) {
+function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
     hideTooltip();
     document.getElementById('date').value = date;
     selectMechanic(mechId);
+    if (scrollToCard) {
+        var card = document.querySelector('.mechanic-card.selected');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     setTimeout(function() {
         document.querySelectorAll('.slot-chip').forEach(function(c) {
             if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) selectSlot(c, slotIndex);
@@ -654,13 +658,25 @@ document.addEventListener('DOMContentLoaded', function() {
         updateVacationBadges(typeof initialDate !== 'undefined' ? initialDate : '');
 
         document.getElementById('booking-form').addEventListener('submit', function(e) {
-            var dateVal = document.getElementById('date').value;
-            if (dateVal && dateVal < TODAY) {
+            if (_spotlightErrors) { e.preventDefault(); return; }
+            var errs = validateBookingForm();
+            if (errs && errs.dateMsg) {
                 e.preventDefault();
-                showPastDateMsg();
-            } else {
-                hidePastDateMsg();
+                showPastDateMsg(errs.dateMsg);
+                return;
             }
+            if (errs === null) {
+                e.preventDefault();
+                showPastDateMsg("Pick a valid date.");
+                return;
+            }
+            if (errs.length) {
+                e.preventDefault();
+                hidePastDateMsg();
+                launchSpotlight(errs);
+                return;
+            }
+            hidePastDateMsg();
         });
 
         document.getElementById('date').addEventListener('change', function() {

@@ -354,10 +354,12 @@ function validateAppointmentInput(array $data): array {
     elseif (!preg_match(DATE_REGEX, $data['date'])) $errors[] = 'Invalid date format.';
     elseif ($data['date'] < date('Y-m-d')) $errors[] = 'Appointment date cannot be in the past.';
 
-    if (!isset($data['mechanic_id']) || !$data['mechanic_id']) $errors[] = 'Please select a mechanic.';
-    elseif (!getMechanicById((int)$data['mechanic_id'])) $errors[] = 'Selected mechanic does not exist.';
-    if (!isset($data['slot_index']) || $data['slot_index'] === '') $errors[] = 'Please select a time slot.';
-    elseif ((int)$data['slot_index'] < 0 || (int)$data['slot_index'] >= SLOT_COUNT) $errors[] = 'Invalid time slot.';
+    if (!isset($data['mechanic_id']) || !$data['mechanic_id']) $errors[] = 'Please select a mechanic first.';
+    else {
+        if (!getMechanicById((int)$data['mechanic_id'])) $errors[] = 'Selected mechanic does not exist.';
+        if (!isset($data['slot_index']) || $data['slot_index'] === '') $errors[] = 'Please select a suitable slot first.';
+        elseif ((int)$data['slot_index'] < 0 || (int)$data['slot_index'] >= SLOT_COUNT) $errors[] = 'Invalid time slot.';
+    }
 
     if (empty(trim($data['address'] ?? ''))) $errors[] = 'Address is required.';
 
