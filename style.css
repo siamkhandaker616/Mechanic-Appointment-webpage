@@ -73,6 +73,9 @@
     --font-marker: 'Permanent Marker';
     --font-action: 'Action Man Bold';
     --font-hand: 'Walter Turncoat';
+    --bg-dot-blue: radial-gradient(var(--dot-blue) 2.5px, transparent 2.5px);
+    --bg-dot-pink: radial-gradient(var(--dot-pink) 2.5px, transparent 2.5px);
+    --bg-main: url('images/icons/bg.png');
 }
 
 /* === RESET & SCROLLBARS === */
@@ -106,11 +109,15 @@ body {
     font-family: var(--font-hand);
     background-color: var(--paper);
     background-image:
+        linear-gradient(to bottom, var(--paper) var(--header-h, 150px), transparent var(--header-h, 150px)),
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E"),
-        radial-gradient(var(--dot-blue) 2.5px, transparent 2.5px),
-        radial-gradient(var(--dot-pink) 2.5px, transparent 2.5px);
-    background-size: 300px 300px, 20px 20px, 20px 20px;
-    background-position: 0 0, 0 0, 10px 10px;
+        var(--bg-dot-blue),
+        var(--bg-dot-pink),
+        var(--bg-main);
+    background-size: 100% var(--header-h, 150px), 300px 300px, 20px 20px, 20px 20px, cover;
+    background-position: 0 0, 0 0, 0 0, 10px 10px, center;
+    background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
+    background-attachment: scroll, scroll, scroll, scroll, fixed;
     background-blend-mode: normal, normal, normal;
     color: var(--ink);
     line-height: 1.5;
@@ -230,6 +237,17 @@ header {
 }
 .settings-dropdown label {
     display: flex; align-items: center; gap: 10px; cursor: pointer;
+    margin-left: 16px;
+}
+.settings-header {
+    font-family: var(--font-action);
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--teal-dark);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+    text-align: left;
 }
 input[type="checkbox"].custom-checkbox {
     appearance: none; -webkit-appearance: none;
@@ -344,6 +362,7 @@ header::after {
 
 .burst {
     position: absolute;
+    background: var(--pink);
     width: 90px;
     height: 90px;
     clip-path: polygon(
@@ -382,6 +401,77 @@ header::after {
     z-index: 2;
     pointer-events: none;
     animation: pow-pop 1.3s ease-out infinite alternate;
+}
+
+/* === DOODLE PLACEMENT & ANIMATIONS === */
+.doodle {
+    position: absolute;
+    pointer-events: none;
+    display: block;
+    z-index: 5;
+    opacity: 0.95;
+}
+
+.doodle-speech-appt {
+    top: -10px;
+    left: -10px;
+    width: 64px;
+    height: 48px;
+    transform: rotate(-25deg);
+    z-index: 10;
+}
+
+.doodle-oil-help {
+    top: -20px;
+    right: 0px;
+    width: 60px;
+    height: auto;
+    transform-origin: bottom center;
+    animation: pour-oil 4s ease-in-out infinite;
+}
+
+.doodle-mech-quote {
+    top: -25px;
+    right: -20px;
+    width: 55px;
+    height: auto;
+    animation: wobble-mech 2s ease-in-out infinite;
+}
+.doodle-mech-quote-lg {
+    width: 65px;
+    height: auto;
+    top: -32px;
+    left: -24px;
+    filter: saturate(1.1);
+    animation: wobble-mech-flip 2s ease-in-out infinite;
+}
+.doodle-mech-quote-lg-noflip {
+    animation: wobble-mech 2s ease-in-out infinite;
+}
+
+.doodle-wrench-admin {
+    top: -14px;
+    left: -8px;
+    width: 60px;
+    height: auto;
+    animation: wobble-mech 2s ease-in-out infinite;
+}
+
+@keyframes pour-oil {
+    0%, 10%   { transform: scaleX(-1) rotate(-5deg); }
+    25%, 45%  { transform: scaleX(-1) rotate(35deg); }
+    55%, 75%  { transform: scaleX(-1) rotate(30deg); }
+    90%, 100% { transform: scaleX(-1) rotate(-5deg); }
+}
+
+@keyframes wobble-mech {
+    0%, 100% { transform: rotate(-10deg); }
+    50%      { transform: rotate(25deg); }
+}
+
+@keyframes wobble-mech-flip {
+    0%, 100% { transform: scaleX(-1) rotate(-10deg); }
+    50%      { transform: scaleX(-1) rotate(25deg); }
 }
 
 /* === SPEECH BUBBLES === */
@@ -1392,20 +1482,6 @@ tr:last-child td {
     100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
 }
 
-/* === DOODLES === */
-
-.doodle {
-    position: absolute;
-    pointer-events: none;
-    z-index: 1;
-}
-
-.doodle img, .doodle svg {
-    display: block;
-    max-width: 100%;
-    height: auto;
-}
-
 /* === MODAL === */
 
 .modal-overlay {
@@ -1880,6 +1956,37 @@ tr:last-child td {
 @keyframes shame-slide {
     0%   { transform: translateY(-100%); }
     100% { transform: translateY(0); }
+}
+
+/* === SETTINGS TOGGLES === */
+
+body.doodles-off {
+    --bg-dot-blue: none;
+    --bg-dot-pink: none;
+}
+body.doodles-off .doodle,
+body.doodles-off .pow-burst {
+    display: none;
+}
+
+body.bg-off {
+    --bg-main: none;
+}
+body.bg-off .omg,
+body.bg-off .tagline {
+    display: none;
+}
+
+body.doodles-off.bg-off {
+    background: var(--paper) !important;
+    background-image: none !important;
+}
+
+body.no-anim *,
+body.no-anim *::before,
+body.no-anim *::after {
+    animation: none !important;
+    transition: none !important;
 }
 
 /* === MOBILE === */

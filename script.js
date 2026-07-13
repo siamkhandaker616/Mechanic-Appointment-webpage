@@ -87,7 +87,11 @@ function updateQuotePosition(card) {
     var quote = card.getAttribute('data-quote');
     var name = card.querySelector('h3')?.textContent || '';
     if (!quote) { qt.classList.add('hidden'); return; }
-    qt.innerHTML = '<span class="qt-text">"' + htmlspecialchars(quote) + '"</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
+    var doodle = card.getAttribute('data-doodle');
+    var dClass = 'doodle doodle-mech-quote';
+    if (doodle && doodle.indexOf('stiletto') > -1) dClass += ' doodle-mech-quote-lg';
+    else if (doodle && doodle.indexOf('lightning') > -1) dClass += ' doodle-mech-quote-lg doodle-mech-quote-lg-noflip';
+    qt.innerHTML = (doodle ? '<img class="' + dClass + '" src="' + htmlspecialchars(doodle) + '" alt="">' : '') + '<span class="qt-text">"' + htmlspecialchars(quote) + '"</span><span class="qt-author">- ' + htmlspecialchars(name) + '</span>';
     var rect = card.getBoundingClientRect();
     var tooltipWidth = qt.offsetWidth;
     var tooltipHeight = qt.offsetHeight;
@@ -476,6 +480,10 @@ function openMechModal(btn) {
     document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
     document.getElementById('modal-mech-exp').value = btn.dataset.experience;
     renderVacations(parseInt(btn.dataset.mid), btn.dataset.mname);
+    document.getElementById('vac-start').value = '';
+    document.getElementById('vac-end').value = '';
+    document.getElementById('vac-reason').value = '';
+    var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function openMechModalById(id, name, nickname, quote, specialties, experience) {
@@ -490,7 +498,10 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
     document.getElementById('modal-mech-specialties').value = specialties;
     document.getElementById('modal-mech-exp').value = experience;
     renderVacations(parseInt(id), name);
-    document.getElementById('mech-modal').classList.remove('hidden');
+    document.getElementById('vac-start').value = '';
+    document.getElementById('vac-end').value = '';
+    document.getElementById('vac-reason').value = '';
+    var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
 }
 function closeMechModal(event) {
     if (event.target === event.currentTarget) {
@@ -555,7 +566,7 @@ function clearOverrideError() {
 
 function showCancelModal(id) { _pendingAction = '?cancel=' + id; document.getElementById('cancel-modal').classList.remove('hidden'); }
 function closeCancelModal(event) { if (event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
-function showFireModal(id, name) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; document.getElementById('fire-modal').classList.remove('hidden'); }
+function showFireModal(id, name, count) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; var el = document.getElementById('fire-modal-cancel-count'); if (count > 0) { el.textContent = count + ' booking' + (count > 1 ? 's' : '') + ' will be cancelled.'; el.style.display = 'block'; } else { el.style.display = 'none'; } document.getElementById('fire-modal').classList.remove('hidden'); }
 function closeFireModal(event) { if (event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
 function showRemoveModal(id) { _pendingAction = '?remove=' + id; document.getElementById('remove-modal').classList.remove('hidden'); }
 function closeRemoveModal(event) { if (event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
@@ -576,7 +587,8 @@ function renderVacations(id, mechName) {
     } else {
         var html = '';
         vacs.forEach(function(v) {
-            var label = htmlspecialchars(v.start_date + ' to ' + v.end_date);
+            function fmt(d) { var p = d.split('-'); var ms = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return parseInt(p[2]) + ' ' + ms[parseInt(p[1])-1] + ' ' + p[0]; }
+            var label = htmlspecialchars(fmt(v.start_date) + ' — ' + fmt(v.end_date));
             if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
             html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
             html += '<span style="flex:1;">' + label + '</span>';
@@ -593,6 +605,8 @@ function addVacation() {
     var start = document.getElementById('vac-start').value;
     var end = document.getElementById('vac-end').value;
     if (!id || !start || !end) return;
+    var vacs = VACATION_DATA[id] || [];
+    if (vacs.length >= 3) { document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
     if (!err) {
         err = document.createElement('div');
         err.id = 'vac-error';
@@ -625,6 +639,14 @@ function closeMsgModal(event) { if (event.target === event.currentTarget) docume
 
 document.addEventListener('DOMContentLoaded', function() {
 
+    /* Apply saved settings to body */
+    var _settingKeys = { 'doodles_disabled': 'doodles-off', 'bg_disabled': 'bg-off', 'animations_disabled': 'no-anim' };
+    Object.keys(_settingKeys).forEach(function(k) {
+        if (localStorage.getItem(k) === '1') document.body.classList.add(_settingKeys[k]);
+    });
+
+    var sbInterval = null;
+
     document.querySelectorAll('input[data-stepper]').forEach(initNumStepper);
 
     /* Settings gear — appears on admin page */
@@ -641,6 +663,58 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.removeItem('spotlight_disabled');
                 }
                 location.reload();
+            });
+        }
+        /* Doodles toggle */
+        var dt = document.getElementById('doodles-toggle');
+        if (dt) {
+            dt.checked = localStorage.getItem('doodles_disabled') === '1';
+            dt.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('doodles_disabled', '1');
+                    document.body.classList.add('doodles-off');
+                } else {
+                    localStorage.removeItem('doodles_disabled');
+                    document.body.classList.remove('doodles-off');
+                }
+            });
+        }
+        /* Background toggle */
+        var bgt = document.getElementById('bg-toggle');
+        if (bgt) {
+            bgt.checked = localStorage.getItem('bg_disabled') === '1';
+            bgt.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('bg_disabled', '1');
+                    document.body.classList.add('bg-off');
+                } else {
+                    localStorage.removeItem('bg_disabled');
+                    document.body.classList.remove('bg-off');
+                }
+            });
+        }
+        /* Animations toggle */
+        var an = document.getElementById('animations-toggle');
+        if (an) {
+            an.checked = localStorage.getItem('animations_disabled') === '1';
+            an.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('animations_disabled', '1');
+                    document.body.classList.add('no-anim');
+                    if (sbInterval) { clearInterval(sbInterval); sbInterval = null; }
+                } else {
+                    localStorage.removeItem('animations_disabled');
+                    document.body.classList.remove('no-anim');
+                    if (!sbInterval && document.getElementById('speech-bubble')) {
+                        var sb = document.getElementById('speech-bubble');
+                        var bubbles = ['speech-bubble-1', 'speech-bubble-2', 'speech-bubble-3'];
+                        var bi = 0;
+                        sbInterval = setInterval(function() {
+                            bi = (bi + 1) % bubbles.length;
+                            sb.src = 'images/doodles/' + bubbles[bi] + '.svg';
+                        }, 800);
+                    }
+                }
             });
         }
         gearBtn.addEventListener('click', function(e) {
@@ -738,6 +812,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Enter' && !document.getElementById('pw-modal').classList.contains('hidden')) confirmPw();
         });
 
+    }
+
+    /* Speech bubble cycling */
+    var sb = document.getElementById('speech-bubble');
+    if (sb) {
+        var bubbles = ['speech-bubble-1', 'speech-bubble-2', 'speech-bubble-3'];
+        var bi = 0;
+        if (localStorage.getItem('animations_disabled') !== '1') {
+            sbInterval = setInterval(function() {
+                bi = (bi + 1) % bubbles.length;
+                sb.src = 'images/doodles/' + bubbles[bi] + '.svg';
+            }, 800);
+        }
     }
 
 });

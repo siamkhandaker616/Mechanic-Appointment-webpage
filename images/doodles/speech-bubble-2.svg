@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90" width="120" height="90">
+  <!-- Bubble cloud shape with bold borders -->
+  <path d="M20,10 C45,-2 95,-2 110,18 C125,38 115,62 90,68 C75,72 50,70 34,84 C32,86 28,78 28,72 C10,72 -2,52 4,32 C10,12 15,12 20,10 Z"
+        fill="#ffffff" stroke="#1a1a2e" stroke-width="4.5" stroke-linejoin="round"/>
+  <!-- Decorative speech bubble comic dots -->
+  <circle cx="36" cy="38" r="5" fill="#1a1a2e"/>
+  <circle cx="56" cy="38" r="5" fill="#1a1a2e"/>
+</svg>

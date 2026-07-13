@@ -82,6 +82,8 @@ CREATE TABLE appointments (
     status ENUM('scheduled','in_progress','completed','cancelled') DEFAULT 'scheduled',
     cancelled_at DATETIME DEFAULT NULL,
     admin_notes TEXT DEFAULT NULL,
+    in_progress_completed BOOLEAN DEFAULT FALSE,
+    backup_data TEXT DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_car_date (car_id, appointment_date),

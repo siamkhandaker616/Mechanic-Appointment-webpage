@@ -80,6 +80,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css?v=<?= time() ?>">
+
 </head>
 <body>
 
@@ -91,6 +92,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
     <h1>Mayhem Mobility <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
 </header>
+<script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
 
 <div class="container">
 
@@ -124,7 +126,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
                 </div>
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="e.g. 555-0199" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Digits only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
+                    <input type="tel" id="phone" name="phone" placeholder="e.g. 555-0199" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Valid phone #s only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="address">Address</label>
@@ -161,7 +163,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             <div id="mechanic-list">
                 <?php foreach ($mechanics as $m): ?>
                 <?php $sched = $mechSchedules[$m['id']] ?? []; ?>
-                <div class="mechanic-card <?= $selectedMechId === (int)$m['id'] ? 'selected' : '' ?>" data-quote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" onclick="selectMechanic(<?= $m['id'] ?>)">
+                <div class="mechanic-card <?= $selectedMechId === (int)$m['id'] ? 'selected' : '' ?>" data-quote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-doodle="<?= htmlspecialchars($m['doodle'] ?? '', ENT_QUOTES) ?>" onclick="selectMechanic(<?= $m['id'] ?>)">
                     <input type="radio" name="mechanic_id" value="<?= $m['id'] ?>" <?= $selectedMechId === (int)$m['id'] ? 'checked' : '' ?> style="display:none;">
                     <h3><?= htmlspecialchars($m['name']) ?></h3>
                     <?php if ($m['nickname']): ?><span class="nickname">"<?= htmlspecialchars($m['nickname']) ?>"</span><?php endif; ?>
@@ -196,6 +198,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 </div>
 
 <div class="panel help-section">
+    <img class="doodle doodle-oil-help" src="images/doodles/oil-can.svg" alt="">
     <h2>Help &amp; Info</h2>
     <details>
         <summary>How do I book?</summary>

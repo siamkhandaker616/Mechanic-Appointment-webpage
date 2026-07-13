@@ -29,11 +29,11 @@ function slotIndexFromHour(int $hour): int {
 /* === MECHANIC QUERIES === */
 
 function getMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, specialties, years_experience AS experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, doodle, specialties, years_experience AS experience FROM mechanics WHERE is_active = 1 ORDER BY id")->fetchAll();
 }
 
 function getMechanicById(int $id): ?array {
-    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
+    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, quote, doodle, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
 }
@@ -108,8 +108,10 @@ function getMechanicSlotsAvailability(int $mechanicId, string $date): array {
 }
 
 function getAdjacentSlotForMechanic(int $mechanicId, string $date, int $slotIndex): ?int {
-    if (isSlotAvailable($mechanicId, $date, $slotIndex + 1)) return $slotIndex + 1;
-    if (isSlotAvailable($mechanicId, $date, $slotIndex - 1)) return $slotIndex - 1;
+    for ($offset = 1; $offset < SLOT_COUNT; $offset++) {
+        if (isSlotAvailable($mechanicId, $date, $slotIndex + $offset)) return $slotIndex + $offset;
+        if (isSlotAvailable($mechanicId, $date, $slotIndex - $offset)) return $slotIndex - $offset;
+    }
     return null;
 }
 
@@ -214,6 +216,8 @@ function advanceAppointmentStatuses(): void {
     if ($currentSlot < 0) $currentSlot = -1;
 
     $db = getDB();
+    $config = $db->query("SELECT use_simulated_time FROM sim_config WHERE id = 1")->fetch();
+    $isSim = $config && $config['use_simulated_time'];
 
     // Revert completed: future → scheduled, today before slot end → in_progress
     $stmt = $db->query("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
@@ -251,23 +255,40 @@ function advanceAppointmentStatuses(): void {
         $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id IN ($ph)")->execute($toRevert);
     }
 
-    // Forward: scheduled → in_progress (single UPDATE)
+    // Forward: scheduled → in_progress — capture IDs before update
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index, mechanic_id FROM appointments WHERE status = '" . STATUS_SCHEDULED . "' AND (appointment_date < ? OR (appointment_date = ? AND slot_index <= ?))");
+    $stmt->execute([$today, $today, $currentSlot]);
+    $toInProgressRows = $stmt->fetchAll();
     $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE status = '" . STATUS_SCHEDULED . "' AND (appointment_date < ? OR (appointment_date = ? AND slot_index <= ?))");
     $stmt->execute([$today, $today, $currentSlot]);
+    if (!$isSim && $toInProgressRows) {
+        foreach ($toInProgressRows as $a) {
+            $backup = json_encode(['date' => $a['appointment_date'], 'slot' => (int)$a['slot_index'], 'mech' => (int)$a['mechanic_id']]);
+            $db->prepare("UPDATE appointments SET in_progress_completed = TRUE, backup_data = ? WHERE id = ?")->execute([$backup, $a['id']]);
+        }
+    }
 
-    // Forward: in_progress → completed
-    $stmt = $db->prepare("SELECT id, appointment_date, slot_index FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "' AND appointment_date <= ?");
+    // Forward: in_progress → completed — capture IDs before update
+    $stmt = $db->prepare("SELECT id, appointment_date, slot_index, mechanic_id FROM appointments WHERE status = '" . STATUS_IN_PROGRESS . "' AND appointment_date <= ?");
     $stmt->execute([$today]);
+    $allInProgress = $stmt->fetchAll();
     $toComplete = [];
-    foreach ($stmt->fetchAll() as $a) {
+    foreach ($allInProgress as $a) {
         $slotStart = slotStartHour((int)$a['slot_index']);
         if ($a['appointment_date'] < $today || ($a['appointment_date'] === $today && $currentHour >= $slotStart + 2)) {
-            $toComplete[] = $a['id'];
+            $toComplete[] = $a;
         }
     }
     if ($toComplete) {
-        $ph = implode(',', array_fill(0, count($toComplete), '?'));
-        $db->prepare("UPDATE appointments SET status = '" . STATUS_COMPLETED . "' WHERE id IN ($ph)")->execute($toComplete);
+        $ids = array_map(fn($x) => $x['id'], $toComplete);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $db->prepare("UPDATE appointments SET status = '" . STATUS_COMPLETED . "' WHERE id IN ($ph)")->execute($ids);
+        if (!$isSim) {
+            foreach ($toComplete as $a) {
+                $backup = json_encode(['date' => $a['appointment_date'], 'slot' => (int)$a['slot_index'], 'mech' => (int)$a['mechanic_id']]);
+                $db->prepare("UPDATE appointments SET in_progress_completed = TRUE, backup_data = ? WHERE id = ?")->execute([$backup, $a['id']]);
+            }
+        }
     }
 }
 
@@ -288,7 +309,7 @@ function getAppointments(?string $status = null): array {
         $sql .= " WHERE a.status = ?";
         $params[] = $status;
     }
-    $sql .= " ORDER BY a.appointment_date DESC, a.slot_index ASC";
+    $sql .= " ORDER BY a.appointment_date ASC, a.slot_index ASC";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
@@ -369,7 +390,7 @@ function validateAppointmentInput(array $data): array {
 /* === MECHANIC MANAGEMENT === */
 
 function getAllMechanics(): array {
-    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, specialties, years_experience AS experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
+    return getDB()->query("SELECT id, name, nickname, bio, quote, theme, doodle, specialties, years_experience AS experience, is_active FROM mechanics ORDER BY is_active DESC, name ASC")->fetchAll();
 }
 
 function addMechanic(string $name, ?string $nickname, ?string $specialties, int $years, ?string $quote = null, string $theme = 'default'): int {
@@ -391,7 +412,9 @@ function updateMechanic(int $id, string $name, ?string $nickname, ?string $speci
 }
 
 function fireMechanic(int $id): void {
-    $stmt = getDB()->prepare("UPDATE mechanics SET is_active = 0 WHERE id = ?");
+    $db = getDB();
+    $db->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE mechanic_id = ? AND status = '" . STATUS_SCHEDULED . "'")->execute([$id]);
+    $stmt = $db->prepare("UPDATE mechanics SET is_active = 0 WHERE id = ?");
     $stmt->execute([$id]);
 }
 
@@ -587,9 +610,25 @@ function handleUpdateAppointment(): never {
     flashAndRedirect('Appointment updated.');
 }
 
+function restoreBackupData(): void {
+    $db = getDB();
+    $stmt = $db->query("SELECT id, backup_data FROM appointments WHERE in_progress_completed = TRUE AND backup_data IS NOT NULL");
+    foreach ($stmt->fetchAll() as $row) {
+        $data = json_decode($row['backup_data'], true);
+        if ($data && isset($data['date'], $data['slot'], $data['mech'])) {
+            $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ?, mechanic_id = ? WHERE id = ?")
+               ->execute([$data['date'], $data['slot'], $data['mech'], $row['id']]);
+        }
+    }
+}
+
 function handleSimToggle(): never {
     $db = getDB();
+    $wasSim = (bool)$db->query("SELECT use_simulated_time FROM sim_config WHERE id = 1")->fetchColumn();
     $useSim = (int)(isset($_POST['use_sim']));
+    if ($wasSim && !$useSim) {
+        restoreBackupData();
+    }
     $stmt = $db->prepare("UPDATE sim_config SET use_simulated_time = ? WHERE id = 1");
     $stmt->execute([$useSim]);
     flashAndRedirect($useSim ? 'Simulated time activated.' : 'Real time restored.');
@@ -748,7 +787,7 @@ function handleOverrideSlot(): never {
     }
 
     if (!empty($conflicts)) {
-        $_SESSION['flash_conflicts'] = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (slot ' . ((int)$c['slot_index'] + 1) . ')', $conflicts);
+            $_SESSION['flash_conflicts'] = array_map(fn($c) => htmlspecialchars($c['client_name']) . ' (' . ($GLOBALS['SLOT_NAMES'][(int)$c['slot_index']] ?? 'Slot ' . ((int)$c['slot_index'] + 1)) . ')', $conflicts);
     } else {
         $slotFlags = [];
         for ($i = 0; $i < SLOT_COUNT; $i++) {

@@ -6,6 +6,8 @@ define('DB_NAME', 'mayhem_mobility');
 define('DB_USER', 'your_db_user');
 define('DB_PASS', 'your_db_password');
 
+define('ADMIN_PW', 'your_admin_password');
+
 define('SLOT_COUNT', 4);
 define('DATE_REGEX', '/^\d{4}-\d{2}-\d{2}$/');
 define('STATUS_SCHEDULED', 'scheduled');

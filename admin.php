@@ -83,6 +83,7 @@ $effectiveTime = getEffectiveTime();
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css?v=<?= time() ?>">
+
 </head>
 <body>
 
@@ -100,10 +101,15 @@ $effectiveTime = getEffectiveTime();
     <div class="settings-gear">
         <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
         <div class="settings-dropdown hidden" id="settings-dropdown">
-            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Disable Spotlight of Shame</label>
+            <div class="settings-header">Disable —</div>
+            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Spotlight of Shame</label>
+            <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>
+            <label><input type="checkbox" id="bg-toggle" class="custom-checkbox"> background</label>
+            <label><input type="checkbox" id="animations-toggle" class="custom-checkbox"> animations</label>
         </div>
     </div>
 </header>
+<script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
 
 <div class="container">
 
@@ -135,6 +141,7 @@ $effectiveTime = getEffectiveTime();
 
 <!-- === ALL APPOINTMENTS === -->
 <div class="panel">
+    <img class="doodle doodle-speech-appt" id="speech-bubble" src="images/doodles/speech-bubble-1.svg" alt="">
     <div class="burst burst-right">LIST!</div>
     <h2>All Appointments</h2>
     <div style="overflow-x:auto;">
@@ -172,7 +179,7 @@ $effectiveTime = getEffectiveTime();
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(<?= $a['id'] ?>)">Remove</button>
                     <?php else: ?>
-                    <span style="font-size:0.8rem;color:#888;">—</span>
+                    <span style="display:block;text-align:center;font-size:0.8rem;color:#888;">—</span>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -295,6 +302,7 @@ $effectiveTime = getEffectiveTime();
 
 <!-- === MECHANICS === -->
 <div class="panel">
+    <img class="doodle doodle-wrench-admin" src="images/doodles/wrench.svg" alt="">
     <div class="burst burst-right">HIRE!</div>
     <h2>Mechanics</h2>
     <div style="overflow-x:auto;">
@@ -311,6 +319,7 @@ $effectiveTime = getEffectiveTime();
         </thead>
         <tbody>
             <?php $mRowNum = 0; ?>
+            <?php $_cancelCountStmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND status = 'scheduled'"); ?>
             <?php foreach ($allMechanics as $m): $mRowNum++; ?>
             <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], date('Y-m-d')); ?>
             <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
@@ -328,7 +337,8 @@ $effectiveTime = getEffectiveTime();
                 <td style="white-space:nowrap;">
                     <?php if ($m['is_active']): ?>
                     <button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="<?= $m['id'] ?>" data-mname="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" data-mnick="<?= htmlspecialchars($m['nickname'] ?? '', ENT_QUOTES) ?>" data-mquote="<?= htmlspecialchars($m['quote'] ?? '', ENT_QUOTES) ?>" data-mspec="<?= htmlspecialchars($m['specialties'] ?? '', ENT_QUOTES) ?>" data-experience="<?= (int)$m['experience'] ?>">Edit</button>
-                    <button type="button" class="btn btn-sm btn-rust" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>')">Fire</button>
+                    <?php $_cancelCountStmt->execute([$m['id']]); $_cc = (int)$_cancelCountStmt->fetchColumn(); ?>
+                    <button type="button" class="btn btn-sm btn-rust" data-bookings="<?= $_cc ?>" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', this.dataset.bookings)">Fire</button>
                     <?php else: ?>
                     <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Rehire</a>
                     <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_mechanic=<?= $m['id'] ?>');return false;">Remove</a>
@@ -512,6 +522,7 @@ $effectiveTime = getEffectiveTime();
         <div class="burst burst-left" style="margin-bottom:12px;">FIRED!</div>
         <h2 style="margin-top:30px; margin-left: 5px;" id="fire-modal-title">Fire Mechanic?</h2>
         <p style="margin:16px 0;" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
+        <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;color:var(--dark);display:none;"></p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Fire</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Nevermind</button>
@@ -541,6 +552,18 @@ $effectiveTime = getEffectiveTime();
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <a href="#" id="unblock-confirm-link" class="btn btn-sm btn-rust">Yes, Unblock</a>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="vac-limit-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+    <div class="modal-box msg-box msg-error" style="max-width:400px;">
+        <button type="button" class="modal-close" onclick="document.getElementById('vac-limit-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="background:var(--pink);font-size:0.55rem;">NICE TRY!</div>
+        <h2 style="margin-top:30px;">Maximum Vacations Reached</h2>
+        <p style="margin:16px 0;">A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('vac-limit-modal').classList.add('hidden')">Fine!</button>
         </div>
     </div>
 </div>
