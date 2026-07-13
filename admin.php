@@ -97,6 +97,12 @@ $effectiveTime = getEffectiveTime();
         <a href="index.php" class="btn btn-sm btn-outline">Booking Page</a>
         <a href="admin.php" class="btn btn-sm btn-outline">Refresh</a>
     </div>
+    <div class="settings-gear">
+        <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
+        <div class="settings-dropdown hidden" id="settings-dropdown">
+            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Disable Spotlight of Shame</label>
+        </div>
+    </div>
 </header>
 
 <div class="container">
@@ -119,9 +125,9 @@ $effectiveTime = getEffectiveTime();
             <button type="submit" name="toggle_sim" value="1" class="btn btn-sm" <?= $useSim ? '' : 'disabled' ?>>Set</button>
         </span>
         <span class="sim-group">
-            <input type="checkbox" name="use_sim" value="1" id="use-sim" <?= $useSim ? 'checked' : '' ?> onchange="this.form.submit()">
+            <input type="checkbox" name="use_sim" value="1" id="use-sim" class="custom-checkbox" <?= $useSim ? 'checked' : '' ?> onchange="this.form.submit()">
             <input type="hidden" name="sim_toggle" value="1">
-            <label for="use-sim">Use simulated time</label>
+            <label for="use-sim"><pre style= "font-family:'Walter Turncoat';"> Use simulated time</pre></label>
         </span>
         </form>
     </div>
@@ -461,7 +467,7 @@ $effectiveTime = getEffectiveTime();
             </table>
             <div style="display:flex;gap:12px;margin-top:16px;justify-content:flex-end;">
                 <button type="submit" name="update_schedule" class="btn btn-sm">Save Schedule</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('schedule-modal').classList.add('hidden')">Cancel</button>
+                <button type="button" class="btn btn-sm btn-rust" onclick="document.getElementById('schedule-modal').classList.add('hidden')">Cancel</button>
             </div>
         </form>
     </div>

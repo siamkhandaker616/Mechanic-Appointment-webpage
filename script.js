@@ -1,3 +1,8 @@
+/* === SHARED GLOBALS === */
+if (typeof window.SPOTLIGHT_DISABLED === 'undefined') {
+    window.SPOTLIGHT_DISABLED = localStorage.getItem('spotlight_disabled') === '1';
+}
+
 /* === UTILITIES === */
 
 function htmlspecialchars(s) {
@@ -622,6 +627,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('input[data-stepper]').forEach(initNumStepper);
 
+    /* Settings gear — appears on admin page */
+    var gearBtn = document.getElementById('settings-btn');
+    var dropdown = document.getElementById('settings-dropdown');
+    if (gearBtn && dropdown) {
+        var toggle = document.getElementById('spotlight-toggle');
+        if (toggle) {
+            toggle.checked = window.SPOTLIGHT_DISABLED || false;
+            toggle.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('spotlight_disabled', '1');
+                } else {
+                    localStorage.removeItem('spotlight_disabled');
+                }
+                location.reload();
+            });
+        }
+        gearBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target) && e.target !== gearBtn) {
+                dropdown.classList.add('hidden');
+            }
+        });
+    }
+
+    /* Thank-you modal — spotlight completion */
+    var doneBtn = document.getElementById('spotlight-done-btn');
+    if (doneBtn) {
+        doneBtn.addEventListener('click', function() {
+            document.getElementById('thank-you-modal').classList.add('hidden');
+            dismissSpotlight();
+        });
+    }
+
     /* Booking page */
     if (document.getElementById('booking-form')) {
         document.addEventListener('click', function(e) {
@@ -673,7 +714,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (errs.length) {
                 e.preventDefault();
                 hidePastDateMsg();
-                launchSpotlight(errs);
+                if (window.SPOTLIGHT_DISABLED) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    (window.showInlineErrors || function(){})(errs);
+                } else {
+                    launchSpotlight(errs);
+                }
                 return;
             }
             hidePastDateMsg();

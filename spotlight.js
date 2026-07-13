@@ -1,5 +1,7 @@
 /* === SPOTLIGHT OF SHAME === */
 
+window.SPOTLIGHT_DISABLED = localStorage.getItem('spotlight_disabled') === '1';
+
 var _spotlightErrors = null;
 var _spotlightIndex = -1;
 var _fieldBurstMap = {};
@@ -8,6 +10,7 @@ var _lastKeydownHandler = null;
 var SPOTLIGHT_FIELDS = '#booking-form input[type="text"], #booking-form input[type="tel"], #booking-form input[type="date"], #booking-form textarea';
 
 var FIELD_PRIORITY = ['name', 'license_no', 'phone', 'engine_no', 'address'];
+var PHONE_BURST_KEYS = ['zilch', 'nada', 'bzzt', 'nope'];
 
 function validateBookingForm() {
     var errors = [];
@@ -87,20 +90,23 @@ function launchSpotlight(errors) {
     for (var fi = 0; fi < errors.length; fi++) {
         _fieldBurstMap[errors[fi].el.id] = shuffled[fi % shuffled.length];
     }
+    var bannerSub = document.getElementById('banner-sub');
+    if (bannerSub) bannerSub.textContent = "The spotlight will guide you to each field — fix it, then move on.";
+    var banner = document.getElementById('shame-banner');
+    if (banner && errors.length >= 2) banner.classList.remove('hidden');
     requestAnimationFrame(function() {
-        positionSpotlight(errors[0]);
         overlay.classList.add('active');
         document.querySelectorAll('.overlay-curtain').forEach(function(c) { c.classList.add('active'); });
         glow.classList.add('active');
         burst.classList.add('active');
         document.querySelectorAll(SPOTLIGHT_FIELDS).forEach(function(el) { el.readOnly = true; });
         errors[0].el.readOnly = false;
-        _focusCooldown = true;
         _focusCooldownTimer = setTimeout(function() { _focusCooldownTimer = null; }, 600);
         errors[0].el.focus();
+        positionSpotlight(errors[0]);
     });
-    document.addEventListener('focusin', handleSpotlightFocus);
     window.addEventListener('scroll', repositionOnScroll, { passive: true });
+    document.addEventListener('focusin', handleSpotlightFocus);
 }
 
 var _scrollBurstTimer = null;
@@ -123,8 +129,23 @@ function repositionOnScroll() {
 function advanceSpotlight() {
     _spotlightErrors[_spotlightIndex].el.readOnly = true;
     _spotlightIndex++;
+    var bannerSub = document.getElementById('banner-sub');
+    if (bannerSub) {
+        if (_spotlightIndex === 1) {
+            bannerSub.textContent = "Follow the spotlight, it's your only way out.";
+        } else if (_spotlightIndex === 2) {
+            bannerSub.textContent = "Wow, another one? This is embarrassing.";
+        } else if (_spotlightIndex >= 3) {
+            document.getElementById('shame-banner').classList.add('hidden');
+        }
+    }
     if (_spotlightIndex >= _spotlightErrors.length) {
-        dismissSpotlight();
+        var totalErrors = _spotlightErrors.length;
+        dismissSpotlight(function() {
+            if (totalErrors >= 2) {
+                document.getElementById('thank-you-modal').classList.remove('hidden');
+            }
+        });
         return;
     }
     positionSpotlight(_spotlightErrors[_spotlightIndex]);
@@ -132,21 +153,25 @@ function advanceSpotlight() {
     _spotlightErrors[_spotlightIndex].el.focus();
     var burst = document.getElementById('spotlight-burst');
     if (burst) {
+        clearTimeout(burst._fadeTimer);
         burst.classList.remove('scroll-hide', 'fade-out');
         burst.style.animation = 'none';
         void burst.offsetWidth;
         burst.style.animation = '';
     }
-    _focusCooldown = true;
     _focusCooldownTimer = setTimeout(function() { _focusCooldownTimer = null; }, 300);
 }
 
-function dismissSpotlight() {
+function dismissSpotlight(callback) {
+    var burst = document.getElementById('spotlight-burst');
+    if (burst) clearTimeout(burst._fadeTimer);
     clearTimeout(_scrollBurstTimer);
     clearTimeout(_focusCooldownTimer);
     _focusCooldownTimer = null;
     _lastBlurHandler = null;
     _lastKeydownHandler = null;
+    var banner = document.getElementById('shame-banner');
+    if (banner) banner.classList.add('hidden');
     document.querySelectorAll(SPOTLIGHT_FIELDS).forEach(function(el) { el.readOnly = false; });
     var overlay = document.getElementById('spotlight-overlay');
     overlay.classList.remove('active');
@@ -162,6 +187,7 @@ function dismissSpotlight() {
         if (glow) glow.remove();
         if (burst) burst.remove();
         document.querySelectorAll('.overlay-curtain').forEach(function(c) { c.remove(); });
+        if (callback) callback();
     }, 400);
 }
 
@@ -182,11 +208,11 @@ function handleSpotlightFocus(e) {
     if (!current) return;
     if (e.target === current.el || current.el.contains(e.target)) {
         var burst = document.getElementById('spotlight-burst');
-        if (burst) {
-            burst.classList.remove('scroll-hide');
-            if (!_focusCooldownTimer) {
+        if (burst && !burst.classList.contains('fade-out')) {
+            clearTimeout(burst._fadeTimer);
+            burst._fadeTimer = setTimeout(function() {
                 burst.classList.add('fade-out');
-            }
+            }, 1200);
         }
 
         if (_lastBlurHandler) current.el.removeEventListener('blur', _lastBlurHandler);
@@ -197,8 +223,9 @@ function handleSpotlightFocus(e) {
             if (err) {
                 var burst = document.getElementById('spotlight-burst');
                 if (burst) {
+                    clearTimeout(burst._fadeTimer);
                     var bk = (current.el.id === 'phone')
-                        ? BURST_KEYS[Math.floor(Math.random() * BURST_KEYS.length)]
+                        ? PHONE_BURST_KEYS[Math.floor(Math.random() * PHONE_BURST_KEYS.length)]
                         : (_fieldBurstMap[current.el.id] || BURST_KEYS[0]);
                     burst.classList.remove('scroll-hide', 'fade-out', 'burst-blank', 'burst-zilch', 'burst-nada', 'burst-bzzt', 'burst-nope');
                     burst.classList.add('burst-' + bk);
@@ -222,8 +249,9 @@ function handleSpotlightFocus(e) {
                 if (err) {
                     var burst = document.getElementById('spotlight-burst');
                     if (burst) {
+                        clearTimeout(burst._fadeTimer);
                         var bk = (current.el.id === 'phone')
-                            ? BURST_KEYS[Math.floor(Math.random() * BURST_KEYS.length)]
+                            ? PHONE_BURST_KEYS[Math.floor(Math.random() * PHONE_BURST_KEYS.length)]
                             : (_fieldBurstMap[current.el.id] || BURST_KEYS[0]);
                         burst.classList.remove('scroll-hide', 'fade-out', 'burst-blank', 'burst-zilch', 'burst-nada', 'burst-bzzt', 'burst-nope');
                         burst.classList.add('burst-' + bk);
@@ -294,4 +322,30 @@ function positionSpotlight(error) {
         burst.style.left = (fieldCenterX - bw / 2) + 'px';
         burst.style.top = Math.max(4, rect.top + rect.height / 2 - bh / 2) + 'px';
     }
+}
+
+window.showInlineErrors = function(errs) {
+    (window.hideInlineErrors || function(){} )();
+    for (var ei = 0; ei < errs.length; ei++) {
+        var sp = document.createElement('span');
+        sp.className = 'field-error';
+        sp.textContent = errs[ei].msg;
+        errs[ei].el.parentNode.appendChild(sp);
+    }
+};
+window.hideInlineErrors = function() {
+    document.querySelectorAll('.field-error').forEach(function(el) { el.remove(); });
+};
+
+/* Inline-error clear-on-input — only on booking page */
+if (document.getElementById('booking-form')) {
+    document.addEventListener('DOMContentLoaded', function() {
+        var formFields = document.querySelectorAll('#booking-form input, #booking-form textarea');
+        for (var fi = 0; fi < formFields.length; fi++) {
+            formFields[fi].addEventListener('input', function() {
+                var existing = this.parentNode.querySelector('.field-error');
+                if (existing) existing.remove();
+            });
+        }
+    });
 }

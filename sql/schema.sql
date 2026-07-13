@@ -45,6 +45,15 @@ CREATE TABLE mechanic_overrides (
     FOREIGN KEY (mechanic_id) REFERENCES mechanics(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE mechanic_vacations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mechanic_id INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    FOREIGN KEY (mechanic_id) REFERENCES mechanics(id) ON DELETE CASCADE
+);
+
 CREATE TABLE clients (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,

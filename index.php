@@ -254,7 +254,21 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         </div>
     </div>
 </div>
-<div id="spotlight-overlay"></div>
+    <div id="spotlight-overlay"></div>
+    <div id="shame-banner" class="shame-banner hidden" onclick="this.classList.add('hidden')">
+        <strong>YOU ARE LOCKED IN.</strong><br>
+        <span id="banner-sub">The spotlight will guide you to each field — fix it, then move on.</span><br>
+        <small>(or refresh like a coward)</small>
+    </div>
+
+<div class="modal-overlay hidden" id="thank-you-modal" onclick="document.getElementById('thank-you-modal').classList.add('hidden')">
+    <div class="modal-box" style="background:var(--pink);border-color:var(--gold);" onclick="event.stopPropagation()">
+        <div class="burst burst-right" style="background:var(--gold);color:var(--ink);">DONE!</div>
+        <p style="text-align:center;font-weight:bold;font-size:1.5rem;color:var(--gold);text-shadow:2px 2px 0 var(--ink);margin-top:40px;">Thank you!!!</p>
+        <p style="text-align:center;font-family:var(--font-hand);font-size:1.2rem;color:var(--gold);text-shadow:1px 1px 0 var(--ink);">You completed the form!</p>
+        <button id="spotlight-done-btn" class="btn btn-sm btn-teal btn-outline" style="margin-top:16px;display:block;margin-left:auto;width:fit-content;">Take a Bow</button>
+    </div>
+</div>
 
 <?php if ($flashMsg): ?>
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">

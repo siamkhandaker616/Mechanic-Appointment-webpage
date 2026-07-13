@@ -8,38 +8,64 @@ The design uses a retro 1960s/70s pop art and comic strip aesthetic — Ben-Day 
 
 The project is built with PHP 8+, MySQL (MariaDB), and vanilla JavaScript. It does not use a frontend or backend framework.
 
-## 2. File Structure
+## 2. Setup
+
+### Local (XAMPP)
+
+1. Place the project folder in your web server root.
+2. Copy `config.example.php` to `config.php` and update DB credentials. Set `ADMIN_PW` and `SITE_URL`.
+3. Import `sql/schema.sql` and `sql/seed.sql` into MySQL.
+4. Start Apache and MySQL from XAMPP Control Panel.
+5. Open `http://localhost/assignment3/index.php` in a browser.
+6. Admin panel is at `admin.php`.
+
+### Live (InfinityFree)
+
+- Booking: `https://mayhem-mobility.page.gd`
+- Admin: `https://mayhem-mobility.page.gd/admin.php`
+
+## 3. File Structure
 
 ```text
 Assignment 3/
   index.php               Booking page (customer-facing)
   admin.php               Admin panel (management interface)
   availability.php        AJAX endpoint for slot availability
-  config.example.php      Template — copy to config.php with your DB credentials
+  config.php              DB credentials, constants, slot labels
   functions.php           All business logic, DB queries, handler functions
+  spotlight.js            Spotlight of Shame validation mini-game
   script.js               Client-side logic (booking + admin)
   datepicker.js           Custom-themed date picker widget
-  style.css               Full 1502-line stylesheet
+  style.css               Full stylesheet (~1930 lines)
   README.md               Quick-start guide
   sql/
-    schema.sql            Full database schema (8 tables)
+    schema.sql            Full database schema (9 tables)
     seed.sql              Seed data (mechanics, schedule, appointments)
   docs/
     PROJECT_DOCUMENTATION.md
+    DEVELOPER_REFERENCE.md
+    AI_DECLARATION.txt
   fonts/
     Action Man Bold.ttf
+    Action Man Shaded Italic.ttf
     Bangers.woff2
     LuckiestGuy-Regular.woff2
     PermanentMarker-Regular.woff2
     WalterTurncoat-Regular.woff2
   images/
     icons/
-      *.png              Tagline, POW burst, etc.
+      tagline.png         Header tagline
+      pow.svg             Appointment confirmation burst
     doodles/
-      *.svg              Decorative SVGs + eye-open/eye-closed password icons
+      *.svg               Decorative SVGs (gear, eye-open/closed, burst-vroom,
+                          hero-helmet, hourglass, lightning, oil-can,
+                          spark-plug, speech-bubble, stiletto, super-shield,
+                          wonder-tiara, wrench)
+    bursts/
+      blank.svg, bzzt.svg, nada.svg, nope.svg, zilch.svg
 ```
 
-## 3. Pages
+## 4. Pages
 
 ### `index.php` — Booking Page
 
@@ -49,422 +75,317 @@ Processing flow:
 
 1. On initial GET, the page renders an empty form plus a mechanic card grid and an empty slot grid.
 2. On POST, `validateAppointmentInput()` checks required fields, date format, phone format, engine number format.
-3. If valid, `findOrCreateClient()` looks up or creates a client by phone number. `findOrCreateCar()` does the same for the car by license number.
-4. `isCarBookedOnDate()` prevents duplicate bookings for the same car on the same day.
-5. `isSlotAvailable()` does a final concurrency check on the chosen slot.
-6. On success, an inline confirmation panel replaces the form (`$success = true` branch).
+3. If invalid, `$_SESSION['flash_msg']` / `$_SESSION['flash_type']` are set and the request redirects back to GET (PRG pattern). Form values preserved via `$_SESSION['booking_post']` → `$savedPost`.
+4. If valid, `findOrCreateClient()` looks up or creates a client by phone number. `findOrCreateCar()` does the same for the car by license number.
+5. `isCarBookedOnDate()` prevents duplicate bookings for the same car on the same day.
+6. `isSlotAvailable()` does a final concurrency check on the chosen slot.
+7. On success, an inline confirmation panel replaces the form (`$success = true` branch).
 
-Inline PHP data exports (inside `<script>` tags before `script.js`):
-
-- `SLOT_LABELS` — time range labels for the 4 slots
-- `SLOT_NAMES` — short names (Morning, Noon, Afternoon, Evening)
-- `VACATION_DATA` — per-mechanic vacation periods
-- `initialMechId`, `initialDate`, `initialSlot` — pre-selected values on form reload after POST
+Also contains an AJAX `verify_pw` endpoint for the password-gated "Admin Panel" link, a password modal, a flash message modal for PRG errors, a Help & Info FAQ section, the spotlight overlay element, and the shame banner.
 
 ### `admin.php` — Admin Panel
 
 The management interface with password-gated destructive actions. No session-based login — the password is checked per-action via an AJAX endpoint or inline POST verification.
 
-Dispatcher pattern:
-
-- Lines 9-14: AJAX `verify_pw` endpoint — returns JSON `{success: bool}`
-- Lines 16-25: GET action handlers (`?cancel=N`, `?fire=N`, etc.) — all redirect via `flashAndRedirect()`
-- Lines 27-39: POST action handlers (`update_date`, `update_mechanic`, etc.) — all redirect via `flashAndRedirect()`
-- Lines 41-45: Flash message consumer — reads and clears session flash vars
-- Line 47: `advanceAppointmentStatuses()` — auto-advances scheduled → in_progress → completed
-- Lines 49-73: Data queries for appointments, mechanics, overrides, sim config
-
 Template sections:
 
-- **Simulated time panel** — toggle, datetime picker, Set button (disabled when sim off)
-- **All Appointments table** — paginated list with per-row Edit (inline date/mechanic swap), Cancel, Remove actions; striped rows via PHP counter class
-- **Active Overrides table** — lists blocked date/slot combinations with Unblock button
+- **Simulated time panel** — toggle, datetime picker, Set button
+- **All Appointments table** — per-row Edit (inline date/slot/mechanic swap), Cancel, Remove
+- **Active Overrides table** — lists blocked date/slot combinations with Unblock
 - **Schedule Override form** — per-mechanic, per-date slot blocking with conflict detection
-- **All Mechanics table** — Name, specialties, exp, status (Active/On Leave/Inactive), with Edit, Schedule, Fire/Restore, Remove actions; striped rows via PHP counter class
+- **All Mechanics table** — Edit, Schedule, Fire/Restore, Remove
 - **Register New Mechanic form** — collapsible `<details>` section
-- **Edit Mechanic modal** — name, nickname, quote, specialties, exp; name/exp locked behind password
+- **Edit Mechanic modal** — name, nickname, quote, specialties, exp; name/exp password-locked
 - **Schedule modal** — day × slot checkbox grid
-- **Conflict modal** — shown when override would clobber existing appointments
+- **Vacation list** — inline within Edit Mechanic modal, with Add/Remove
+- **Conflict modal** — shown when override would clash with existing appointments
 - **Password modal** — generic password gate for destructive actions
-
-All modal dialogs follow a consistent pattern: overlay backdrop, decorated box with burst label, action description, confirm button, dismiss options (close X, Cancel button, overlay click).
+- **Flash message modal** — shown after redirect on success/failure
+- **Settings gear** — "Disable Spotlight of Shame" toggle (localStorage, affects booking page)
 
 ### `availability.php` — AJAX Slot Endpoint
 
-Called by `fetch('availability.php?mechanic_id=X&date=Y&slot_index=Z')` from `script.js`.
-
-Response structure:
-
-- `slots` — array of `{index, label, available}` for the selected mechanic/date
-- `on_vacation` — boolean
-- `all_slots` — `{ mechanic_id: [{index, available}, ...] }` for all mechanics
-- `all_names` — `{ mechanic_id: name }` for tooltip labels
-- When `slot_index` is provided: `mechanic_first_name`, `mechanic_nickname`, `adjacent_slot`, `nearby_prev_date`, `nearby_next_date`
-
-Used by both the booking page (rendering slot chips) and the tooltip suggestion system (clicking a taken slot shows alternatives).
-
-## 4. Database Structure
-
-8 tables:
-
-### `mechanics`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | Auto-increment |
-| name | VARCHAR(100) | |
-| nickname | VARCHAR(50) | Nullable |
-| bio | TEXT | |
-| quote | VARCHAR(255) | Shown on booking page hover |
-| theme | VARCHAR(20) | per-mechanic visual theme |
-| specialties | TEXT | Comma-separated |
-| years_experience | INT | |
-| is_active | BOOLEAN | Soft delete for firing |
-| created_at | DATETIME | |
-
-### `mechanic_schedule`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| mechanic_id | INT FK | mechanics.id |
-| day_of_week | TINYINT | 0=Sun … 6=Sat |
-| slot_1..slot_4 | BOOLEAN | Default TRUE |
-
-Unique on `(mechanic_id, day_of_week)`.
-
-### `mechanic_overrides`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| mechanic_id | INT FK | |
-| override_date | DATE | |
-| slot_1..slot_4 | BOOLEAN | 0 = blocked |
-| reason | VARCHAR(255) | |
-
-Unique on `(mechanic_id, override_date)`. Inserted with `ON DUPLICATE KEY UPDATE` so re-overriding updates in place.
-
-### `mechanic_vacations`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| mechanic_id | INT FK | |
-| start_date | DATE | |
-| end_date | DATE | |
-| reason | VARCHAR(255) | |
-
-### `clients`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| name | VARCHAR(100) | |
-| phone | VARCHAR(20) | Unique — used for lookups |
-| address | TEXT | |
-| created_at | DATETIME | |
-
-### `cars`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| client_id | INT FK | |
-| license_no | VARCHAR(50) | Unique |
-| engine_no | VARCHAR(50) | |
-| model | VARCHAR(100) | |
-| created_at | DATETIME | |
-
-### `appointments`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| client_id | INT FK | |
-| car_id | INT FK | |
-| mechanic_id | INT FK | |
-| appointment_date | DATE | |
-| slot_index | TINYINT | 0=10:00, 1=12:00, 2=14:00, 3=16:00 |
-| status | ENUM | scheduled / in_progress / completed / cancelled |
-| cancelled_at | DATETIME | Nullable |
-| admin_notes | TEXT | |
-| created_at / updated_at | DATETIME | |
-
-Unique on `(car_id, appointment_date)` — one booking per car per day.
-
-### `reviews`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | |
-| appointment_id | INT FK | Unique |
-| rating | TINYINT | 1–5 |
-| comment | TEXT | |
-| created_at | DATETIME | |
-
-### `sim_config`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INT PK | CHECK (id=1) — singleton row |
-| use_simulated_time | BOOLEAN | |
-| simulated_datetime | DATETIME | |
-
-Pre-seeded with one row on schema creation.
-
-## 5. JavaScript / AJAX Architecture
-
-### `script.js` (415 lines)
-
-All client-side logic for both pages. Page-specific code is guarded by `DOMContentLoaded` checks for element existence (`#booking-form` for booking page, `#pw-modal` for admin page).
-
-#### Booking page functions
-
-- **`htmlspecialchars(s)`** — Custom escape for `<`, `>`, `&`, `"`, `'` using DOM text node + innerHTML + `.replace()`.
-- **`isOnVacation(mechId, date)`** — Checks `VACATION_DATA` for date overlap.
-- **`updateVacationBadges(date)`** — Adds/removes "ON VACATION" badges on mechanic cards dynamically when date changes.
-- **`updateQuotePosition(card)`** — Positions the quote tooltip relative to a hovered mechanic card.
-- **`selectMechanic(id)`** — Marks a mechanic card as selected, fetches availability.
-- **`fetchAvailability()`** — Calls `availability.php`, renders `.slot-chip` divs. Green chips are clickable (selectable), gray chips show a tooltip on click.
-- **`selectSlot(el, index)`** — Highlights the chosen slot chip, stores index in hidden input.
-- **`showTooltip(el)`** — Called when clicking a taken slot. Fetches alternative suggestions from `availability.php` (adjacent slots, nearby dates, other mechanics free at that time). Renders clickable suggestion chips that call `fillSuggestion()`.
-- **`hideTooltip()`** — Hides the suggestion tooltip.
-- **`fillSuggestion(mechId, date, slotIndex)`** — Fills the form with the suggested mechanic/date/slot, re-fetches availability, auto-selects the slot.
-- **`formatSuggestDate(dateStr)`** — Reverses ISO date for UK-style display in tooltip chips.
-
-#### Admin page functions
-
-- **Password gate**: `requirePw(actionUrl)`, `requirePwForForm(form)`, `requirePwForField(fieldId)`, `openPwModal()`, `closePwModal()`, `confirmPw()`, `togglePwVisibility()` — Generic password modal system used by all destructive actions. The modal sends `verify_pw=1` via XHR; on success, executes the pending action (redirect, form submit, or field unlock).
-- **`toggleEdit(id)`** — Shows/hides the inline edit form row for an appointment.
-- **`toggleOverrides()`** — Shows/hides the Active Overrides panel.
-- **`openMechModal(btn)`** — Fills and opens the Edit Mechanic modal from data attributes.
-- **`openScheduleModal(id, name)`** — Opens the schedule checkbox grid modal.
-- **`toggleMechSwapBtn(sel)`** — Enables/disables the Change Mechanic button based on selection change.
-- **`toggleDateChangeBtn(el)`** — Enables/disables the Change Date button based on date/slot change.
-- **`renderVacations(id)`** — Renders a mechanic's vacation list inside the Edit modal.
-- **`addVacation()`** — Dynamically creates and submits a hidden form to add a vacation period.
-- Modal show/close functions: `showCancelModal`, `showFireModal`, `showRemoveModal`, `showUnblockModal` and their `close*Modal` counterparts.
-
-### `datepicker.js` (311 lines)
-
-A custom date picker that replaces native `<input type="date">` and `<input type="datetime-local">` UI when the `data-datepicker` attribute is present.
-
-Features:
-
-- Singleton manager (`DPM`) with scroll/resize/click listeners, registered per-picker
-- Calendar grid with month navigation (prev/next arrows)
-- Day selection with today highlighting
-- Month/year hover tooltip
-- Confirm button mode (data-confirm attrubute)
-- Placement control (data-placement: auto / top)
-- Lazy popup creation on first focus
-- Positions relative to input, avoids viewport edges
-
-## 6. Backend Architecture
-
-### `functions.php` (665 lines)
-
-Core business logic split into:
-
-#### Helper functions
-- `fmtDate()` — ISO date → "j M Y" format
-- `fmtNameTwoLines()` — Splits name at first space, inserts `<br>`
-- `slotStartHour()` / `slotEndHour()` / `slotIndexFromHour()` — Slot time math
-- `getDB()` — PDO singleton from `config.php`
-
-#### Availability system
-- `isSlotAvailable()` — Checks schedule, overrides, existing appointments, vacations. Returns `false` if the slot is taken, blocked, or mechanic is on vacation.
-- `getAdjacentSlotForMechanic()` — Returns the nearest free slot (+1 or -1)
-- `getNearbyDatesForMechanic()` — Searches ±14 days for the same slot with the same mechanic
-
-#### Appointment CRUD
-- `createAppointment()`, `cancelAppointment()`, `removeAppointment()` (DELETE for cancelled)
-- `updateAppointmentDate()` — Validates via `validateSlotAssignment()` before updating
-- `updateAppointmentMechanic()` — Same validation pattern
-- `validateSlotAssignment()` — Central validator: checks schedule, override, and appointment conflicts
-- `validateAppointmentInput()` — Field-level validation (required fields, formats)
-- `advanceAppointmentStatuses()` — Two-pass auto-advance: first reverts incorrectly forward-advanced appointments, then advances `scheduled → in_progress` (time-based) and `in_progress → completed` (time-based)
-
-#### Mechanic management
-- `getMechanics()`, `getMechanicById()`, `getAllMechanics()`, `getMechanicsForSelect()`
-- `addMechanic()` — Inserts mechanic + auto-creates 7-day full schedule
-- `updateMechanic()`, `fireMechanic()`, `restoreMechanic()`, `removeMechanic()` (hard delete)
-
-#### Schedule system
-- `getMechanicSchedule()`, `updateMechanicSchedule()`
-- `getMechanicVacations()`, `addMechanicVacation()`, `removeMechanicVacation()`
-- `isMechanicOnVacation()`
-
-#### Client/Car management
-- `findOrCreateClient()` — Lookup by phone, update name/address if returning
-- `findOrCreateCar()` — Lookup by license, update engine/model if returning
-- `isCarBookedOnDate()` — Prevents double-booking
-
-#### Simulation
-- `getEffectiveTime()` — Returns simulated datetime if enabled, else real time
-
-#### Flash + redirect
-- `flashAndRedirect()` — Sets session flash vars, redirects to admin.php, exits
-
-#### 17 Action handlers (`handle*()` functions)
-
-All follow the pattern: read input, perform action, call `flashAndRedirect()`.
-
-| Handler | Trigger | Action |
-|---------|---------|--------|
-| `handleRemoveAllCancelled()` | GET `?remove_all_cancelled` | Deletes all cancelled appointments |
-| `handleRemove()` | GET `?remove=N` | Deletes a specific cancelled appointment |
-| `handleCancel()` | GET `?cancel=N` | Marks appointment as cancelled |
-| `handleFire()` | GET `?fire=N` | Sets `is_active = 0` on mechanic |
-| `handleRestore()` | GET `?restore=N` | Sets `is_active = 1` on mechanic |
-| `handleRemoveMechanic()` | GET `?remove_mechanic=N` | Hard-deletes a mechanic |
-| `handleUnblock()` | GET `?unblock=N` | Deletes an override row |
-| `handleRemoveVacation()` | GET `?remove_vacation=N` | Deletes a vacation row |
-| `handleUpdateDate()` | POST `update_date` | Changes appointment date/slot (password-gated) |
-| `handleUpdateMechanic()` | POST `update_mechanic` | Swaps appointment mechanic (password-gated) |
-| `handleSimToggle()` | POST `sim_toggle` | Toggles simulated time on/off |
-| `handleToggleSim()` | POST `toggle_sim` | Sets simulated datetime |
-| `handleAddMechanic()` | POST `add_mechanic` | Creates new mechanic |
-| `handleUpdateMechanicInfo()` | POST `update_mechanic_info` | Edits mechanic details |
-| `handleUpdateSchedule()` | POST `update_schedule` | Updates day × slot grid |
-| `handleAddVacation()` | POST `add_vacation` | Adds vacation period |
-| `handleOverrideSlot()` | POST `override_slot` | Blocks specific slots on a date |
+Called by the booking page to fetch slot availability for a mechanic on a given date. Returns which slots are free, taken, or blocked. When a taken slot is clicked, returns alternative suggestions (adjacent slots, nearby dates, other mechanics free at that time).
 
-All handlers return `never` — they always terminate via `flashAndRedirect()` (which calls `header()` + `exit`).
-
-## 7. Visual Design Concept
+## 5. Database Structure
 
-The aesthetic is retro comic book / pop art:
-
-- **Panel layouts**: `.panel` elements have slight rotation offsets (0.4°–0.6°) for a hand-placed comic panel feel. Even/odd panels alternate rotation direction.
-- **Color palette**: `--ink` (#1a1a2e) on `--paper` (#e0cc5a) with accent colors: teal, rust, navy, pink, gold, cyan, burst (magenta), pop (blue).
-- **Fonts**: Five self-hosted display fonts: Bangers (headlines), Action Man Bold (bursts), Walter Turncoat (body), Luckiest Guy (subheadings), Permanent Marker (accents).
-- **Bursts**: Triangular star shapes with `clip-path: polygon()` in four directional variants (left, right, top-left, top-right). Used on modals ("WHOA!", "FIRED!", "GONE!", "FREE!", "BOOK!", "LIST!", "TIME!", "HELD!", "BLOCKED!", "BAM", "POW", "ZOWIE", "VROOM", "KAPOW", "CLICK").
-- **Onomatopoeia watermarks**: Three fixed-position repeating background-style texts ("VROOM", "KAPOW", "CLICK" on booking page; "POW", "ZOWIE", "BAM" on admin).
-- **Ben-Day dots**: `.dot-bg` utility applies `background-image: radial-gradient(circle, ...)` for a retro printing effect.
-- **Shadows**: Heavy box-shadows with `--shadow-offset: 6px` for a 3D pop-art feel.
-- **Tables**: Themed with `--navy` headers (`--gold` text), `--cyan` row backgrounds, alternating `#bcd4d4` stripe on even rows (via `tr.stripe-even td`).
-- **Buttons**: Styled with comic colors, bold font, heavy shadows, hover transforms.
-- **Scrollbars**: Custom thin `--ink` scrollbars matching the theme.
+9 tables:
 
-## 8. Password Gate System
+- **`mechanics`** — id, name, nickname, quote, theme, specialties, years_experience, is_active, created_at
+- **`mechanic_schedule`** — id, mechanic_id, day_of_week, slot_1..slot_4 (unique on mechanic+day)
+- **`mechanic_overrides`** — id, mechanic_id, override_date, slot_1..slot_4, reason (unique on mechanic+date)
+- **`mechanic_vacations`** — id, mechanic_id, start_date, end_date, reason
+- **`clients`** — id, name, phone (unique), address, created_at
+- **`cars`** — id, client_id, license_no (unique), engine_no, model, created_at
+- **`appointments`** — id, client_id, car_id, mechanic_id, date, slot_index, status, cancelled_at, admin_notes, timestamps (unique on car+date)
+- **`reviews`** — id, appointment_id (unique), rating 1-5, comment, created_at
+- **`sim_config`** — id (singleton), use_simulated_time, simulated_datetime
 
-Destructive actions are protected by an admin password (`ADMIN_PW` constant in `config.php`, default `'meow meow'`).
+## 6. Features
 
-### Gated actions
+### 6.1 Booking Flow
 
-The following require password confirmation:
+**What it does:** A customer selects a mechanic from the card grid, picks a date, sees available time slots highlighted in green, clicks one, fills in their details (name, phone, address, car info), and books. If validation fails, the form is repopulated with their entries and a flash message explains the error.
 
-- Cancel appointment
-- Remove cancelled appointment
-- Remove all cancelled appointments
-- Fire mechanic
-- Remove mechanic
-- Edit appointment date
-- Edit appointment mechanic
-- Unlock name field in Edit Mechanic modal
-- Unlock experience field in Edit Mechanic modal
+**How it works (implementer notes):** Form submission is validated client-side by `spotlight.js` (`validateBookingForm()`) and server-side by `functions.php` (`validateAppointmentInput()`). Server errors use the PRG pattern: `$_SESSION['flash_msg']` + `$_SESSION['booking_post']` are set, the page redirects back to GET, and the form is repopulated from `$savedPost`. The form uses `novalidate` — HTML5 validation is replaced by the custom Spotlight of Shame system. Slots are fetched via `availability.php` which checks `isSlotAvailable()` against the mechanic's schedule, overrides, existing appointments, and vacations.
 
-### Non-gated actions
 
-These do NOT require password:
+### 6.2 Slot Suggestions & Conflict Handling
 
-- Restore mechanic
-- Unblock override
-- Remove vacation
-- Hire mechanic
-- Sim toggle
-- Schedule update
-- Add vacation
-- Override slot
+**What it does:** If a customer clicks a grey (taken) slot, a tooltip appears with suggestions: the same slot on nearby dates (±30 days), the same date with an adjacent free slot, or the same slot with a different mechanic who is free at that time. Clicking a suggestion auto-fills the form with the new mechanic/date/slot. If a "different mechanic" suggestion is used, the page scrolls to that mechanic's card.
 
-### Password modal flow
+**How it works (implementer notes):** `showTooltip()` calls `availability.php?mechanic_id=X&date=Y&slot_index=Z`. The endpoint runs `getAdjacentSlotForMechanic()` (+1/-1 slot), `getNearbyDatesForMechanic()` (±30 days), and queries all other mechanics' availability for that slot. Results are rendered as clickable chips that call `fillSuggestion(mechId, date, slotIndex, scrollToCard)` — when `scrollToCard` is true, `card.scrollIntoView({ behavior:'smooth', block:'center' })` is called.
 
-1. User clicks a gated action → `requirePw()` sets `_pendingAction`, opens modal
-2. User enters password, clicks Confirm → `confirmPw()` sends `verify_pw=1` via XHR to `admin.php`
-3. Server compares `$_POST['admin_pw']` against `ADMIN_PW` constant, returns `{success: bool}`
-4. On success: executes the pending action (redirect, form submit, or field unlock)
-5. On failure: shows error message inside modal, user can retry
+### 6.3 Admin — Appointment Management
 
-The password input includes a show/hide toggle using `eye-open.svg`/`eye-closed.svg` icons.
+**What it does:** The All Appointments table lists every booking with client, car, date, slot, mechanic, and status. Each scheduled appointment has Edit and Cancel buttons. Edit opens an inline row with dropdowns for date, slot, and mechanic — any change enables the Update button. Cancel sets the status to cancelled. Cancelled appointments can be hard-deleted with Remove. A "Remove All Cancelled" bulk action is available at the bottom.
 
-## 9. Simulation System
+**How it works (implementer notes):** `handleUpdateAppointment()` handles date/slot/mechanic changes in a single POST handler (`?update_appointment`). It validates via `validateSlotAssignment()` which checks schedule, overrides, and appointment conflicts. Cancel/remove actions are GET handlers guarded by the password gate. The inline edit row visibility toggles via `toggleEdit()`, and the Update button enable/disable is managed by `toggleUpdateApptBtn()` which compares current values to `data-original-*` attributes.
 
-A simulated clock that overrides the real system time for testing.
+### 6.4 Admin — Mechanic Management
 
-- **Toggle**: Checkbox in the Simulated Time panel activates/deactivates sim mode. The panel highlights when active.
-- **Set button**: A datetime-local input lets the admin pick a specific simulated time. The Set button is disabled when sim mode is off.
-- **Display**: Current effective time shown in the panel with a `(simulated)` label when active.
-- **Behavior**: `getEffectiveTime()` checks `sim_config.use_simulated_time` — if true, returns `sim_config.simulated_datetime`, otherwise returns `new DateTime()`.
-- **Status auto-advance**: `advanceAppointmentStatuses()` uses the effective time to determine when appointments move from `scheduled → in_progress → completed`, enabling time-travel testing.
+**What it does:** The All Mechanics table shows every mechanic with name, nickname, specialties, years of experience, and status (Active / On Leave / Inactive). Active mechanics can be Edited (name, nickname, quote, specialties, exp — name and exp are password-locked), have their weekly Schedule configured (day × slot checkboxes), or be Fired (soft-delete, becomes Inactive). Inactive mechanics can be Restored (rehired) or Removed (hard-delete). New mechanics are registered via a collapsible form. After hiring, the Edit modal auto-opens so the admin can fill in details and set the schedule. Vacations are managed inline within the Edit modal — pick start/end dates and optionally a reason.
 
-## 10. Schedule Override System
+**How it works (implementer notes):** `addMechanic()` inserts the mechanic and creates a 7-day schedule with all slots false (the admin must configure availability via the Schedule modal). `fireMechanic()` sets `is_active = 0`. `removeMechanic()` hard-deletes from all related tables. The new-hire auto-open mechanic modal is driven by a JS block in `admin.php` that checks `$_GET['new_mechanic']` and calls `openMechModalById()`. Vacations are stored in `mechanic_vacations` and checked via `isMechanicOnVacation()`.
 
-Allows blocking specific time slots for a mechanic on a given date (e.g., days off, early leave).
+### 6.5 Admin — Schedule Overrides
 
-- **Override form**: Dropdown for mechanic, date picker, 4 checkboxes for slots (labelled with time ranges), optional reason text.
-- **Validation**: Rejects if mechanic doesn't work that day (`isSlotAvailable()` check). Rejects if slot is not in mechanic's base schedule.
-- **Conflict detection**: Before saving, checks if any existing non-cancelled, non-completed appointments occupy the selected slots. If conflicts exist, a modal lists them with client names and the save is blocked.
-- **Unblock**: Each override in the Active Overrides table has an Unblock button that deletes the row.
-- **Privacy**: Override reasons are shown inside the admin panel only.
+**What it does:** The admin can block specific time slots for a mechanic on a specific date (e.g., sick day, early leave). The form selects a mechanic, date, which slots to block, and an optional reason. If any existing non-cancelled appointments occupy those slots, a conflict modal lists the affected clients and the save is blocked. Active overrides are shown in a table with an Unblock button.
 
-## 11. Status Auto-Advance
+**How it works (implementer notes):** `handleOverrideSlot()` POST handler uses `ON DUPLICATE KEY UPDATE` so re-overriding the same mechanic+date updates in place. Conflict detection queries appointments with matching mechanic/date/slot and status != cancelled/completed. Client-side validation via `validateOverrideForm()` ensures mechanic and date are filled.
 
-Appointment statuses auto-advance based on the effective time (real or simulated).
+### 6.6 Admin — Simulated Clock
 
-### Forward pass
+**What it does:** The Simulated Time panel lets the admin toggle a fake clock. When enabled, the admin sets a specific datetime and the system behaves as if that is the current time. Appointments auto-advance (scheduled → in_progress → completed) based on the simulated time. This enables time-travel testing of status transitions. The panel highlights when active.
 
-- `scheduled → in_progress`: If current time is past the appointment start time (slot start), the status advances.
-- `in_progress → completed`: If current time is past the appointment end time (slot end), the status advances.
+**How it works (implementer notes):** `getEffectiveTime()` checks `sim_config.use_simulated_time`. If true, returns `sim_config.simulated_datetime`; otherwise returns `new DateTime()`. `advanceAppointmentStatuses()` runs a two-pass system: a reversion pass (resets incorrectly advanced appointments), then a forward pass (advances based on slot start/end times vs effective time). Runs once per admin page load after POST handling.
 
-### Reversion pass
+### 6.7 Password Gate
 
-Before the forward pass, a reversion pass resets any appointments that were incorrectly advanced (e.g., if simulated time was set to a date before the appointment). This prevents false states.
+**What it does:** Destructive actions (cancel/remove appointments, fire/remove mechanics, edit appointments, unlock sensitive fields) require an admin password. A modal pops up asking for the password, which is verified via AJAX. On success, the action executes. On failure, an error is shown inside the modal and the user can retry.
 
-The auto-advance runs once per admin page load, after POST handling and before rendering.
+**Actions that require password:** Cancel appointment, Remove cancelled appointment, Remove all cancelled, Fire mechanic, Remove mechanic, Edit appointment, Unlock name/exp in Edit Mechanic modal.
 
-## 12. Images and Assets
+**Actions that do NOT require password:** Restore mechanic, Unblock override, Remove vacation, Hire mechanic, Sim toggle, Schedule update, Add vacation, Override slot.
 
-### Fonts
-- `fonts/Action Man Bold.ttf` — Burst/action labels
-- `fonts/Bangers.woff2` — Headlines (preloaded)
-- `fonts/LuckiestGuy-Regular.woff2` — Subheadings
-- `fonts/PermanentMarker-Regular.woff2` — Accent text
-- `fonts/WalterTurncoat-Regular.woff2` — Body text (preloaded)
+**How it works (implementer notes):** `requirePw(actionUrl)` sets `_pendingAction` and opens the modal. `confirmPw()` sends `verify_pw=1&admin_pw=X` via XHR to `admin.php` (or `index.php` for the admin link). Server compares against `ADMIN_PW` constant (`'meow meow'` default) and returns `{success: bool}`. On success, the pending URL is followed or form submitted.
 
-### Icons (PNG)
-- `images/icons/tagline.png` — Header tagline image
-- `images/icons/pow.png` — Appointment confirmation burst
+### 6.8 Status Auto-Advance
 
-### Doodles (SVG)
-- `images/doodles/eye-open.svg` — Password show icon
-- `images/doodles/eye-closed.svg` — Password hide icon
+Appointments automatically move through statuses based on the effective time (real or simulated):
 
-## 13. Notes
+- `scheduled → in_progress`: when current time passes the slot start time
+- `in_progress → completed`: when current time passes the slot end time
 
-- Copy `config.example.php` to `config.php` and fill in your database credentials before running locally.
-- The contact form from the homepage assignment is not present in this project — bookings are handled by the app itself.
+A reversion pass runs first to reset any appointments that were incorrectly advanced (e.g., after moving the sim clock backwards). Runs once per admin page load.
+
+### 6.9 Spotlight of Shame
+
+**What it does:** When the customer submits the form with missing or invalid fields, the page darkens — four curtains close in around the first error, a yellow spotlight beam shines down from the top of the viewport, a comic-style burst graphic (one of five hand-drawn SVGs: blank, zilch, nada, bzzt, nope) pops up next to the field, and a menacing "YOU ARE LOCKED IN" banner slides in at the top. All other fields become read-only. The customer must fix each field one by one — the spotlight advances to the next error only after the current field is corrected. On valid entry (blur or Enter), the burst fades and the spotlight moves on. The banner reads "the spotlight will guide you to each field — fix it, then move on."
+
+If the admin disables the feature via the settings gear (admin page header), form errors instead show inline red text beneath each field and the page scrolls to top on submit. The spotlight toggle is stored in `localStorage` and persists across sessions.
+
+**How it works (implementer notes):** Managed entirely by `spotlight.js`. `validateBookingForm()` checks form fields against `data-validate`/`data-err-*` attributes. `launchSpotlight()` creates overlay curtains (positioned via `getBoundingClientRect`), a beam (CSS `clip-path: polygon()` cone), a glow (gold border rim), and positions an error burst SVG. `advanceSpotlight()` moves to the next error, re-randomising phone-field bursts from `PHONE_BURST_KEYS` while keeping other fields on their fixed shuffled key. `repositionOnScroll()` hides bursts during scroll (120ms debounce). Listener cleanup uses `_lastBlurHandler`/`_lastKeydownHandler` to prevent leaks. A 600ms cooldown timer prevents the auto-focus burst from immediately fading out.
+
+## 7. Theme & Customization
+
+The entire interface is hand-crafted as a retro 1960s/70s pop art and comic strip experience. Every pixel — from the font loading strategy to the Ben-Day dot backgrounds, from the hand-drawn doodle SVGs to the rotation angle of each panel — was deliberately chosen to sell the illusion that you are not using a web application, but flipping through a comic book.
+
+### 7.1 Art Direction
+
+The guiding principle: **ink on newsprint**. The cream base simulates aged comic paper; the near-black ink stands in for printer's ink. Teal, rust, gold, and pink provide the four-colour process feel. The slightly uneven panel rotations mimic a page where panels were physically cut and pasted. The jagged speech bubbles, the burst graphics, the onomatopoeia watermarks — every element references a specific comic book convention.
+
+All decorative graphics are original vector SVG artwork, drawn by hand in Inkscape and Illustrator, then optimised with SVGO. No stock assets, no clip art, no AI-generated graphics.
+
+### 7.2 Colour Palette
+
+| Variable | Hex | Role |
+|----------|-----|------|
+| `--ink` | `#1a1a2e` | Text, primary borders — a warm near-black that avoids harshness |
+| `--paper` | `#e0cc5a` | Page background — aged cream, not sterile white |
+| `--cream` | `#ecd94d` | Panel/card background — warmer than newsprint |
+| `--teal` | `#2a6b6b` | Primary accent — complementary to cream, recalls ink+water |
+| `--teal-light` | `#3a9b9b` | Checkbox checked state, hover states |
+| `--teal-dark` | `#1a4a4a` | Subtitle text, depth accent |
+| `--rust` | `#a0453b` | Danger, cancellation, shame — warm red-brown |
+| `--pink` | `#d63384` | Pop energy burst, decorative accents |
+| `--gold` | `#f5c518` | Highlights, banner text, star accents |
+| `--navy` | `#16213e` | Table headers, deep accent |
+| `--cyan` | `#caeded` | Speech bubble fill — the only light cool colour |
+| `--shadow-md` | `rgba(26,26,46,0.4)` | Box shadows — matches ink colour |
+
+Pairs are deliberately mismatched: teal buttons with gold text, rust banners with gold text, pink accents against cream backgrounds. The result is deliberately loud — a pop art comic should not be subtle.
+
+### 7.3 Font System
+
+Six self-hosted fonts — no Google Fonts CDN, no external requests:
+
+| Font | Use | Fallback Chain |
+|------|-----|----------------|
+| **Bangers** (WOFF2) | Headlines, panel titles, all-caps emphasis | `cursive, fantasy, Impact` |
+| **Luckiest Guy** (WOFF2) | Subheadings, nav items | `cursive, serif` |
+| **Permanent Marker** (WOFF2) | Accents, quote text | `cursive, "Comic Sans MS"` |
+| **Walter Turncoat** (WOFF2) | Body text, form labels, table content | `cursive, sans-serif` |
+| **Action Man Bold** (TTF) | Burst graphics, onomatopoeia | `Impact, sans-serif` |
+| **Action Man Shaded Italic** (TTF) | Decorative burst text | `cursive, serif` |
+
+The self-hosting was deliberate: Google Fonts would break the offline XAMPP experience, introduce latency, and leak user data. Fonts were downloaded, converted to WOFF2 for compression, and served from `/fonts/`. The fallback chains ensure each font is replaced by a visually similar system font in the same generic category.
+
+Between the six font faces, only **one** (`<h1>` headline) uses a standard serif keyword — everything else maps to `cursive` or `fantasy`, pushing the page further into hand-drawn territory even when the custom font fails to load.
+
+### 7.4 Ben-Day Dots
+
+The background is built from layered CSS `radial-gradient()` circles — a Ben-Day dot pattern that mimics the four-colour halftone printing process used in comic books of the 1960s.
+
+```css
+/* Simplified — actual uses three overlapping gradients */
+background-image:
+  radial-gradient(circle, var(--ink) 1px, transparent 1px),
+  radial-gradient(circle, transparent 0.5px, var(--paper) 0.5px);
+```
+
+The effect is applied to the `<body>` background, creating the texture of cheap newsprint. The dot density and colour shift subtly between page sections (cream dots over the body, darker dots on the settings dropdown). In the spotlight overlay, the curtains layer a noise texture (`data:image/svg+xml` base64 encoded SVG) with a halftone dot overlay to simulate the feel of a comic panel that has been physically darkened.
+
+### 7.5 Panel System
+
+Every section on both pages is wrapped in a `.panel` — a box that reads like a comic strip panel:
+
+- **Rotation**: Even panels rotate `-0.6deg`, odd panels `0.4deg` — alternating to create a hand-placed, slightly chaotic layout. The rotation is subtle enough not to disorient but noticeable enough to suppress the "perfectly aligned web app" feel.
+- **Dashed stripe**: `::before` creates a teal dashed line across the top, like a comic panel border.
+- **Corner square**: `::after` places a filled pink `■` character in the bottom-right corner — referencing the solid colour blocks that appear in comic panel corners.
+- **Shadow**: `2px 2px 0 var(--ink)` — not a blur shadow but a hard offset, like a misaligned printing plate.
+- **Booking panel exception**: The main booking panel has `border-top: none` — the dashed stripe sits on top of the form rather than repeating the border.
+
+Key panels decorated this way: booking panel, mechanic cards, each admin section (appointments, mechanics, overrides, schedule), modals, the flash message box.
+
+### 7.6 Hand-Drawn Burst SVGs
+
+The most labour-intensive visual assets are the seven hand-drawn burst SVGs — the comic-style "wrong answer" graphics that appear during the Spotlight of Shame.
+
+#### Spotlight Error Bursts (`images/bursts/`)
+
+Five original SVGs created for the spotlight validation mini-game. Each started as a pencil sketch, then hand-traced as vector paths in Inkscape — not auto-traced from raster images, not AI-generated, not clip art. Every curve was placed point by point.
+
+| File | Design Detail |
+|------|---------------|
+| `blank.svg` | An empty burst shape — the point is the shape itself, not the text. A stylised jagged starburst with rounded tips and alternating long/spike points. Used as the base animation container for all error bursts. |
+| `zilch.svg` | The word "ZILCH" hand-lettered in bold sans-serif, slanted right. Each letter is a separate path to allow independent positioning within the burst star. The "Z" is oversized, the "H" is undersized — deliberate pop art lettering irregularity. |
+| `nada.svg` | "NADA" in bold italic, with a sharp upward slant. The "D" has an exaggerated bowl, the "A"s are asymmetrical. Letter spacing is tight — the word fills the star like a label bursting at the seams. |
+| `bzzt.svg` | The most complex of the set. "BZZT" with electrical discharge zig-zags radiating from the letters. Three lightning-bolt paths (one per Z) created as separate strokes, each with 6–8 jagged segments. The "B" is drawn as two disconnected lobes to suggest the electric shock interfering with the letterform itself. |
+| `nope.svg` | "NOPE" with two exclamation marks stacked diagonally. The "O" is drawn as an irregular ellipse — not a perfect circle — to maintain the hand-drawn feel. The "P" has an exaggerated descender that curves into the star point. |
+
+Each SVG was then hand-optimised: path data minified (decimal precision reduced, redundant commands merged), viewBox and responsive sizing set, `<title>` and `<desc>` added for accessibility. The total filesize across all five bursts is under 12 KB.
+
+#### Confirmation Burst (`images/icons/pow.svg`)
+
+The "POW!" graphic shown on the booking confirmation panel. Originally hand-drawn as a PNG raster sketch, then manually re-traced as clean SVG paths, optimised through SVGO, and inlined into the page. It represents the payoff — where the error bursts are negative feedback, POW! is the celebratory burst that tells the customer they succeeded.
+
+### 7.7 CSS Burst Labels & Animation System
+
+**Panel / Modal bursts** (`.burst` class):
+
+A separate system from the hand-drawn SVGs — these are pure CSS star shapes created via `clip-path: polygon()` (24-point star) with text content:
+
+- 15 labels used across the site: BOOK!, TIME!, LIST!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, GONE!, FREE!, LOCKED!
+- Each set in Action Man Shaded Italic, rotated 2–5°, positioned absolutely to overlap the panel/modal border (the comic book convention of a sound effect bleeding out of the panel)
+- Colours vary by context: gold text on pink burst, white text on teal burst, ink text on gold burst
+
+**Spotlight burst animation:**
+
+The hand-drawn burst SVGs (section 7.6) are animated via CSS keyframes:
+
+- `error-pop`: scale 0 → 1.1 (overshoot) → 1.0 (settle) — a pop-and-squeeze effect over 250ms
+- `fade-out`: opacity 1 → 0 over 400ms, triggered when switching fields or dismissing
+- `scroll-hide` class: pauses all animation (opacity 0, animation-play-state paused) while the user scrolls, preventing the burst from trailing across the viewport
+
+Phone fields (`.field-phone`) re-randomise their burst word on every invalid input, cycling between `zilch`, `nada`, `bzzt`, and `nope`. All other fields keep their assigned burst for the entire session — the shuffled key is fixed on first error.
+
+### 7.8 Decorative Doodle Icons
+
+Thirteen hand-drawn icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages. Each was drawn as a single SVG path (no auto-trace), then minified:
+
+`gear.svg` (gear icon, rotates on hover), `eye-open.svg` / `eye-closed.svg` (password visibility toggle), `burst-vroom.svg` (admin section header VROOM burst), `hero-helmet.svg` (mechanic card badge), `hourglass.svg` (simulated time panel), `lightning.svg` (flash message accent), `oil-can.svg` (car form section icon), `spark-plug.svg` (engine/slot decoration), `speech-bubble.svg` (quote tooltip indicator), `stiletto.svg` (danger/destructive marker), `super-shield.svg` (confirmation/protection icon), `wonder-tiara.svg` (hero/reward accent), `wrench.svg` (mechanic icon).
+
+These are secondary to the hand-drawn bursts but follow the same ethos: bespoke vector artwork, no stock assets, fully accessible.
+
+### 7.8 Onomatopoeia Watermarks
+
+Each page has a `.omg` elements positioned at fixed viewport locations, layered behind content like a watermark bleed from another page:
+
+- **Booking page**: "VROOM" (top), "KAPOW" (centre), "CLICK" (bottom)
+- **Admin page**: "POW" (top-right), "ZOWIE" (mid-left), "BAM" (bottom)
+
+Styled in Action Man Bold, large font size (4.5rem+), rotated 5–15°, opacity 6–10%, colour matched to section background. These are the equivalent of sound effects that have "bled through" from a previous panel — a printing technique where ink from the other side of the thin newsprint is faintly visible.
+
+### 7.9 Settings Gear & Dropdown
+
+The gear icon (`images/doodles/gear.svg`) in the admin page header rotates on hover (`transform: rotate(90deg)`, `transition: transform 0.5s`). The dropdown panel beneath it uses:
+
+- `var(--cream)` background with a dot pattern overlay
+- `var(--border)` (`2px solid var(--ink)`) plus `var(--shadow-md)`
+- A "⚙ SETTINGS" header in `--font-display` (Bangers) with a pink dashed underline
+- The spotlight toggle `input[type="checkbox"]` is replaced by a `.custom-checkbox`
+
+### 7.10 Custom Checkbox
+
+The `.custom-checkbox` class replaces native checkbox appearance with a themed alternative:
+
+- `appearance: none` — removes native browser styling
+- `var(--paper)` background, `2px solid var(--ink)` border, `2px 2px 0 var(--ink)` hard shadow
+- When checked: `var(--teal-light)` fill with a gold checkmark (painted via `::after` content `✓` in `--gold`)
+- Shared by the spotlight toggle on admin.php and the sim time toggle — any future toggle will use the same class
+
+### 7.11 Speech Bubbles & Tooltips
+
+**Standard bubbles** (`.bubble`): Cyan fill (`var(--cyan)`), `2px dashed var(--ink)` border, triangular tail (`::before`/`::after`). Used for mechanic quotes on hover — the tail aligns to the left side of the card.
+
+**Jagged bubbles** (`.jagged-bubble`): Cyan fill, ink border, but the top edge is jagged (CSS `clip-path` with teeth). Used for the date error message.
+
+**Quote tooltips** (`.quote-tooltip`): Appear below mechanic cards on hover. Gold background (`var(--gold)`), ink border, ink shadow. Positioned via `updateQuotePosition()` which watches card position in the scrolling layout.
+
+**Slot tooltips** (`.slot-tooltip`): Appear when a taken slot is clicked. Gold background, ink border, `filter: drop-shadow(...)` for a jagged shadow effect. Contains suggestion chips for alternative slots/dates/mechanics.
+
+### 7.12 Buttons & Tables
+
+**Buttons** (`.btn`): `var(--ink)` background, `var(--gold)` text, `2px solid var(--ink)` border, `3px 3px 0 var(--ink)` hard shadow. Hover lifts shadow to `5px 5px`. Active pushes shadow to `1px 1px` for a pressed effect. Variants: `--pink` (pop/confirm), `--rust` (danger/destroy), `--outline` (inverted), `--sm` (compact), `--recruit` (green hire).
+
+**Tables**: Comic-themed throughout — `var(--cream)` alternating with `var(--paper)` stripes (`tr.stripe-even`), `var(--navy)` headers with white text, `2px solid var(--ink)` borders, `2px 2px 0 var(--ink)` on headers. Status badges (`.status-badge`) use colour-coded pills (teal = scheduled, gold = in_progress, navy = completed, rust = cancelled).
+
+### 7.13 Inline Error Text
+
+When the Spotlight of Shame is disabled, validation errors appear as `.field-error` spans beneath each invalid field. Styled in `var(--font-hand)` (Walter Turncoat) to look hand-written, italic, `var(--rust)` colour — a subtle red scribble in the margin, like a teacher's correction.
+
+### 7.14 Custom Datepicker
+
+The date picker (`datepicker.js`, 320 lines) is a fully custom widget — no `<input type="date">`. It renders a calendar grid themed to match the site:
+
+- Cream/paper backgrounds, teal headers, ink borders
+- Month navigation with Bangers-font arrows
+- Hover tooltip shows the full month name + year
+- Today highlighted in teal
+- Placement adapts to viewport edges (auto-flip to top)
+- Lazy construction — the popup DOM is created on first focus
+- Confirm mode via `data-confirm` attribute for certain fields
+
+### 7.15 Theme Statistics
+
+A rough count of the customization effort:
+
+- **~1930 lines** of CSS across a single stylesheet
+- **6 font faces**, self-hosted from `.woff2`/`.ttf` files
+- **13 hand-drawn SVG doodles** in `images/doodles/`
+- **5 hand-drawn SVG error bursts** in `images/bursts/`
+- **1 hand-drawn SVG confirmation burst** in `images/icons/`
+- **15 burst labels** applied across panels and modals (BOOK!, TIME!, LIST!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, GONE!, FREE!, LOCKED!)
+- **6 onomatopoeia watermarks** (3 per page, VROOM/KAPOW/CLICK + POW/ZOWIE/BAM)
+- **8+ CSS custom properties** for the colour palette
+- **~15 CSS animation keyframe sets** (panel slide, burst pop/fade/scroll-hide, shame-banner slide, tooltip pop, modal fade, gear rotate, spinner)
+- **Ben-Day dots** via layered `radial-gradient()` on `<body>`, overlay curtains, and dropdown
+- **No CSS framework** — every selector is hand-written for this specific design
+
+## 8. Notes
+
+- Copy `config.example.php` to `config.php` before running. Default admin password is `'meow meow'`.
 - No email or SMS notifications are sent. Customers must remember their appointment time.
-- The `json_encode()` outputs for `VACATION_DATA` and `SCHEDULE_DATA` use `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT` flags to prevent XSS via stored vacation reasons.
-- All SQL queries use prepared statements for user input. Only hardcoded constants (status values, table names) are concatenated directly.
-
-## 14. How to Run
-
-### Local (XAMPP)
-
-1. Place the project folder in your web server root.
-2. Copy `config.example.php` to `config.php` and update DB credentials.
-3. Import `sql/schema.sql` and `sql/seed.sql` into MySQL.
-4. Start Apache and MySQL from XAMPP Control Panel.
-5. Open the booking page in a browser (e.g., `http://localhost/assignment3/index.php`).
-6. Admin panel is at `admin.php` in the same directory.
-
-### Live (InfinityFree)
-
-- Booking page: `https://mayhem-mobility.page.gd`
-- Admin panel: `https://mayhem-mobility.page.gd/admin.php`
-
-## 15. Summary
-
-This project is a functional car workshop appointment system with a retro comic book aesthetic for CSE 391 Assignment 3. It implements phone-based no-login booking, 4 daily time slots, mechanic management (hire/fire/edit/schedule), admin appointment editing, schedule overrides with conflict detection, vacation tracking, a simulated clock for time-travel testing, and automatic status progression. The codebase demonstrates PHP 8+ PDO/MySQL, vanilla JavaScript AJAX, PRG (Post-Redirect-Get) pattern with session flash messages, prepared statement SQL, CSS custom properties, responsive design, comic pop art styling with custom fonts and decorative bursts, and a password-gated admin system.
+- All SQL queries use prepared statements. Only hardcoded constants are concatenated directly.
+- JSON exports (`VACATION_DATA`, `SCHEDULE_DATA`) use `JSON_HEX_*` flags to prevent XSS.
