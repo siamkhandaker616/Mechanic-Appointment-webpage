@@ -1,0 +1,62 @@
+============================================================
+           AI USAGE DECLARATION
+============================================================
+
+Name: Siam Khandaker
+Student ID: 22299030
+Assignment: 03
+Date: 13/07/2026
+
+------------------------------------------------------------
+1. AI TOOLS USED (check all that apply)
+------------------------------------------------------------
+[ ] None
+[ ] ChatGPT
+[ ] GitHub Copilot
+[✓] Google Gemini
+[✓] Claude
+[ ] Cursor
+[ ] Other: ________________
+
+------------------------------------------------------------
+2. PURPOSE OF AI USE (check all that apply)
+------------------------------------------------------------
+[✓] Learning/understanding concepts
+[✓] Debugging my code
+[✓] Generating code snippets
+[✓] Writing text content
+[ ] Design/styling ideas
+[✓] Image generation
+[ ] Other: ________________
+
+------------------------------------------------------------
+3. DESCRIPTION OF AI USE
+------------------------------------------------------------
+Briefly describe what you used AI for and how: AI assistance was used for this documentation file and for image-hunting/moodboard guidance while selecting replacement visual assets. It was also heavily used to understand how to override native browser elements to fit the highly stylized look of the project.
+The website's final content, personal details, styling choices, and submitted project files remain curated and reviewed by me.
+
+
+------------------------------------------------------------
+4. AI-ASSISTED SECTIONS
+------------------------------------------------------------
+List specific files/sections where AI helped significantly:
+
+File: _____datepicker.js___________ Section: ___to make a whole custom functional sim mode______________
+File: _____spotlight.js____________ Section: ___to make a dramatic spotlight event to help users correct form submissions with empty required fields_________
+File: _____functions.php____________ Section: __to workshop and troubleshoot problems I faced while implementing slot overrides, mechanic firing, appointment management etc_______________
+
+------------------------------------------------------------
+5. DECLARATION
+------------------------------------------------------------
+I declare that:
+- This disclosure is complete and accurate
+- I understand all code in my submission
+- I can explain and modify my work if asked
+- I take full responsibility for my submission
+
+Signature: _____Siam Khandaker__________________
+Date: _______13/07/2026____________________
+
+============================================================
+Save as: docs/AI_Declaration.txt
+============================================================
