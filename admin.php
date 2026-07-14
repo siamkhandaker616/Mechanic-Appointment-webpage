@@ -17,6 +17,9 @@ if (isset($_POST['verify_pw'])) {
 /* === GET ACTION HANDLERS === */
 
 if (isset($_GET['remove_all_cancelled'])) handleRemoveAllCancelled();
+if (isset($_GET['rebook']))              handleReBook();
+if (isset($_GET['rebook_confirm']))      handleReBookConfirm();
+if (isset($_GET['remove_all_completed'])) handleRemoveAllCompleted();
 if (isset($_GET['remove']))             handleRemove();
 if (isset($_GET['cancel']))             handleCancel();
 if (isset($_GET['fire']))               handleFire();
@@ -43,11 +46,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $msg = $_SESSION['flash_msg'] ?? $_GET['msg'] ?? '';
 $msgType = $_SESSION['flash_type'] ?? ($_GET['msg'] ?? '' ? 'success' : '');
 $conflictList = $_SESSION['flash_conflicts'] ?? [];
-unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_conflicts']);
+$pendingRebook = $_SESSION['pending_rebook'] ?? null;
+unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_conflicts'], $_SESSION['pending_rebook']);
 
 advanceAppointmentStatuses();
 
 $appointments = getAppointments();
+$cancelledCount = 0;
+$completedCount = 0;
+foreach ($appointments as $appt) {
+    if ($appt['status'] === STATUS_CANCELLED) $cancelledCount++;
+    if ($appt['status'] === STATUS_COMPLETED) $completedCount++;
+}
 $mechanics = getMechanics();
 $mechanicsForSelect = getMechanicsForSelect();
 $allMechanics = getAllMechanics();
@@ -177,6 +187,7 @@ $effectiveTime = getEffectiveTime();
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
+                    <button type="button" class="btn btn-sm btn-jade" onclick="requirePw('?rebook=<?= $a['id'] ?>', false)">Rebook</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(<?= $a['id'] ?>)">Remove</button>
                     <?php else: ?>
                     <span style="display:block;text-align:center;font-size:0.8rem;color:#888;">—</span>
@@ -208,9 +219,16 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </tbody>
     </table>
-    <div style="margin-top:16px;text-align:right;">
-        <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_all_cancelled');return false;">Remove All Cancelled</a>
+    <?php if ($cancelledCount > 0 || $completedCount > 0): ?>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+        <?php if ($cancelledCount > 0): ?>
+        <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_all_cancelled');return false;">Clear Cancelled</a>
+        <?php endif; ?>
+        <?php if ($completedCount > 0): ?>
+        <a href="#" class="btn btn-sm btn-jade" onclick="requirePw('?remove_all_completed');return false;">Archive Completed</a>
+        <?php endif; ?>
     </div>
+    <?php endif; ?>
     </div>
 </div>
 
@@ -340,7 +358,7 @@ $effectiveTime = getEffectiveTime();
                     <?php $_cancelCountStmt->execute([$m['id']]); $_cc = (int)$_cancelCountStmt->fetchColumn(); ?>
                     <button type="button" class="btn btn-sm btn-rust" data-bookings="<?= $_cc ?>" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', this.dataset.bookings)">Fire</button>
                     <?php else: ?>
-                    <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-outline">Rehire</a>
+                    <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-jade">Rehire</a>
                     <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_mechanic=<?= $m['id'] ?>');return false;">Remove</a>
                     <?php endif; ?>
                 </td>
@@ -510,7 +528,7 @@ $effectiveTime = getEffectiveTime();
         <h2 style="margin-top:30px; margin-left: 5px;">Cancel Appointment ?</h2>
         <p style="margin:16px 0;">This can't be undone. Are you sure?</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Cancel</button>
+            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Cancel</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Nevermind</button>
         </div>
     </div>
@@ -524,8 +542,38 @@ $effectiveTime = getEffectiveTime();
         <p style="margin:16px 0;" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
         <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;color:var(--dark);display:none;"></p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Fire</button>
+            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Fire</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Nevermind</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="rebook-mech-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+    <div class="modal-box msg-box msg-error" style="max-width:420px;">
+        <button type="button" class="modal-close" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
+        <h2 style="margin-top:30px;" id="rebook-mech-heading"></h2>
+        <p style="margin:16px 0;">Pick a new mechanic for this job:</p>
+        <select id="rebook-mech-select" style="width:100%;font-size:1rem;">
+            <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
+            <option value="<?= $mid ?>"><?= htmlspecialchars($mname) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">Stay Cancelled</button>
+            <button type="button" class="btn btn-sm btn-rust" id="rebook-confirm-btn">Reassign</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="sim-block-modal" onclick="closeSimBlockModal(event)">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="closeSimBlockModal()">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
+        <h2 style="margin-top:30px; margin-left: 5px;">Sim Mode Active</h2>
+        <p style="margin:16px 0;">Sim mode is active — you're playing with fake time, not making real decisions. Exit sim mode first.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="closeSimBlockModal()">OK</button>
         </div>
     </div>
 </div>
@@ -619,9 +667,20 @@ window.addEventListener('DOMContentLoaded', function() {
     );
 });
 <?php endif; endif; ?>
+<?php if (isset($_GET['rebook_pick_mechanic']) && $pendingRebook): ?>
+window.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('rebook-mech-heading').textContent = <?= json_encode($pendingRebook['old_first_name']) ?> + ' has already ridden off into the sunset — pick another.';
+    document.getElementById('rebook-mech-modal').classList.remove('hidden');
+    document.getElementById('rebook-confirm-btn').addEventListener('click', function() {
+        var mech = document.getElementById('rebook-mech-select').value;
+        window.location.href = '?rebook_confirm=<?= $pendingRebook['id'] ?>&new_mech=' + mech;
+    });
+});
+<?php endif; ?>
 var TODAY = '<?= date('Y-m-d') ?>';
 var SCHEDULE_DATA = <?= json_encode($scheduleData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+var SIM_MODE_ACTIVE = <?= json_encode($useSim) ?>;
 </script>
 <script src="script.js"></script>
 <script src="datepicker.js"></script>

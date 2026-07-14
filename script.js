@@ -378,11 +378,28 @@ function updateStepperBg(input) {
 }
 
 var _pendingField = null;
+var _pendingNewTab = false;
 
 /* === PASSWORD MODAL === */
 
-function requirePw(actionUrl) {
-    _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; openPwModal();
+function checkSimGuard() {
+    if (typeof SIM_MODE_ACTIVE !== 'undefined' && SIM_MODE_ACTIVE) {
+        document.getElementById('sim-block-modal').classList.remove('hidden');
+        return false;
+    }
+    return true;
+}
+function closeSimBlockModal(event) {
+    if (!event || event.target === event.currentTarget) {
+        document.getElementById('sim-block-modal').classList.add('hidden');
+    }
+}
+function requirePw(actionUrl, guardSim) {
+    if (guardSim !== false && !checkSimGuard()) return;
+    _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; _pendingNewTab = false; openPwModal();
+}
+function requirePwNewTab(actionUrl) {
+    _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; _pendingNewTab = true; openPwModal();
 }
 function requirePwForForm(form) {
     _pendingForm = form; _pendingAction = ''; _pendingField = null; openPwModal(); return false;
@@ -431,7 +448,12 @@ function confirmPw() {
                 if (tgt) tgt.focus();
                 _pendingField = null;
             } else if (_pendingAction) {
-                window.location.href = _pendingAction;
+                if (_pendingNewTab) {
+                    window.open(_pendingAction, '_blank');
+                    _pendingNewTab = false;
+                } else {
+                    window.location.href = _pendingAction;
+                }
             } else if (_pendingForm) {
                 var btn = _pendingForm.querySelector('button[type="submit"][name]');
                 if (btn) {
@@ -453,7 +475,7 @@ function confirmPw() {
 }
 function closePwModal() {
     document.getElementById('pw-modal').classList.add('hidden');
-    _pendingAction = ''; _pendingForm = null; _pendingField = null;
+    _pendingAction = ''; _pendingForm = null; _pendingField = null; _pendingNewTab = false;
 }
 
 /* === TOGGLES === */
@@ -823,7 +845,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sbInterval = setInterval(function() {
                 bi = (bi + 1) % bubbles.length;
                 sb.src = 'images/doodles/' + bubbles[bi] + '.svg';
-            }, 800);
+            }, 600);
         }
     }
 

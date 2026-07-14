@@ -17,6 +17,7 @@ CREATE TABLE mechanics (
     specialties TEXT,
     years_experience INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
+    fired BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -82,7 +83,6 @@ CREATE TABLE appointments (
     status ENUM('scheduled','in_progress','completed','cancelled') DEFAULT 'scheduled',
     cancelled_at DATETIME DEFAULT NULL,
     admin_notes TEXT DEFAULT NULL,
-    in_progress_completed BOOLEAN DEFAULT FALSE,
     backup_data TEXT DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -261,10 +261,10 @@ function advanceAppointmentStatuses(): void {
     $toInProgressRows = $stmt->fetchAll();
     $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_IN_PROGRESS . "' WHERE status = '" . STATUS_SCHEDULED . "' AND (appointment_date < ? OR (appointment_date = ? AND slot_index <= ?))");
     $stmt->execute([$today, $today, $currentSlot]);
-    if (!$isSim && $toInProgressRows) {
+    if ($isSim && $toInProgressRows) {
         foreach ($toInProgressRows as $a) {
-            $backup = json_encode(['date' => $a['appointment_date'], 'slot' => (int)$a['slot_index'], 'mech' => (int)$a['mechanic_id']]);
-            $db->prepare("UPDATE appointments SET in_progress_completed = TRUE, backup_data = ? WHERE id = ?")->execute([$backup, $a['id']]);
+            $backup = json_encode(['date' => $a['appointment_date'], 'slot' => (int)$a['slot_index'], 'mech' => (int)$a['mechanic_id'], 'cancelled' => 'false']);
+            $db->prepare("UPDATE appointments SET backup_data = ? WHERE id = ? AND backup_data IS NULL")->execute([$backup, $a['id']]);
         }
     }
 
@@ -283,12 +283,6 @@ function advanceAppointmentStatuses(): void {
         $ids = array_map(fn($x) => $x['id'], $toComplete);
         $ph = implode(',', array_fill(0, count($ids), '?'));
         $db->prepare("UPDATE appointments SET status = '" . STATUS_COMPLETED . "' WHERE id IN ($ph)")->execute($ids);
-        if (!$isSim) {
-            foreach ($toComplete as $a) {
-                $backup = json_encode(['date' => $a['appointment_date'], 'slot' => (int)$a['slot_index'], 'mech' => (int)$a['mechanic_id']]);
-                $db->prepare("UPDATE appointments SET in_progress_completed = TRUE, backup_data = ? WHERE id = ?")->execute([$backup, $a['id']]);
-            }
-        }
     }
 }
 
@@ -413,9 +407,14 @@ function updateMechanic(int $id, string $name, ?string $nickname, ?string $speci
 
 function fireMechanic(int $id): void {
     $db = getDB();
-    $db->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE mechanic_id = ? AND status = '" . STATUS_SCHEDULED . "'")->execute([$id]);
-    $stmt = $db->prepare("UPDATE mechanics SET is_active = 0 WHERE id = ?");
+    $stmt = $db->prepare("SELECT id FROM appointments WHERE mechanic_id = ? AND status = '" . STATUS_SCHEDULED . "'");
     $stmt->execute([$id]);
+    foreach ($stmt->fetchAll() as $a) {
+        saveBackupIfSim((int)$a['id']);
+    }
+    $db->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE mechanic_id = ? AND status = '" . STATUS_SCHEDULED . "'")->execute([$id]);
+    $stmt = $db->prepare("UPDATE mechanics SET is_active = 0, fired = ? WHERE id = ?");
+    $stmt->execute([isSimMode() ? 1 : 0, $id]);
 }
 
 function restoreMechanic(int $id): void {
@@ -491,16 +490,50 @@ function flashAndRedirect(string $msg, string $type = 'success'): never {
     exit;
 }
 
+/* === SIM GUARDS & BACKUP === */
+
+function isSimMode(): bool {
+    $config = getDB()->query("SELECT use_simulated_time FROM sim_config WHERE id = 1")->fetch();
+    return $config && $config['use_simulated_time'];
+}
+
+function guardAgainstSim(): void {
+    if (isSimMode()) {
+        flashAndRedirect('Sim mode is active — you\'re playing with fake time, not making real decisions. Exit sim mode first.', 'error');
+    }
+}
+
+function saveBackupIfSim(int $appointmentId): void {
+    if (!isSimMode()) return;
+    $db = getDB();
+    $stmt = $db->prepare("SELECT appointment_date, slot_index, mechanic_id, status FROM appointments WHERE id = ? AND backup_data IS NULL");
+    $stmt->execute([$appointmentId]);
+    $orig = $stmt->fetch();
+    if (!$orig) return;
+    $backup = json_encode(['date' => $orig['appointment_date'], 'slot' => (int)$orig['slot_index'], 'mech' => (int)$orig['mechanic_id'], 'cancelled' => $orig['status'] === STATUS_CANCELLED ? 'true' : 'false']);
+    $db->prepare("UPDATE appointments SET backup_data = ? WHERE id = ?")->execute([$backup, $appointmentId]);
+}
+
 /* === ACTION HANDLERS === */
 
 function handleRemoveAllCancelled(): never {
+    guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
     $stmt->execute();
     flashAndRedirect($stmt->rowCount() . ' cancelled appointment(s) removed.');
 }
 
+function handleRemoveAllCompleted(): never {
+    guardAgainstSim();
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
+    $stmt->execute();
+    flashAndRedirect($stmt->rowCount() . ' completed appointment(s) removed.');
+}
+
 function handleRemove(): never {
+    guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
     $stmt->execute([(int)$_GET['remove']]);
@@ -510,11 +543,63 @@ function handleRemove(): never {
 
 function handleCancel(): never {
     $id = (int)$_GET['cancel'];
+    saveBackupIfSim($id);
     if (cancelAppointment($id)) {
         flashAndRedirect('Appointment cancelled.');
     } else {
         flashAndRedirect('Could not cancel — appointment may already be in progress or completed.', 'error');
     }
+}
+
+function handleReBook(): never {
+    $id = (int)$_GET['rebook'];
+    $db = getDB();
+    $stmt = $db->prepare("SELECT a.appointment_date, a.slot_index, a.mechanic_id, m.is_active FROM appointments a JOIN mechanics m ON m.id = a.mechanic_id WHERE a.id = ? AND a.status = '" . STATUS_CANCELLED . "'");
+    $stmt->execute([$id]);
+    $appt = $stmt->fetch();
+    if (!$appt) {
+        flashAndRedirect('Appointment not found or not cancelled.', 'error');
+    }
+    $effectiveTime = getEffectiveTime();
+    $todayStr = $effectiveTime->format('Y-m-d');
+    if ($appt['appointment_date'] < $todayStr) {
+        flashAndRedirect('Can\'t rebook a ghost — that date\'s already in the rearview.', 'error');
+    }
+    if ($appt['appointment_date'] === $todayStr) {
+        $currentHour = (int)$effectiveTime->format('G');
+        if ($currentHour >= slotStartHour((int)$appt['slot_index'])) {
+            flashAndRedirect('Too slow — that time slot already drove off without you.', 'error');
+        }
+    }
+    if (!$appt['is_active']) {
+        $mstmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+        $mstmt->execute([(int)$appt['mechanic_id']]);
+        $mname = $mstmt->fetchColumn() ?: 'Unknown';
+        $firstName = explode(' ', $mname)[0];
+        $_SESSION['pending_rebook'] = ['id' => $id, 'old_first_name' => $firstName];
+        header('Location: admin.php?rebook_pick_mechanic=1');
+        exit;
+    }
+    saveBackupIfSim($id);
+    $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "', cancelled_at = NULL WHERE id = ?");
+    $stmt->execute([$id]);
+    flashAndRedirect('Appointment rebooked successfully.');
+}
+
+function handleReBookConfirm(): never {
+    $id = (int)$_GET['rebook_confirm'];
+    $newMech = (int)$_GET['new_mech'];
+    $db = getDB();
+    $stmt = $db->prepare("SELECT 1 FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
+    $stmt->execute([$id]);
+    if (!$stmt->fetch()) flashAndRedirect('Appointment not found.', 'error');
+    $stmt = $db->prepare("SELECT 1 FROM mechanics WHERE id = ? AND is_active = 1");
+    $stmt->execute([$newMech]);
+    if (!$stmt->fetch()) flashAndRedirect('Invalid mechanic.', 'error');
+    saveBackupIfSim($id);
+    $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "', mechanic_id = ?, cancelled_at = NULL WHERE id = ?");
+    $stmt->execute([$newMech, $id]);
+    flashAndRedirect('Appointment rebooked with new mechanic.');
 }
 
 function handleFire(): never {
@@ -536,6 +621,7 @@ function handleRestore(): never {
 }
 
 function handleRemoveMechanic(): never {
+    guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['remove_mechanic']]);
@@ -568,6 +654,7 @@ function handleUpdateAppointment(): never {
         flashAndRedirect('Invalid password.', 'error');
     }
     $id = (int)($_POST['appointment_id'] ?? 0);
+    saveBackupIfSim($id);
     $newDate = $_POST['new_date'] ?? '';
     $newSlot = (int)($_POST['new_slot'] ?? 0);
     $newMech = (int)($_POST['new_mechanic'] ?? 0);
@@ -612,14 +699,18 @@ function handleUpdateAppointment(): never {
 
 function restoreBackupData(): void {
     $db = getDB();
-    $stmt = $db->query("SELECT id, backup_data FROM appointments WHERE in_progress_completed = TRUE AND backup_data IS NOT NULL");
+    // Restore appointments with backup
+    $stmt = $db->query("SELECT id, backup_data FROM appointments WHERE backup_data IS NOT NULL");
     foreach ($stmt->fetchAll() as $row) {
         $data = json_decode($row['backup_data'], true);
         if ($data && isset($data['date'], $data['slot'], $data['mech'])) {
-            $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ?, mechanic_id = ? WHERE id = ?")
-               ->execute([$data['date'], $data['slot'], $data['mech'], $row['id']]);
+            $newStatus = $data['cancelled'] === 'true' ? STATUS_CANCELLED : STATUS_SCHEDULED;
+            $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ?, mechanic_id = ?, status = ?, cancelled_at = NULL, backup_data = NULL WHERE id = ?")
+               ->execute([$data['date'], $data['slot'], $data['mech'], $newStatus, $row['id']]);
         }
     }
+    // Restore mechanics that were fired during sim
+    $db->exec("UPDATE mechanics SET is_active = 1, fired = FALSE WHERE fired = TRUE");
 }
 
 function handleSimToggle(): never {

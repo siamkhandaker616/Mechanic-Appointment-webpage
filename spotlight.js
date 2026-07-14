@@ -93,7 +93,10 @@ function launchSpotlight(errors) {
     var bannerSub = document.getElementById('banner-sub');
     if (bannerSub) bannerSub.textContent = "The spotlight will guide you to each field — fix it, then move on.";
     var banner = document.getElementById('shame-banner');
-    if (banner && errors.length >= 2) banner.classList.remove('hidden');
+    if (banner && errors.length >= 2) {
+        banner.classList.remove('hidden');
+        banner.style.setProperty('--banner-bg-opacity', 0.4 + 0.2 * Math.min(3, errors.length - 1));
+    }
     requestAnimationFrame(function() {
         overlay.classList.add('active');
         document.querySelectorAll('.overlay-curtain').forEach(function(c) { c.classList.add('active'); });
@@ -135,8 +138,15 @@ function advanceSpotlight() {
             bannerSub.textContent = "Follow the spotlight, it's your only way out.";
         } else if (_spotlightIndex === 2) {
             bannerSub.textContent = "Wow, another one? This is embarrassing.";
-        } else if (_spotlightIndex >= 3) {
-            document.getElementById('shame-banner').classList.add('hidden');
+        }
+    }
+    var bannerMaxSteps = Math.min(3, _spotlightErrors.length - 1);
+    var banner = document.getElementById('shame-banner');
+    if (banner) {
+        if (_spotlightIndex >= bannerMaxSteps) {
+            banner.classList.add('hidden');
+        } else {
+            banner.style.setProperty('--banner-bg-opacity', 0.4 + 0.2 * (bannerMaxSteps - _spotlightIndex));
         }
     }
     if (_spotlightIndex >= _spotlightErrors.length) {

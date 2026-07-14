@@ -51,6 +51,7 @@
     --teal-light: #3a9b9b;
     --teal-dark: #1a4a4a;
     --rust: #a0453b;
+    --rust-rgb: 160, 69, 59;
     --jade: #126f20;
     --navy: #16213e;
     --pink: #d63384;
@@ -450,11 +451,12 @@ header::after {
 }
 
 .doodle-wrench-admin {
-    top: -14px;
-    left: -8px;
+    top: -15px;
+    left: -5px;
     width: 60px;
     height: auto;
-    animation: wobble-mech 2s ease-in-out infinite;
+    filter: saturate(0.8);
+    animation: wobble-mech 2.4s ease-in-out infinite;
 }
 
 @keyframes pour-oil {
@@ -465,8 +467,8 @@ header::after {
 }
 
 @keyframes wobble-mech {
-    0%, 100% { transform: rotate(-10deg); }
-    50%      { transform: rotate(25deg); }
+    0%, 100% { transform:  rotate(-10deg); }
+    50%      { transform:  rotate(30deg); }
 }
 
 @keyframes wobble-mech-flip {
@@ -760,6 +762,15 @@ textarea {
 .btn-rust:hover {
     background: var(--gold);
     color: var(--rust);
+}
+
+.btn-jade {
+    background: var(--jade);
+    color: var(--cyan);
+}
+.btn-jade:hover {
+    background: var(--gold);
+    color: var(--pink);
 }
 
 .btn-sm {
@@ -1940,7 +1951,7 @@ tr:last-child td {
 
 .shame-banner {
     position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-    background: var(--rust); color: var(--gold); text-align: center;
+    background: rgba(var(--rust-rgb), var(--banner-bg-opacity, 1)); color: var(--gold); text-align: center;
     padding: 10px 20px; font-family: var(--font-display);
     font-size: 1.2rem; letter-spacing: 1px;
     border-bottom: 4px solid var(--ink);

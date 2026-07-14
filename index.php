@@ -192,7 +192,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <button type="submit" class="btn btn-pink">Book Appointment</button>
-            <a href="#" class="btn btn-sm btn-outline" onclick="requirePw('admin.php');return false;">Admin Panel</a>
+            <a href="#" class="btn btn-sm btn-outline" onclick="requirePwNewTab('admin.php');return false;">Admin Panel</a>
         </div>
     </form>
 </div>
