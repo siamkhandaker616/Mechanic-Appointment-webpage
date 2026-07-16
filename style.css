@@ -1991,17 +1991,57 @@ tr:last-child td {
     width: calc(100% + 5px);
     z-index: 1000;
     max-height: 240px;
-    overflow-y: auto;
-    display: none;
     scrollbar-width: thin;
     scrollbar-color: var(--ink) transparent;
+    perspective: 800px;
+    clip-path: inset(0 0 100% 0);
+    pointer-events: none;
+    overflow: hidden;
 }
 
 .custom-select-dropdown.open {
-    display: block;
-    animation: drop-in 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    clip-path: none;
+    pointer-events: auto;
+}
+
+.custom-select-dropdown::before {
+    content: '';
+    position: absolute;
+    inset: 0;
     border: 3px solid var(--ink);
     border-top: none;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.01s ease;
+    z-index: 5;
+}
+.custom-select-dropdown.borders-visible::before {
+    opacity: 1;
+}
+
+.fold-panel {
+    overflow: hidden;
+    height: 0;
+    transition: height 0s;
+}
+
+.fold-panel.folding {
+    overflow: hidden;
+}
+
+.fold-paper {
+    transform-origin: top center;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
+    position: absolute;
+    width: 100%;
+    contain: layout style;
+}
+
+.fold-paper.unfolded {
+    transform: rotateX(0deg) !important;
+    position: relative;
 }
 
 .custom-select-dropdown::-webkit-scrollbar { width: 6px; }
@@ -2300,10 +2340,6 @@ tr:last-child td {
     100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
 }
 
-@keyframes drop-in {
-    0%   { opacity: 0; transform: translateY(-6px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
 
 @keyframes shame-slide {
     0%   { transform: translateY(-100%); }

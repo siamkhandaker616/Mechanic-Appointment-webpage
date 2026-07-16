@@ -34,12 +34,38 @@
 
         var opts = selectEl.options;
         var optEls = [];
+        var animating = false;
+        var foldTimeouts = [];
+
+        function animateRotate(el, fromDeg, toDeg, duration, onDone) {
+            var startTime = performance.now();
+            function step(now) {
+                var elapsed = now - startTime;
+                var t = Math.min(elapsed / duration, 1);
+                var eased = 1 - Math.pow(1 - t, 3);
+                el.style.transform = 'rotateX(' + (fromDeg + (toDeg - fromDeg) * eased) + 'deg)';
+                if (t < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.style.transform = 'rotateX(' + toDeg + 'deg)';
+                    if (onDone) onDone();
+                }
+            }
+            requestAnimationFrame(step);
+        }
 
         function buildOptions() {
             dropdown.innerHTML = '';
             optEls = [];
             for (var i = 0; i < opts.length; i++) {
                 (function(idx) {
+                    var panel = document.createElement('div');
+                    panel.className = 'fold-panel';
+
+                    var paper = document.createElement('div');
+                    paper.className = 'fold-paper';
+                    paper.style.transform = 'rotateX(92deg)';
+
                     var div = document.createElement('div');
                     div.className = 'custom-select-option';
 
@@ -54,7 +80,9 @@
                         trigger.focus();
                     });
 
-                    dropdown.appendChild(div);
+                    paper.appendChild(div);
+                    panel.appendChild(paper);
+                    dropdown.appendChild(panel);
                     optEls.push(div);
                 })(i);
             }
@@ -105,28 +133,178 @@
             });
         }
 
+        function measurePanelHeights() {
+            var panels = dropdown.querySelectorAll('.fold-panel');
+            var heights = [];
+            dropdown.style.overflow = 'visible';
+            panels.forEach(function(p) {
+                var paper = p.querySelector('.fold-paper');
+                paper.style.position = 'relative';
+                paper.style.transform = 'none';
+                p.style.height = 'auto';
+                p.style.overflow = 'visible';
+                heights.push(p.scrollHeight);
+                p.style.height = '';
+                p.style.overflow = '';
+                paper.style.position = '';
+                paper.style.transform = '';
+            });
+            dropdown.style.overflow = '';
+            return heights;
+        }
+
         function openDropdown() {
-            if (isOpen) return;
+            if (isOpen || animating) return;
+            animating = true;
             syncFromNative();
-            isOpen = true;
+
             trigger.classList.add('open');
             dropdown.classList.add('open');
-            if (optEls[selectedIdx]) {
-                optEls[selectedIdx].scrollIntoView({ block: 'nearest' });
+            dropdown.style.clipPath = 'inset(0 0 100% 0)';
+
+            var panels = dropdown.querySelectorAll('.fold-panel');
+
+            panels.forEach(function(p) {
+                p.style.height = '0';
+                p.style.overflow = 'hidden';
+                var paper = p.querySelector('.fold-paper');
+                paper.style.transform = 'rotateX(92deg)';
+                paper.style.position = '';
+            });
+
+            var heights = measurePanelHeights();
+
+            panels.forEach(function(p, i) {
+                p.style.height = heights[i] + 'px';
+                p.style.overflow = 'hidden';
+                var paper = p.querySelector('.fold-paper');
+                paper.style.position = 'absolute';
+                paper.style.transform = 'rotateX(92deg)';
+            });
+
+            var revealStart = performance.now();
+
+            function revealStep(now) {
+                if (!animating) return;
+                var elapsed = now - revealStart;
+                var t = Math.min(elapsed / 170, 1);
+                var eased = 1 - Math.pow(1 - t, 3);
+                dropdown.style.clipPath = 'inset(0 0 ' + (100 * (1 - eased)) + '% 0)';
+                if (t < 1) {
+                    requestAnimationFrame(revealStep);
+                } else {
+                    dropdown.style.clipPath = 'none';
+                    dropdown.style.overflowY = 'auto';
+
+                    var completed = 0;
+                    var total = panels.length;
+
+                    Array.prototype.forEach.call(panels, function(p, i) {
+                        var paper = p.querySelector('.fold-paper');
+                        var delay = 80 + i * 110;
+                        var t2 = setTimeout(function() {
+                            p.classList.add('folding');
+                            animateRotate(paper, 92, 0, 340, function() {
+                                paper.classList.add('unfolded');
+                                p.classList.remove('folding');
+                                completed++;
+                                if (completed === total) {
+                                    isOpen = true;
+                                    animating = false;
+                                    setTimeout(function() { dropdown.classList.add('borders-visible'); }, 80);
+                                    if (optEls[selectedIdx]) {
+                                        optEls[selectedIdx].scrollIntoView({ block: 'nearest' });
+                                    }
+                                }
+                            });
+                        }, delay);
+                        foldTimeouts.push(t2);
+                    });
+                }
             }
+            requestAnimationFrame(revealStep);
+        }
+
+        function abortOpen() {
+            dropdown.classList.remove('borders-visible');
+            foldTimeouts.forEach(function(t) { clearTimeout(t); });
+            foldTimeouts = [];
+            var panels = dropdown.querySelectorAll('.fold-panel');
+            panels.forEach(function(p) {
+                var paper = p.querySelector('.fold-paper');
+                paper.classList.remove('unfolded');
+                paper.style.transform = 'rotateX(92deg)';
+                paper.style.position = 'absolute';
+                p.classList.remove('folding');
+            });
+            dropdown.style.overflow = 'hidden';
+            dropdown.style.clipPath = 'inset(0 0 100% 0)';
+            trigger.classList.remove('open');
+            dropdown.classList.remove('open');
+            dropdown.style.overflowY = '';
+            isOpen = false;
+            animating = false;
         }
 
         function closeDropdown() {
-            if (!isOpen) return;
-            isOpen = false;
-            trigger.classList.remove('open');
-            dropdown.classList.remove('open');
+            if (!isOpen && !animating) return;
+            if (animating) { if (!isOpen) abortOpen(); return; }
+            dropdown.classList.remove('borders-visible');
+
+            animating = true;
+
+            foldTimeouts.forEach(function(t) { clearTimeout(t); });
+            foldTimeouts = [];
+
+            var panels = dropdown.querySelectorAll('.fold-panel');
+            var panelArr = Array.prototype.slice.call(panels);
+            var total = panelArr.length;
+            var completed = 0;
+
+            panelArr.reverse().forEach(function(p, ri) {
+                var paper = p.querySelector('.fold-paper');
+                var delay = ri * 85;
+                var t = setTimeout(function() {
+                    p.classList.add('folding');
+                    paper.classList.remove('unfolded');
+                    animateRotate(paper, 0, 92, 270, function() {
+                        p.classList.remove('folding');
+                        completed++;
+                        if (completed === total) {
+                            dropdown.style.overflow = 'hidden';
+                            var foldStart = performance.now();
+
+                            function foldStep(now) {
+                                if (!animating) return;
+                                var elapsed = now - foldStart;
+                                var t2 = Math.min(elapsed / 150, 1);
+                                var eased = 1 - Math.pow(1 - t2, 3);
+                                dropdown.style.clipPath = 'inset(0 0 ' + (100 * eased) + '% 0)';
+                                if (t2 < 1) {
+                                    requestAnimationFrame(foldStep);
+                                } else {
+                                    dropdown.style.clipPath = 'inset(0 0 100% 0)';
+                                    trigger.classList.remove('open');
+                                    dropdown.classList.remove('open');
+                                    dropdown.style.overflowY = '';
+                                    isOpen = false;
+                                    animating = false;
+                                }
+                            }
+                            requestAnimationFrame(foldStep);
+                        }
+                    });
+                }, delay);
+                foldTimeouts.push(t);
+            });
         }
 
         function toggleDropdown() {
             if (isOpen) closeDropdown();
             else openDropdown();
         }
+
+        dropdown._close = closeDropdown;
 
         trigger.addEventListener('click', toggleDropdown);
 
@@ -165,9 +343,8 @@
         for (var w = 0; w < wraps.length; w++) {
             var trig = wraps[w].querySelector('.custom-select-trigger');
             if (trig && trig.classList.contains('open') && !wraps[w].contains(e.target)) {
-                trig.classList.remove('open');
                 var dd = wraps[w].querySelector('.custom-select-dropdown');
-                if (dd) dd.classList.remove('open');
+                if (dd && dd._close) dd._close();
             }
         }
     });
