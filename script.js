@@ -542,6 +542,7 @@ function closeMechModal(event) {
 /* === SCHEDULE MODAL === */
 
 function openScheduleModal(id, name) {
+    if (!checkSimGuard()) return;
     document.getElementById('schedule-mech-id').value = id;
     document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
     document.getElementById('sched-mech-name').value = document.getElementById('modal-mech-name').value;
@@ -584,6 +585,33 @@ function clearOverrideError() {
     document.getElementById('override-error').style.display = 'none';
 }
 
+function validateRecruitForm() {
+    if (!checkSimGuard()) return false;
+    var name = document.querySelector('[name="mech_name"]');
+    if (!name.value.trim()) {
+        name.focus();
+        name.classList.add('shake');
+        showBurstOver(name);
+        setTimeout(function() { name.classList.remove('shake'); }, 600);
+        return false;
+    }
+    return true;
+}
+
+function showBurstOver(el) {
+    var old = document.getElementById('recruit-burst');
+    if (old) old.remove();
+    var bursts = ['blank', 'zilch', 'nada', 'bzzt', 'nope'];
+    var pick = bursts[Math.floor(Math.random() * bursts.length)];
+    var r = el.getBoundingClientRect();
+    var d = document.createElement('div');
+    d.id = 'recruit-burst';
+    d.className = 'error-burst burst-' + pick + ' active';
+    d.style.cssText = 'position:fixed;width:125px;height:125px;left:' + (r.left + r.width/2 - 62.5) + 'px;top:' + (r.top + r.height/2 - 62.5) + 'px;z-index:300;pointer-events:none;';
+    document.body.appendChild(d);
+    setTimeout(function() { if (d.parentNode) d.remove(); }, 1500);
+}
+
 /* === CONFIRMATION MODALS === */
 
 function showCancelModal(id) { _pendingAction = '?cancel=' + id; document.getElementById('cancel-modal').classList.remove('hidden'); }
@@ -614,13 +642,14 @@ function renderVacations(id, mechName) {
             if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
             html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
             html += '<span style="flex:1;">' + label + '</span>';
-            html += '<a href="?remove_vacation=' + v.id + '&mech_name=' + encodeURIComponent(mechName || '') + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;">End</a>';
+            html += '<a href="?remove_vacation=' + v.id + '&mech_name=' + encodeURIComponent(mechName || '') + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;" onclick="return checkSimGuard()">End</a>';
             html += '</div>';
         });
         list.innerHTML = html;
     }
 }
 function addVacation() {
+    if (!checkSimGuard()) return;
     var err = document.getElementById('vac-error');
     if (err) err.style.display = 'none';
     var id = document.getElementById('modal-mech-id').value;

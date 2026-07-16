@@ -370,10 +370,10 @@ $effectiveTime = getEffectiveTime();
 
     <details class="recruitment-details">
         <summary>Register New Mechanic</summary>
-        <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;" onsubmit="return validateRecruitForm()" novalidate>
             <div>
                 <label>Name</label>
-                <input type="text" name="mech_name" placeholder="e.g. John Doe" required>
+                <input type="text" name="mech_name" placeholder="e.g. John Doe">
             </div>
             <div>
                 <label>Nickname</label>
@@ -402,7 +402,7 @@ $effectiveTime = getEffectiveTime();
         <h2>Edit Mechanic</h2>
         <div style="display:flex;gap:12px;align-items:stretch;">
             <div style="flex:1;">
-                <form method="post" id="mech-modal-form">
+                <form method="post" id="mech-modal-form" onsubmit="return checkSimGuard()">
                     <input type="hidden" name="mech_id" id="modal-mech-id">
                     <input type="hidden" name="_new_hire_name" id="new-hire-name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
                     <div style="display:flex;gap:12px;">
@@ -463,7 +463,7 @@ $effectiveTime = getEffectiveTime();
         <div class="burst burst-right">WEEK!</div>
         <h2><span id="schedule-mech-name">Schedule</span></h2>
         <p style="margin-bottom:12px;font-size:0.85rem;">Toggle which slots this mechanic works each day.</p>
-        <form method="post" id="schedule-form">
+        <form method="post" id="schedule-form" onsubmit="return checkSimGuard()">
             <input type="hidden" name="mech_id" id="schedule-mech-id">
             <input type="hidden" name="mech_name" id="sched-mech-name">
             <input type="hidden" name="mech_nickname" id="sched-mech-nickname">

@@ -639,6 +639,7 @@ function handleUnblock(): never {
 }
 
 function handleRemoveVacation(): never {
+    guardAgainstSim();
     removeMechanicVacation((int)$_GET['remove_vacation']);
     $name = trim($_GET['mech_name'] ?? '');
     $firstName = $name ? explode(' ', $name)[0] : '';
@@ -740,6 +741,7 @@ function handleToggleSim(): never {
 }
 
 function handleAddMechanic(): never {
+    guardAgainstSim();
     $name = trim($_POST['mech_name'] ?? '');
     $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
     $specialties = trim($_POST['mech_specialties'] ?? '');
@@ -754,6 +756,7 @@ function handleAddMechanic(): never {
 }
 
 function handleUpdateMechanicInfo(): never {
+    guardAgainstSim();
     $id = (int)($_POST['mech_id'] ?? 0);
     $name = trim($_POST['mech_name'] ?? '');
     $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
@@ -774,6 +777,7 @@ function handleUpdateMechanicInfo(): never {
 }
 
 function handleUpdateSchedule(): never {
+    guardAgainstSim();
     $mechId = (int)($_POST['mech_id'] ?? 0);
     $schedule = [];
     for ($d = 0; $d <= 6; $d++) {
@@ -804,6 +808,7 @@ function handleUpdateSchedule(): never {
 }
 
 function handleAddVacation(): never {
+    guardAgainstSim();
     $mechId = (int)($_POST['vac_mech_id'] ?? 0);
     $start = $_POST['vac_start'] ?? '';
     $end = $_POST['vac_end'] ?? '';
