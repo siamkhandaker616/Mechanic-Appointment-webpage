@@ -42,7 +42,7 @@ function getMechanicsForSelect(): array {
     $mechs = getMechanics();
     $result = [];
     foreach ($mechs as $m) {
-        $result[$m['id']] = $m['name'] . ($m['nickname'] ? " (\"" . $m['nickname'] . "\")" : "");
+        $result[$m['id']] = $m['name'];
     }
     return $result;
 }

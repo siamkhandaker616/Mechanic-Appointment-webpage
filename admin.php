@@ -200,12 +200,12 @@ $effectiveTime = getEffectiveTime();
                         <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
                             <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleUpdateApptBtn(this)">
-                            <select name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleUpdateApptBtn(this)">
+                             <select class="custom-select" name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleUpdateApptBtn(this)">
                                 <?php foreach ($SLOT_LABELS as $si => $sl): ?>
                                 <option value="<?= $si ?>" <?= $si === (int)$a['slot_index'] ? 'selected' : '' ?>><?= htmlspecialchars($sl) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <select name="new_mechanic" data-original-mechanic="<?= (int)$a['mechanic_id'] ?>" onchange="toggleUpdateApptBtn(this)">
+                             <select class="custom-select" name="new_mechanic" data-original-mechanic="<?= (int)$a['mechanic_id'] ?>" onchange="toggleUpdateApptBtn(this)">
                                 <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
                                 <option value="<?= $mid ?>" <?= $mid === (int)$a['mechanic_id'] ? 'selected' : '' ?>><?= htmlspecialchars($mname) ?></option>
                                 <?php endforeach; ?>
@@ -241,7 +241,7 @@ $effectiveTime = getEffectiveTime();
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
             <div>
                 <label>Mechanic</label>
-                <select name="override_mechanic" onchange="clearOverrideError()">
+                <select class="custom-select" name="override_mechanic" onchange="clearOverrideError()">
                     <option value="">— Select —</option>
                     <?php foreach ($mechanics as $m): ?>
                     <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
@@ -529,7 +529,7 @@ $effectiveTime = getEffectiveTime();
         <p style="margin:16px 0;">This can't be undone. Are you sure?</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Cancel</button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Nevermind</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
 </div>
@@ -538,30 +538,34 @@ $effectiveTime = getEffectiveTime();
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('fire-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">FIRED!</div>
-        <h2 style="margin-top:30px; margin-left: 5px;" id="fire-modal-title">Fire Mechanic?</h2>
+        <h2 style="margin-top:30px;margin-left: 5px;" id="fire-modal-title">Fire Mechanic?</h2>
         <p style="margin:16px 0;" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
         <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;color:var(--dark);display:none;"></p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Fire</button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Nevermind</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
 </div>
 
 <div class="modal-overlay hidden" id="rebook-mech-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
-    <div class="modal-box msg-box msg-error" style="max-width:420px;">
+    <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
-        <h2 style="margin-top:30px;" id="rebook-mech-heading"></h2>
-        <p style="margin:16px 0;">Pick a new mechanic for this job:</p>
-        <select id="rebook-mech-select" style="width:100%;font-size:1rem;">
-            <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
-            <option value="<?= $mid ?>"><?= htmlspecialchars($mname) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">Stay Cancelled</button>
-            <button type="button" class="btn btn-sm btn-rust" id="rebook-confirm-btn">Reassign</button>
+        <h2 style="margin-top:30px;margin-bottom:50px;" id="rebook-mech-heading"></h2>
+        <div style="display:flex;gap:16px;align-items:center;">
+            <div style="flex:1;">
+                <p style="margin:0 0 6px;font-size: 0.85rem">Pick a new mechanic for this job:</p>
+                <select id="rebook-mech-select" class="custom-select fire-swap">
+                    <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
+                    <option value="<?= $mid ?>"><?= htmlspecialchars($mname) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">Forget it</button>
+                <button type="button" class="btn btn-sm btn-jade" id="rebook-confirm-btn">Reassign</button>
+            </div>
         </div>
     </div>
 </div>
@@ -570,7 +574,7 @@ $effectiveTime = getEffectiveTime();
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="closeSimBlockModal()">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
-        <h2 style="margin-top:30px; margin-left: 5px;">Sim Mode Active</h2>
+        <h2 style="margin-top:30px;margin-left: 5px;">Sim Mode Active</h2>
         <p style="margin:16px 0;">Sim mode is active — you're playing with fake time, not making real decisions. Exit sim mode first.</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="closeSimBlockModal()">OK</button>
@@ -582,11 +586,11 @@ $effectiveTime = getEffectiveTime();
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('remove-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">GONE!</div>
-        <h2 style="margin-top:30px; margin-left: 5px;">Remove Appointment?</h2>
-        <p style="margin:16px 0; ">This permanently deletes the record. Are you sure?</p>
+        <h2 style="margin-top:30px;margin-left: 5px;">Remove Appointment?</h2>
+        <p style="margin:16px 0;">This permanently deletes the record. Are you sure?</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Remove</button>
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('remove-modal').classList.add('hidden')">Nevermind</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('remove-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
 </div>
@@ -595,19 +599,19 @@ $effectiveTime = getEffectiveTime();
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('unblock-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left" style="margin-bottom:12px;">FREE!</div>
-        <h2 style="margin-top:30px; margin-left: 5px;">Remove Override?</h2>
+        <h2 style="margin-top:30px;margin-left: 5px;">Remove Override?</h2>
         <p style="margin:16px 0;" id="unblock-msg">This will unblock the slots for this date.</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
             <a href="#" id="unblock-confirm-link" class="btn btn-sm btn-rust">Yes, Unblock</a>
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Nevermind</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
 </div>
 
 <div class="modal-overlay hidden" id="vac-limit-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
-    <div class="modal-box msg-box msg-error" style="max-width:400px;">
+    <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('vac-limit-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" style="background:var(--pink);font-size:0.55rem;">NICE TRY!</div>
+        <div class="burst burst-left" style="background:var(--pink);">NICE</br>TRY!</div>
         <h2 style="margin-top:30px;">Maximum Vacations Reached</h2>
         <p style="margin:16px 0;">A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!</p>
         <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
@@ -648,6 +652,7 @@ $effectiveTime = getEffectiveTime();
 <?php endif; ?>
 
 <!-- === INLINE SCRIPT === -->
+<script src="custom-select.js"></script>
 <script>
 <?php if (isset($_GET['new_mechanic'])): 
     $__nmId = (int)$_GET['new_mechanic'];
@@ -669,7 +674,7 @@ window.addEventListener('DOMContentLoaded', function() {
 <?php endif; endif; ?>
 <?php if (isset($_GET['rebook_pick_mechanic']) && $pendingRebook): ?>
 window.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('rebook-mech-heading').textContent = <?= json_encode($pendingRebook['old_first_name']) ?> + ' has already ridden off into the sunset — pick another.';
+    document.getElementById('rebook-mech-heading').textContent = <?= json_encode($pendingRebook['old_first_name']) ?> + " doesn't work here anymore";
     document.getElementById('rebook-mech-modal').classList.remove('hidden');
     document.getElementById('rebook-confirm-btn').addEventListener('click', function() {
         var mech = document.getElementById('rebook-mech-select').value;
