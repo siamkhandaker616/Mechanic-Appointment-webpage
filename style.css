@@ -78,7 +78,7 @@
     --font-hand: 'Walter Turncoat';
     --bg-dot-blue: radial-gradient(var(--dot-blue) 2.5px, transparent 2.5px);
     --bg-dot-pink: radial-gradient(var(--dot-pink) 2.5px, transparent 2.5px);
-    --bg-main: url('images/icons/bg.png');
+    --bg-main: url('images/icons/bg.webp');
 }
 
 /* === RESET & SCROLLBARS === */
