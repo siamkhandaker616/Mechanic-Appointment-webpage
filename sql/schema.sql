@@ -13,6 +13,7 @@ CREATE TABLE mechanics (
     bio TEXT,
     nickname VARCHAR(50) DEFAULT NULL,
     quote VARCHAR(255) DEFAULT NULL,
+    doodle TEXT DEFAULT NULL,
     theme VARCHAR(20) DEFAULT 'default',
     specialties TEXT,
     years_experience INT DEFAULT 0,

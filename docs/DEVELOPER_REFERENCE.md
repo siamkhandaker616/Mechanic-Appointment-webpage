@@ -176,7 +176,7 @@ All `handle*()` functions follow the pattern: read input, perform action, call `
 | Function | Line | Purpose |
 |----------|------|---------|
 | `htmlspecialchars(s)` | 3 | DOM-based string escape for HTML |
-| `formatSuggestDate(dateStr)` | 9 | ISO → "D Mon YYYY" |
+| `fmtDate(isoStr)` | 9 | ISO → "D Mon YYYY" |
 | `repositionPastDateMsg()` | 24 | Position date-error bubble below submit button |
 | `showPastDateMsg(msg)` | 36 | Show jagged date-error bubble |
 | `hidePastDateMsg()` | 53 | Hide date-error bubble |

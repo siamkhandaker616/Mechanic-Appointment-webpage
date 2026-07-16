@@ -1,4 +1,4 @@
--- Seed data for Mystery Motors
+-- Seed data for Mayhem Mobility
 
 USE mayhem_mobility;
 

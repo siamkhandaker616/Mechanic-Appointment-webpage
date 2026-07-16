@@ -852,7 +852,7 @@ function handleAddVacation(): never {
     if (!preg_match(DATE_REGEX, $start) || !preg_match(DATE_REGEX, $end)) {
         flashAndRedirect('Invalid date format.', 'error');
     }
-    if ($start < date('Y-m-d')) {
+    if ($start < getEffectiveTime()->format('Y-m-d')) {
         flashAndRedirect('Vacation cannot start in the past.', 'error');
     }
     $newHireName = trim($_POST['_new_hire_name'] ?? '');

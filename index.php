@@ -254,7 +254,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
             </button>
         </div>
         <p id="pw-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
-        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="confirmPw()">Confirm</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="closePwModal()">Cancel</button>
         </div>
@@ -267,7 +267,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <p style="margin:8px 0 16px;">Enter your phone number to pull up your last booking.</p>
         <input type="tel" id="qb-phone-input" placeholder="e.g. 09123456789" style="width:100%;font-size:1rem;">
         <p id="qb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
-        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="lookupQuickBook()">Look Up</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('qb-phone-modal').classList.add('hidden')">Cancel</button>
         </div>
@@ -277,10 +277,10 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 <div class="modal-overlay hidden" id="qb-fail-modal" onclick="closeQbFailModal(event)">
     <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()">
         <button type="button" class="modal-close" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
-        <h2 style="margin-top:30px;margin-left:5px;">Not Found</h2>
-        <p style="margin:16px 0;" id="qb-fail-msg">That number ain't in our grease-stained ledger, pal. First time? Fill out the form.</p>
-        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <div class="burst burst-left" class="modal-burst-below">NOPE!</div>
+        <h2 class="modal-h2">Not Found</h2>
+        <p class="modal-body-p" id="qb-fail-msg">That number ain't in our grease-stained ledger, pal. First time? Fill out the form.</p>
+        <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">OK</button>
         </div>
     </div>
@@ -307,7 +307,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
     <div class="modal-box msg-box msg-<?= htmlspecialchars($flashType) ?>">
         <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
         <div class="msg-content"><?= htmlspecialchars($flashMsg) ?></div>
-        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
         </div>
     </div>

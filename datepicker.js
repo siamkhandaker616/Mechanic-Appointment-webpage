@@ -3,6 +3,11 @@
 var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var DAY_HEADERS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
+function _effDate() {
+    if (typeof EFFECTIVE_DATE !== 'undefined') return new Date(EFFECTIVE_DATE + 'T00:00:00');
+    return new Date();
+}
+
 /* === PICKER MANAGER === */
 
 var DPM = {
@@ -48,11 +53,12 @@ var DPM = {
 class DatePicker {
     constructor(input) {
         this.input = input;
+        DatePicker.instances.push(this);
         this.isDateTime = input.type === 'datetime-local';
         this.confirm = input.dataset.confirm === '' || input.dataset.confirm === 'true';
         this.placement = input.dataset.placement || 'auto';
         this.date = null;
-        this.viewDate = new Date();
+        this.viewDate = _effDate();
         this.popup = null;
         this.display = null;
         this.wrapper = null;
@@ -111,7 +117,7 @@ class DatePicker {
 
         var firstDay = new Date(year, month, 1).getDay();
         var daysInMonth = new Date(year, month + 1, 0).getDate();
-        var today = new Date();
+        var today = _effDate();
 
         var html = '';
 
@@ -225,8 +231,8 @@ class DatePicker {
                 self.updateValue();
                 self.close();
             } else if (target.dataset.action === 'today') {
-                self.viewDate = new Date();
-                self.date = new Date();
+                self.viewDate = _effDate();
+                self.date = _effDate();
                 self.render();
                 if (!self.confirm) {
                     self.updateValue();
@@ -274,7 +280,7 @@ class DatePicker {
     open() {
         var self = this;
         DPM.openPickers.forEach(function (p) { if (p !== self) p.close(); });
-        this.viewDate = this.date ? new Date(this.date) : new Date();
+        this.viewDate = this.date ? new Date(this.date) : _effDate();
         this.render();
         this.popup.classList.remove('hidden');
         DPM.register(this);
@@ -308,7 +314,15 @@ class DatePicker {
         this.input.value = value;
         this.input.dispatchEvent(new Event('change', { bubbles: true }));
     }
+
+    clear() {
+        this.date = null;
+        this.display.value = '';
+        this.input.value = '';
+    }
 }
+
+DatePicker.instances = [];
 
 /* === INIT === */
 

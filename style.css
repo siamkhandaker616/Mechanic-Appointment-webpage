@@ -784,6 +784,32 @@ textarea {
 .btn:hover::after {
     transform: translateX(3px);
 }
+.btn:focus-visible {
+    transform: translate(-3px, -3px);
+    box-shadow: 8px 8px 0 var(--ink);
+    background: var(--teal-light);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
+.btn-outline:focus-visible {
+    background: var(--gold);
+    color: var(--ink);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
+
+/* === UTILITY CLASSES === */
+
+.modal-btn-row { display:flex; gap:12px; margin-top:20px; justify-content:flex-end; }
+.modal-burst-below { margin-bottom:12px; }
+.modal-body-p { margin:16px 0; }
+.modal-h2 { margin-top:30px; margin-left:5px; }
+.th-center { text-align:center; }
+.ov-scroll-x { overflow-x:auto; }
+.col-form { display:flex; flex-direction:column; gap:12px; }
+.vac-label { font-size:0.75rem; }
+.flex-1 { flex:1; }
+.td-nowrap { white-space:nowrap; }
 
 /* === MECHANIC CARDS === */
 
@@ -801,6 +827,12 @@ textarea {
 .mechanic-card:hover {
     transform: translate(-2px, -2px);
     box-shadow: 5px 5px 0 var(--teal);
+}
+.mechanic-card:focus-visible {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--teal);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
 }
 
 .mechanic-card.selected {
@@ -944,6 +976,14 @@ textarea {
     transform: translate(-1px, -1px);
     box-shadow: var(--shadow-md);
 }
+.slot-chip:focus-visible {
+    background: var(--teal);
+    color: var(--gold);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--shadow-md);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
 
 .slot-chip.taken {
     opacity: 0.55;
@@ -1039,7 +1079,7 @@ textarea {
 
 .quote-tooltip {
     position: absolute;
-    z-index: 9998;
+    z-index: 105;
     background: var(--gold);
     border: 4px solid var(--ink);
     padding: 18px 24px;
@@ -1117,6 +1157,13 @@ textarea {
     box-shadow: 5px 5px 0 var(--pink);
     border-color: var(--pink);
 }
+.suggestion-chip:focus-visible {
+    transform: scale(1.05) translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--pink);
+    border-color: var(--pink);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
 
 .suggestion-chip .chip-label {
     display: block;
@@ -1124,34 +1171,6 @@ textarea {
     font-weight: normal;
     color: var(--navy);
     font-family: var(--font-hand);
-}
-
-/* === FLASH MESSAGES === */
-
-.flash-msg {
-    border: var(--border);
-    padding: 14px 18px;
-    margin-bottom: 20px;
-    font-weight: bold;
-    font-family: var(--font-sub);
-    text-transform: uppercase;
-    box-shadow: var(--shadow-md);
-}
-
-.flash-msg.success {
-    background: var(--teal);
-    color: var(--gold);
-}
-
-.flash-msg.error {
-    background: var(--rust);
-    color: var(--gold);
-}
-
-.flash-msg ul {
-    margin-left: 20px;
-    font-family: var(--font-hand);
-    text-transform: none;
 }
 
 /* === TABLES === */
@@ -1331,6 +1350,12 @@ tr:last-child td {
     transform: rotate(-1.5deg) scale(1.05);
     background: var(--jade);
 }
+.recruitment-details summary:focus-visible {
+    transform: rotate(-1.5deg) scale(1.05);
+    background: var(--jade);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
 
 .recruitment-details summary::after {
     content: " ◀";
@@ -1505,13 +1530,10 @@ tr:last-child td {
 .modal-close:hover {
     color: var(--gold);
 }
-
-.field-error {
-    color: var(--rust);
-    font-size: 0.75rem;
-    font-weight: bold;
-    margin-top: 4px;
-    text-transform: uppercase;
+.modal-close:focus-visible {
+    color: var(--gold);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
 }
 
 /* === CUSTOM DATE PICKER === */
@@ -1617,6 +1639,11 @@ tr:last-child td {
 .dp-nav:hover {
     background: var(--gold);
 }
+.dp-nav:focus-visible {
+    background: var(--gold);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
+}
 
 .dp-title {
     font-family: var(--font-action);
@@ -1660,6 +1687,13 @@ tr:last-child td {
     background: var(--teal-light);
     color: white;
     border-color: var(--ink);
+}
+.dp-day:focus-visible {
+    background: var(--teal-light);
+    color: white;
+    border-color: var(--ink);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
 }
 
 .dp-day.dp-empty {
@@ -1786,6 +1820,12 @@ tr:last-child td {
 .num-step-btn:hover {
     background: var(--teal);
     color: var(--cream);
+}
+.num-step-btn:focus-visible {
+    background: var(--teal);
+    color: var(--cream);
+    outline: 3px solid var(--pink);
+    outline-offset: 2px;
 }
 
 .num-step-btn:active {
@@ -2159,8 +2199,8 @@ tr:last-child td {
 .error-burst.scroll-hide { opacity: 0 !important; animation: none !important; }
 
 .field-error {
-    display: block; color: #b04040; font-size: 0.8rem; margin-top: 2px;
-    font-family: var(--font-hand); font-weight: normal; font-style: italic;
+    display: block; color: var(--rust); font-size: 1rem; margin-top: 2px;
+    font-family: var(--font-hand); font-weight: bold; font-style: italic;
 }
 
 .shame-banner {

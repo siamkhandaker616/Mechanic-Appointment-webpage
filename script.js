@@ -11,14 +11,10 @@ function htmlspecialchars(s) {
     return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function formatSuggestDate(dateStr) {
-    var parts = dateStr.split('-');
-    var year = parts[0];
-    var monthNum = parseInt(parts[1], 10);
-    var day = parseInt(parts[2], 10);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var monthStr = months[monthNum - 1] || '';
-    return day + ' ' + monthStr + ' ' + year;
+function fmtDate(isoStr) {
+    var p = isoStr.split('-');
+    var ms = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return parseInt(p[2]) + ' ' + ms[parseInt(p[1]) - 1] + ' ' + p[0];
 }
 
 function repositionPastDateMsg() {
@@ -27,7 +23,7 @@ function repositionPastDateMsg() {
     var btn = document.querySelector('#booking-form button[type="submit"]');
     if (btn) {
         var r = btn.getBoundingClientRect();
-        var left = Math.max(8, Math.min(r.left + r.width / 2 - 45 + 30 + window.scrollX, window.innerWidth - 220));
+        var left = Math.max(8, Math.min(r.left + r.width / 2 - 45 + 30 + window.scrollX, document.documentElement.scrollWidth - 220));
         el.style.top = (r.bottom + window.scrollY - 4) + 'px';
         el.style.left = left + 'px';
     }
@@ -170,10 +166,10 @@ function showTooltip(el) {
                 html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + date + '\', ' + data.adjacent_slot + ')"><span class="chip-label">' + SLOT_LABELS[data.adjacent_slot] + '</span></button>';
             }
             if (data.nearby_prev_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date + '\', ' + slotIndex + ')">' + formatSuggestDate(data.nearby_prev_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date + '\', ' + slotIndex + ')">' + fmtDate(data.nearby_prev_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
             }
             if (data.nearby_next_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date + '\', ' + slotIndex + ')">' + formatSuggestDate(data.nearby_next_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date + '\', ' + slotIndex + ')">' + fmtDate(data.nearby_next_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
             }
             html += '</div>';
         }
@@ -247,11 +243,16 @@ function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
         var card = document.querySelector('.mechanic-card.selected');
         if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    setTimeout(function() {
-        document.querySelectorAll('.slot-chip').forEach(function(c) {
-            if (parseInt(c.dataset.slot) === slotIndex && !c.classList.contains('taken')) selectSlot(c, slotIndex);
-        });
-    }, 0);
+    (function pollSlot(slot, tries) {
+        var chips = document.querySelectorAll('.slot-chip');
+        if (chips.length > 0 || tries <= 0) {
+            chips.forEach(function(c) {
+                if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
+            });
+            return;
+        }
+        setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
+    })(slotIndex, 30);
 }
 
 /* === TABLE FILTERS === */
@@ -302,6 +303,8 @@ function clearFilters() {
     if (fromWrap) fromWrap.querySelector('.datepicker-display').value = '';
     var toWrap = document.getElementById('filter-date-to').closest('.datepicker-wrap');
     if (toWrap) toWrap.querySelector('.datepicker-display').value = '';
+    document.getElementById('filter-status').selectedIndex = 0;
+    document.getElementById('filter-mechanic').selectedIndex = 0;
     var mechWrap = document.getElementById('filter-mechanic').closest('.custom-select-wrap');
     if (mechWrap) {
         var triggerText = mechWrap.querySelector('.custom-select-trigger-inner .label');
@@ -569,8 +572,10 @@ function openMechModal(btn) {
     document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
     document.getElementById('modal-mech-exp').value = btn.dataset.experience;
     renderVacations(parseInt(btn.dataset.mid), btn.dataset.mname);
-    document.getElementById('vac-start').value = '';
-    document.getElementById('vac-end').value = '';
+    ['vac-start', 'vac-end'].forEach(function(id) {
+        var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
+        if (picker) picker.clear(); else document.getElementById(id).value = '';
+    });
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
     document.getElementById('mech-modal').classList.remove('hidden');
@@ -587,8 +592,10 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
     document.getElementById('modal-mech-specialties').value = specialties;
     document.getElementById('modal-mech-exp').value = experience;
     renderVacations(parseInt(id), name);
-    document.getElementById('vac-start').value = '';
-    document.getElementById('vac-end').value = '';
+    ['vac-start', 'vac-end'].forEach(function(id) {
+        var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
+        if (picker) picker.clear(); else document.getElementById(id).value = '';
+    });
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
 }
@@ -704,8 +711,7 @@ function renderVacations(id, mechName) {
     } else {
         var html = '';
         vacs.forEach(function(v) {
-            function fmt(d) { var p = d.split('-'); var ms = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return parseInt(p[2]) + ' ' + ms[parseInt(p[1])-1] + ' ' + p[0]; }
-            var label = htmlspecialchars(fmt(v.start_date) + ' — ' + fmt(v.end_date));
+            var label = htmlspecialchars(fmtDate(v.start_date) + ' — ' + fmtDate(v.end_date));
             if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
             html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
             html += '<span style="flex:1;">' + label + '</span>';
@@ -722,14 +728,16 @@ function addVacation() {
     var id = document.getElementById('modal-mech-id').value;
     var start = document.getElementById('vac-start').value;
     var end = document.getElementById('vac-end').value;
-    if (!id || !start || !end) return;
-    var vacs = VACATION_DATA[id] || [];
-    if (vacs.length >= 3) { document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
     if (!err) {
         err = document.createElement('div');
         err.id = 'vac-error';
         err.className = 'field-error';
         document.getElementById('vac-end').parentNode.appendChild(err);
+    }
+    if (!start || !end) {
+        err.textContent = 'Please select both start and end dates.';
+        err.style.display = 'block';
+        return;
     }
     if (start < TODAY) {
         err.textContent = 'Vacation cannot start in the past.';
@@ -741,6 +749,8 @@ function addVacation() {
         err.style.display = 'block';
         return;
     }
+    var vacs = VACATION_DATA[id] || [];
+    if (vacs.length >= 3) { document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
     var reason = document.getElementById('vac-reason').value;
     var newHireName = window._newHireName || '';
     var f = document.createElement('form');
@@ -798,9 +808,7 @@ function lookupQuickBook() {
             if (wrap) {
                 var disp = wrap.querySelector('.datepicker-display');
                 if (disp && dateStr) {
-                    var p = dateStr.split('-');
-                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                    disp.value = parseInt(p[2]) + ' ' + months[parseInt(p[1]) - 1] + ' ' + p[0];
+                    disp.value = fmtDate(dateStr);
                 }
                 if (!dateStr) disp.value = '';
             }
@@ -903,7 +911,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         sbInterval = setInterval(function() {
                             bi = (bi + 1) % bubbles.length;
                             sb.src = 'images/doodles/' + bubbles[bi] + '.svg';
-                        }, 800);
+                        }, 600);
                     }
                 }
             });
@@ -971,11 +979,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showPastDateMsg(errs.dateMsg);
                 return;
             }
-            if (errs === null) {
-                e.preventDefault();
-                showPastDateMsg("Pick a valid date.");
-                return;
-            }
+
             if (errs.length) {
                 e.preventDefault();
                 hidePastDateMsg();
