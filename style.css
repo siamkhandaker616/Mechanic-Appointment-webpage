@@ -78,7 +78,7 @@
     --font-hand: 'Walter Turncoat';
     --bg-dot-blue: radial-gradient(var(--dot-blue) 2.5px, transparent 2.5px);
     --bg-dot-pink: radial-gradient(var(--dot-pink) 2.5px, transparent 2.5px);
-    --bg-main: url('images/icons/bg.webp');
+    --bg-main: url('https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/bg.webp?v=1');
 }
 
 /* === RESET & SCROLLBARS === */
@@ -385,8 +385,8 @@ header::after {
 }
 
 .burst-right {
-    top: -10px;
-    right: -10px;
+    top: -20px;
+    right: -15px;
 }
 
 .burst-left {
@@ -621,12 +621,17 @@ input, select, textarea {
     color: var(--ink);
     outline: none;
     transition: box-shadow 0.15s, border-color 0.15s;
-    caret-color: #fe55af;
+    caret-color: var(--pink);
     color-scheme: light;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     transform: translate3d(0, 0, 0);
     will-change: transform;
+}
+
+input:hover, textarea:hover, .datepicker-display:hover {
+    border-color: var(--teal);
+    box-shadow: 3px 3px 0 var(--pink);
 }
 
 input[type="checkbox"] {

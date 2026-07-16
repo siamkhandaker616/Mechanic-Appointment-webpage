@@ -102,7 +102,7 @@ $effectiveTime = getEffectiveTime();
 <div class="omg omg-bot">BAM</div>
 
 <header>
-    <h1>Mayhem Mobility <img src="images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
+    <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Admin Panel</p>
     <div class="admin-nav">
         <a href="index.php" class="btn btn-sm btn-outline">Booking Page</a>
