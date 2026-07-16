@@ -28,6 +28,7 @@ $confirmed = null;
 /* === FORM HANDLING === */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['edit_booking'])) handleEditBooking();
     $errors = validateAppointmentInput($_POST);
 
     if (empty($errors)) {
@@ -187,8 +188,11 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 
         <div class="form-group">
             <label>Available Slots</label>
-            <div id="slot-container" class="slot-grid">
-                <p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+                <div id="slot-container" class="slot-grid" style="flex:1;">
+                    <p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-pink" onclick="openEditBooking()" style="margin-top:4px;">Edit Booking</button>
             </div>
             <input type="hidden" name="slot_index" id="slot_index" value="">
         </div>
@@ -283,6 +287,86 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">OK</button>
         </div>
+    </div>
+</div>
+
+<!-- === EDIT BOOKING MODALS === -->
+<div class="modal-overlay hidden" id="eb-phone-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+    <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right">EDIT!</div>
+        <h2>Edit Booking</h2>
+        <p style="margin:8px 0 16px;">Enter your phone number to find your booking.</p>
+        <input type="tel" id="eb-phone-input" placeholder="e.g. 09123456789" style="width:100%;font-size:1rem;">
+        <p id="eb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-pink" onclick="lookupEditBooking()">Look Up</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-phone-modal').classList.add('hidden')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="eb-select-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+    <div class="modal-box" style="max-width:420px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right">PICK!</div>
+        <h2>Select Booking to Edit</h2>
+        <p style="margin:8px 0 16px;">You have multiple bookings. Pick one to edit.</p>
+        <div id="eb-select-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div class="modal-btn-row" style="margin-top:12px;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-select-modal').classList.add('hidden')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="eb-edit-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+    <div class="modal-box" style="max-width:620px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right">FIX!</div>
+        <h2>Edit Your Booking</h2>
+        <form id="eb-form" method="post" action="">
+            <input type="hidden" name="edit_booking" value="1">
+            <input type="hidden" name="appointment_id" id="eb-appt-id">
+            <div style="display:flex;gap:12px;align-items:stretch;">
+                <div class="flex-1">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="eb-name" name="name" placeholder="e.g. John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <textarea id="eb-address" name="address" placeholder="e.g. 123 Main Street"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="eb-display-phone" readonly style="background:var(--paper);cursor:default;">
+                    </div>
+                </div>
+                <div style="border-left:2px dashed var(--ink);align-self:stretch;"></div>
+                <div class="flex-1">
+                    <div class="form-group">
+                        <label>Car License Number</label>
+                        <input type="text" id="eb-license" name="license_no" placeholder="e.g. ABC-1234">
+                    </div>
+                    <div class="form-group">
+                        <label>Car Engine Number</label>
+                        <input type="text" id="eb-engine" name="engine_no" placeholder="e.g. 8NR-TS2021">
+                    </div>
+                    <div class="form-group">
+                        <label>Car Model <span style="font-weight:normal;">(optional)</span></label>
+                        <input type="text" id="eb-model" name="car_model" placeholder="e.g. Ford Mustang">
+                    </div>
+                    <div style="margin-top:8px;padding:6px 8px;background:var(--cream);border-radius:6px;font-size:0.85rem;">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <span><strong>Date:</strong> <span id="eb-display-date"></span></span>
+                            <span><strong>Slot:</strong> <span id="eb-display-slot"></span></span>
+                            <span><strong>Mechanic:</strong> <span id="eb-display-mechanic"></span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-btn-row" style="margin-top:16px;">
+                <button type="submit" class="btn btn-sm btn-pink">Save Changes</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-edit-modal').classList.add('hidden')">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
 

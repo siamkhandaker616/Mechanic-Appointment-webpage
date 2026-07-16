@@ -838,6 +838,74 @@ function lookupQuickBook() {
         });
 }
 
+/* === EDIT BOOKING === */
+
+function openEditBooking() {
+    document.getElementById('eb-phone-input').value = '';
+    document.getElementById('eb-phone-error').style.display = 'none';
+    document.getElementById('eb-phone-modal').classList.remove('hidden');
+    setTimeout(function() { document.getElementById('eb-phone-input').focus(); }, 100);
+}
+
+function lookupEditBooking() {
+    var phone = document.getElementById('eb-phone-input').value.trim();
+    var err = document.getElementById('eb-phone-error');
+    if (!phone) {
+        err.textContent = 'Please enter a phone number.';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    fetch('availability.php?action=edit_lookup&phone=' + encodeURIComponent(phone))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.found) {
+                document.getElementById('eb-phone-modal').classList.add('hidden');
+                document.getElementById('qb-fail-msg').textContent = data.message || 'No bookings found for that number.';
+                document.getElementById('qb-fail-modal').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('eb-phone-modal').classList.add('hidden');
+            if (data.appointments.length === 1) {
+                openEditModal(data.appointments[0]);
+            } else {
+                var list = document.getElementById('eb-select-list');
+                list.innerHTML = '';
+                data.appointments.forEach(function(a) {
+                    var card = document.createElement('div');
+                    card.className = 'eb-select-card';
+                    var mechName = a.mechanic_name || 'Unknown';
+                    card.innerHTML = '<div style="font-weight:bold;">' + fmtDate(a.appointment_date) + ' &middot; ' + SLOT_NAMES[a.slot_index] + '</div>'
+                        + '<div style="font-size:0.85rem;opacity:0.8;">' + a.car.license_no + ' &middot; ' + mechName + '</div>';
+                    card.addEventListener('click', function() { openEditModal(a); });
+                    list.appendChild(card);
+                });
+                var err2 = document.getElementById('eb-select-error');
+                if (err2) err2.style.display = 'none';
+                document.getElementById('eb-select-modal').classList.remove('hidden');
+            }
+        })
+        .catch(function() {
+            err.textContent = 'Could not reach server. Try again.';
+            err.style.display = 'block';
+        });
+}
+
+function openEditModal(appt) {
+    document.getElementById('eb-select-modal').classList.add('hidden');
+    document.getElementById('eb-appt-id').value = appt.id;
+    document.getElementById('eb-name').value = appt.client.name;
+    document.getElementById('eb-address').value = appt.client.address;
+    document.getElementById('eb-license').value = appt.car.license_no;
+    document.getElementById('eb-engine').value = appt.car.engine_no;
+    document.getElementById('eb-model').value = appt.car.model || '';
+    document.getElementById('eb-display-phone').value = appt.client.phone;
+    document.getElementById('eb-display-date').textContent = fmtDate(appt.appointment_date);
+    document.getElementById('eb-display-slot').textContent = SLOT_NAMES[appt.slot_index] || 'Slot ' + (appt.slot_index + 1);
+    document.getElementById('eb-display-mechanic').textContent = appt.mechanic_name || 'Unknown';
+    document.getElementById('eb-edit-modal').classList.remove('hidden');
+}
+
 /* === DOMCONTENTLOADED === */
 
 document.addEventListener('DOMContentLoaded', function() {

@@ -810,6 +810,7 @@ textarea {
 .vac-label { font-size:0.75rem; }
 .flex-1 { flex:1; }
 .td-nowrap { white-space:nowrap; }
+.td-car { word-break: break-all; }
 
 /* === MECHANIC CARDS === */
 
@@ -1459,6 +1460,19 @@ tr:last-child td {
 }
 
 
+.eb-select-card {
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    padding: 10px;
+    cursor: pointer;
+    background: var(--paper);
+    transition: background 0.1s, color 0.1s;
+}
+.eb-select-card:hover {
+    background: var(--teal);
+    color: #fff;
+}
+
 /* === MODAL === */
 
 .modal-overlay {
@@ -1468,7 +1482,7 @@ tr:last-child td {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 115;
     animation: popIn 0.2s ease-out;
 }
 

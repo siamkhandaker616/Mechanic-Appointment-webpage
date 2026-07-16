@@ -37,6 +37,57 @@ if ($action === 'quickbook') {
     exit;
 }
 
+if ($action === 'edit_lookup') {
+    $phone = preg_replace('/[^\d]/', '', $_GET['phone'] ?? '');
+    if (!$phone) {
+        echo json_encode(['found' => false, 'message' => 'Phone number is required.']);
+        exit;
+    }
+    $db = getDB();
+    $stmt = $db->prepare("
+        SELECT a.id, a.appointment_date, a.slot_index, a.status,
+               c.id AS client_id, c.name AS client_name, c.phone, c.address,
+               car.id AS car_id, car.license_no, car.engine_no, car.model,
+               m.name AS mechanic_name
+        FROM appointments a
+        JOIN clients c ON c.id = a.client_id
+        JOIN cars car ON car.id = a.car_id
+        JOIN mechanics m ON m.id = a.mechanic_id
+        WHERE REPLACE(REPLACE(c.phone, '-', ''), ' ', '') = ?
+          AND a.status = '" . STATUS_SCHEDULED . "'
+        ORDER BY a.appointment_date ASC, a.slot_index ASC
+    ");
+    $stmt->execute([$phone]);
+    $rows = $stmt->fetchAll();
+    if (!$rows) {
+        echo json_encode(['found' => false, 'message' => 'No upcoming appointments found for that number.']);
+        exit;
+    }
+    $appointments = [];
+    foreach ($rows as $r) {
+        $appointments[] = [
+            'id' => (int)$r['id'],
+            'appointment_date' => $r['appointment_date'],
+            'slot_index' => (int)$r['slot_index'],
+            'client' => [
+                'id' => (int)$r['client_id'],
+                'name' => $r['client_name'],
+                'phone' => $r['phone'],
+                'address' => $r['address'],
+            ],
+            'car' => [
+                'id' => (int)$r['car_id'],
+                'license_no' => $r['license_no'],
+                'engine_no' => $r['engine_no'],
+                'model' => $r['model'],
+            ],
+            'mechanic_name' => $r['mechanic_name'],
+        ];
+    }
+    echo json_encode(['found' => true, 'appointments' => $appointments]);
+    exit;
+}
+
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
 $date = $_GET['date'] ?? '';
 

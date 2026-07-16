@@ -191,7 +191,7 @@ $effectiveTime = getEffectiveTime();
                 data-date="<?= $a['appointment_date'] ?>">
                 <td><strong><?= fmtNameTwoLines($a['client_name']) ?></strong></td>
                 <td class="td-nowrap"><?= htmlspecialchars($a['phone']) ?></td>
-                <td class="td-nowrap"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
+                <td class="td-car"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
                 <td class="td-nowrap"><?= htmlspecialchars(fmtDate($a['appointment_date'])) ?></td>
                 <td><?= htmlspecialchars($SLOT_NAMES[(int)$a['slot_index']] ?? '') ?></td>
                 <td><strong><?= fmtNameTwoLines($a['mechanic_name']) ?></strong></td>

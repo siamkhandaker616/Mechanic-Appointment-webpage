@@ -734,6 +734,33 @@ function handleUpdateAppointment(): never {
     flashAndRedirect('Appointment updated.');
 }
 
+function handleEditBooking(): never {
+    $id = (int)($_POST['appointment_id'] ?? 0);
+    $name = trim($_POST['name'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+    $licenseNo = strtoupper(trim($_POST['license_no'] ?? ''));
+    $engineNo = strtoupper(trim($_POST['engine_no'] ?? ''));
+    $model = trim($_POST['car_model'] ?? '');
+
+    if (!$id || !$name || !$address || !$licenseNo || !$engineNo) {
+        flashAndRedirect('All fields except car model are required.', 'error');
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT a.client_id, a.car_id FROM appointments a WHERE a.id = ? AND a.status = '" . STATUS_SCHEDULED . "'");
+    $stmt->execute([$id]);
+    $appt = $stmt->fetch();
+    if (!$appt) flashAndRedirect('Appointment not found.', 'error');
+
+    $stmt = $db->prepare("UPDATE clients SET name = ?, address = ? WHERE id = ?");
+    $stmt->execute([$name, $address, $appt['client_id']]);
+
+    $stmt = $db->prepare("UPDATE cars SET license_no = ?, engine_no = ?, model = ? WHERE id = ?");
+    $stmt->execute([$licenseNo, $engineNo, $model, $appt['car_id']]);
+
+    flashAndRedirect('Booking updated!');
+}
+
 function restoreBackupData(): void {
     $db = getDB();
     // Restore appointments with backup
