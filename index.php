@@ -115,7 +115,10 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <div class="panel booking-panel">
     <div class="burst burst-right">BOOK!</div>
     <h2>Book a Time</h2>
-    <p style="margin-bottom:16px;">Tell us about yourself and your car, then pick your mechanic and slot.</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <p style="margin:0;">Tell us about yourself and your car, then pick your mechanic and slot.</p>
+        <button type="button" class="btn btn-sm btn-teal" onclick="openQuickBook()" style="flex-shrink:0;">Quick Book</button>
+    </div>
 
     <form method="post" id="booking-form" novalidate>
         <div class="row">
@@ -257,6 +260,32 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         </div>
     </div>
 </div>
+<div class="modal-overlay hidden" id="qb-phone-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+    <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right">PHONE!</div>
+        <h2>Quick Book</h2>
+        <p style="margin:8px 0 16px;">Enter your phone number to pull up your last booking.</p>
+        <input type="tel" id="qb-phone-input" placeholder="e.g. 09123456789" style="width:100%;font-size:1rem;">
+        <p id="qb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink" onclick="lookupQuickBook()">Look Up</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('qb-phone-modal').classList.add('hidden')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="qb-fail-modal" onclick="closeQbFailModal(event)">
+    <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()">
+        <button type="button" class="modal-close" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="margin-bottom:12px;">NOPE!</div>
+        <h2 style="margin-top:30px;margin-left:5px;">Not Found</h2>
+        <p style="margin:16px 0;" id="qb-fail-msg">That number ain't in our grease-stained ledger, pal. First time? Fill out the form.</p>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">OK</button>
+        </div>
+    </div>
+</div>
+
     <div id="spotlight-overlay"></div>
     <div id="shame-banner" class="shame-banner hidden" onclick="this.classList.add('hidden')">
         <strong>YOU ARE LOCKED IN.</strong><br>

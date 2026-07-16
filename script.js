@@ -254,6 +254,73 @@ function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
     }, 0);
 }
 
+/* === TABLE FILTERS === */
+
+function filterAppTable() {
+    var name = (document.getElementById('filter-name')?.value || '').toLowerCase();
+    var phone = (document.getElementById('filter-phone')?.value || '').toLowerCase();
+    var car = (document.getElementById('filter-car')?.value || '').toLowerCase();
+    var status = document.getElementById('filter-status')?.value || '';
+    var mechanic = (document.getElementById('filter-mechanic')?.value || '').toLowerCase();
+    var dateFrom = document.getElementById('filter-date-from')?.value || '';
+    var dateTo = document.getElementById('filter-date-to')?.value || '';
+
+    document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
+        var show = true;
+        if (name && (tr.dataset.name || '').indexOf(name) === -1) show = false;
+        if (show && phone && (tr.dataset.phone || '').indexOf(phone) === -1) show = false;
+        if (show && car && (tr.dataset.car || '').indexOf(car) === -1) show = false;
+        if (show && status && tr.dataset.status !== status) show = false;
+        if (show && mechanic && (tr.dataset.mechanic || '').indexOf(mechanic) === -1) show = false;
+        if (show && dateFrom && tr.dataset.date < dateFrom) show = false;
+        if (show && dateTo && tr.dataset.date > dateTo) show = false;
+        tr.style.display = show ? '' : 'none';
+        var editRow = tr.nextElementSibling;
+        if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = show ? '' : 'none';
+    });
+}
+
+function openSearchModal() {
+    document.getElementById('search-modal').classList.remove('hidden');
+}
+
+function closeSearchModal(event) {
+    if (!event || event.target === event.currentTarget) {
+        document.getElementById('search-modal').classList.add('hidden');
+    }
+}
+
+function clearFilters() {
+    document.getElementById('filter-name').value = '';
+    document.getElementById('filter-phone').value = '';
+    document.getElementById('filter-car').value = '';
+    document.getElementById('filter-status').selectedIndex = 0;
+    document.getElementById('filter-mechanic').selectedIndex = 0;
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    var fromWrap = document.getElementById('filter-date-from').closest('.datepicker-wrap');
+    if (fromWrap) fromWrap.querySelector('.datepicker-display').value = '';
+    var toWrap = document.getElementById('filter-date-to').closest('.datepicker-wrap');
+    if (toWrap) toWrap.querySelector('.datepicker-display').value = '';
+    var mechWrap = document.getElementById('filter-mechanic').closest('.custom-select-wrap');
+    if (mechWrap) {
+        var triggerText = mechWrap.querySelector('.custom-select-trigger-inner .label');
+        if (triggerText) triggerText.textContent = 'All Mechanics';
+        mechWrap.querySelectorAll('.custom-select-option').forEach(function(o) { o.classList.remove('selected'); });
+        var first = mechWrap.querySelector('.custom-select-option');
+        if (first) first.classList.add('selected');
+    }
+    var statusWrap = document.getElementById('filter-status').closest('.custom-select-wrap');
+    if (statusWrap) {
+        var triggerText2 = statusWrap.querySelector('.custom-select-trigger-inner .label');
+        if (triggerText2) triggerText2.textContent = 'All Status';
+        statusWrap.querySelectorAll('.custom-select-option').forEach(function(o) { o.classList.remove('selected'); });
+        var first2 = statusWrap.querySelector('.custom-select-option');
+        if (first2) first2.classList.add('selected');
+    }
+    filterAppTable();
+}
+
 /* === ADMIN === */
 
 var _pendingAction = '';
@@ -685,6 +752,79 @@ function addVacation() {
 }
 function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
 function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+
+/* === QUICK BOOK === */
+
+function closeQbFailModal(event) {
+    if (!event || event.target === event.currentTarget) document.getElementById('qb-fail-modal').classList.add('hidden');
+}
+
+function openQuickBook() {
+    document.getElementById('qb-phone-input').value = '';
+    document.getElementById('qb-phone-error').style.display = 'none';
+    document.getElementById('qb-phone-modal').classList.remove('hidden');
+    setTimeout(function() { document.getElementById('qb-phone-input').focus(); }, 100);
+}
+
+function lookupQuickBook() {
+    var phone = document.getElementById('qb-phone-input').value.trim();
+    var err = document.getElementById('qb-phone-error');
+    if (!phone) {
+        err.textContent = 'Please enter a phone number.';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    fetch('availability.php?action=quickbook&phone=' + encodeURIComponent(phone))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.found) {
+                document.getElementById('qb-phone-modal').classList.add('hidden');
+                document.getElementById('qb-fail-msg').textContent = data.message || 'That number ain\'t in our grease-stained ledger, pal. First time? Fill out the form above.';
+                document.getElementById('qb-fail-modal').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('qb-phone-modal').classList.add('hidden');
+            document.getElementById('name').value = data.client.name;
+            document.getElementById('phone').value = data.client.phone;
+            document.getElementById('address').value = data.client.address;
+            document.getElementById('license_no').value = data.car.license_no;
+            document.getElementById('engine_no').value = data.car.engine_no;
+            document.getElementById('car_model').value = data.car.model || '';
+            var dateInput = document.getElementById('date');
+            var dateStr = data.next_available ? data.next_available.date : '';
+            dateInput.value = dateStr;
+            var wrap = dateInput.closest('.datepicker-wrap');
+            if (wrap) {
+                var disp = wrap.querySelector('.datepicker-display');
+                if (disp && dateStr) {
+                    var p = dateStr.split('-');
+                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    disp.value = parseInt(p[2]) + ' ' + months[parseInt(p[1]) - 1] + ' ' + p[0];
+                }
+                if (!dateStr) disp.value = '';
+            }
+            dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+            selectMechanic(data.last_mechanic_id);
+            if (data.next_available) {
+                (function pollSlot(slot, tries) {
+                    var chips = document.querySelectorAll('.slot-chip');
+                    if (chips.length > 0 || tries <= 0) {
+                        chips.forEach(function(c) {
+                            if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
+                        });
+                        return;
+                    }
+                    setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
+                })(data.next_available.slot, 30);
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .catch(function() {
+            err.textContent = 'Could not reach server. Try again.';
+            err.style.display = 'block';
+        });
+}
 
 /* === DOMCONTENTLOADED === */
 

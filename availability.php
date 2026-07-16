@@ -4,6 +4,39 @@ require_once __DIR__ . '/functions.php';
 
 header('Content-Type: application/json');
 
+$action = $_GET['action'] ?? '';
+
+if ($action === 'quickbook') {
+    $phone = preg_replace('/[^\d]/', '', $_GET['phone'] ?? '');
+    if (!$phone) {
+        echo json_encode(['found' => false, 'message' => 'Phone number is required.']);
+        exit;
+    }
+    $last = getLastAppointmentByPhone($phone);
+    if (!$last) {
+        echo json_encode(['found' => false, 'message' => 'That number ain\'t in our grease-stained ledger, pal. First time? Fill out the form.']);
+        exit;
+    }
+    $dayAfter = date('Y-m-d', strtotime($last['appointment_date'] . ' +1 day'));
+    $nextAvail = findNextAvailableSlot((int)$last['mechanic_id'], $dayAfter);
+    echo json_encode([
+        'found' => true,
+        'client' => [
+            'name' => $last['client_name'],
+            'phone' => $last['phone'],
+            'address' => $last['address'],
+        ],
+        'car' => [
+            'license_no' => $last['license_no'],
+            'engine_no' => $last['engine_no'],
+            'model' => $last['model'],
+        ],
+        'last_mechanic_id' => (int)$last['mechanic_id'],
+        'next_available' => $nextAvail,
+    ]);
+    exit;
+}
+
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
 $date = $_GET['date'] ?? '';
 

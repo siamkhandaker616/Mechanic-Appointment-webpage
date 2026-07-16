@@ -153,7 +153,15 @@ $effectiveTime = getEffectiveTime();
 <div class="panel">
     <img class="doodle doodle-speech-appt" id="speech-bubble" src="images/doodles/speech-bubble-1.svg" alt="">
     <div class="burst burst-right">LIST!</div>
-    <h2>All Appointments</h2>
+    <span style="display:inline-flex;align-items:center;">
+        <h2 style="margin:0;">All Appointments</h2>
+        <img src="images/doodles/magnifying-glass.svg"
+             id="search-toggle"
+             alt="Search filters"
+             onmouseover="this.src='images/doodles/magnifying-glass-hover.svg'"
+             onmouseout="this.src='images/doodles/magnifying-glass.svg'"
+             onclick="openSearchModal()">
+    </span>
     <div style="overflow-x:auto;">
     <table id="appt-table">
         <thead>
@@ -174,7 +182,13 @@ $effectiveTime = getEffectiveTime();
             <?php else: ?>
             <?php $aRowNum = 0; ?>
             <?php foreach ($appointments as $a): $aRowNum++; ?>
-            <tr class="<?= $aRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
+            <tr class="<?= $aRowNum % 2 === 0 ? 'stripe-even' : '' ?>"
+                data-name="<?= htmlspecialchars(strtolower($a['client_name'])) ?>"
+                data-phone="<?= htmlspecialchars($a['phone']) ?>"
+                data-car="<?= htmlspecialchars(strtolower($a['license_no'] . ' ' . ($a['model'] ?? ''))) ?>"
+                data-status="<?= $a['status'] ?>"
+                data-mechanic="<?= htmlspecialchars(strtolower($a['mechanic_name'])) ?>"
+                data-date="<?= $a['appointment_date'] ?>">
                 <td><strong><?= fmtNameTwoLines($a['client_name']) ?></strong></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['phone']) ?></td>
                 <td style="white-space:nowrap;"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
@@ -650,6 +664,51 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 <?php endif; ?>
+
+<div class="modal-overlay hidden" id="search-modal" onclick="closeSearchModal(event)">
+    <div class="modal-box" style="max-width:580px;" onclick="event.stopPropagation()">
+        <button type="button" class="modal-close" onclick="closeSearchModal()">&times;</button>
+        <div class="burst burst-right">FIND!</div>
+        <h2>Filter Appointments</h2>
+        <div class="row" style="align-items:flex-start;">
+            <div class="col" style="display:flex;flex-direction:column;gap:12px;">
+                <input type="text" id="filter-name" placeholder="Name" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
+                <input type="text" id="filter-phone" placeholder="Phone" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
+                <input type="text" id="filter-car" placeholder="Car" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
+            </div>
+            <div class="col" style="display:flex;flex-direction:column;gap:12px;">
+                <select id="filter-status" class="custom-select" onchange="filterAppTable()">
+                    <option value="">All Status</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <div style="height:36px;"></div>
+                <select id="filter-mechanic" class="custom-select" onchange="filterAppTable()">
+                    <option value="">All Mechanics</option>
+                    <?php foreach ($mechanics as $m): ?>
+                    <option value="<?= htmlspecialchars($m['name']) ?>"><?= htmlspecialchars($m['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div style="margin-top:12px;">
+            <label style="font-family:var(--font-hand);font-size:0.85rem;">Date range:</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <input type="date" id="filter-date-from" onchange="filterAppTable()" style="flex:1;">
+                <input type="date" id="filter-date-to" onchange="filterAppTable()" style="flex:1;">
+            </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px;justify-content:space-between;">
+            <button type="button" class="btn btn-sm btn-pink" onclick="clearFilters()">Clear</button>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-sm btn-rust" onclick="closeSearchModal()">Cancel</button>
+                <button type="button" class="btn btn-sm btn-jade" onclick="closeSearchModal()">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- === INLINE SCRIPT === -->
 <script src="custom-select.js"></script>

@@ -196,6 +196,42 @@ function createAppointment(int $clientId, int $carId, int $mechanicId, string $d
     return (int)$db->lastInsertId();
 }
 
+/* === QUICK BOOK HELPERS === */
+
+function getLastAppointmentByPhone(string $phone): ?array {
+    $db = getDB();
+    $digits = preg_replace('/[^\d]/', '', $phone);
+    $stmt = $db->prepare("
+        SELECT a.id, a.client_id, a.car_id, a.mechanic_id, a.appointment_date, a.slot_index, a.status,
+               c.name AS client_name, c.phone, c.address,
+               car.license_no, car.engine_no, car.model
+        FROM appointments a
+        JOIN clients c ON c.id = a.client_id
+        JOIN cars car ON car.id = a.car_id
+        WHERE REPLACE(REPLACE(c.phone, '-', ''), ' ', '') = ?
+        ORDER BY a.appointment_date DESC, a.id DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$digits]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function findNextAvailableSlot(int $mechanicId, string $fromDate = ''): ?array {
+    if (!$fromDate) {
+        $fromDate = date('Y-m-d', strtotime('+1 day'));
+    }
+    for ($i = 0; $i < 30; $i++) {
+        $date = date('Y-m-d', strtotime($fromDate . " +{$i} days"));
+        for ($s = 0; $s < SLOT_COUNT; $s++) {
+            if (isSlotAvailable($mechanicId, $date, $s)) {
+                return ['date' => $date, 'slot' => $s];
+            }
+        }
+    }
+    return null;
+}
+
 /* === TIME MANAGEMENT === */
 
 function getEffectiveTime(): DateTime {
