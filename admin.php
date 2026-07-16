@@ -198,7 +198,7 @@ $effectiveTime = getEffectiveTime();
                 <td class="td-nowrap"><span class="status-badge status-<?= htmlspecialchars($a['status']) ?>"><?= htmlspecialchars(str_replace('_', ' ', $a['status'])) ?></span></td>
                 <td class="td-nowrap">
                     <?php if ($a['status'] === STATUS_SCHEDULED): ?>
-                    <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>)">Edit</button>
+                    <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>, this)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
                     <button type="button" class="btn btn-sm btn-jade" onclick="requirePw('?rebook=<?= $a['id'] ?>', false)">Rebook</button>

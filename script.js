@@ -550,7 +550,11 @@ function closePwModal() {
 
 /* === TOGGLES === */
 
-function toggleEdit(id) { document.getElementById('edit-' + id).classList.toggle('show'); }
+function toggleEdit(id, btn) {
+    var el = document.getElementById('edit-' + id);
+    el.classList.toggle('show');
+    btn.textContent = el.classList.contains('show') ? 'Hide' : 'Edit';
+}
 function toggleOverrides() {
     var panel = document.getElementById('overrides-panel');
     var btn = document.getElementById('overrides-toggle');
