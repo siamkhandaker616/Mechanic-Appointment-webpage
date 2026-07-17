@@ -746,6 +746,15 @@ textarea {
     background: var(--pink);
 }
 
+.btn-jade {
+    background: var(--jade);
+    color: var(--cyan);
+}
+.btn-jade:hover {
+    background: var(--gold);
+    color: var(--jade);
+}
+
 .btn-recruit {
     animation: recflic 1s steps(1) infinite;
 }
@@ -757,15 +766,6 @@ textarea {
 .btn-rust:hover {
     background: var(--gold);
     color: var(--rust);
-}
-
-.btn-jade {
-    background: var(--jade);
-    color: var(--cyan);
-}
-.btn-jade:hover {
-    background: var(--gold);
-    color: var(--jade);
 }
 
 .btn-sm {

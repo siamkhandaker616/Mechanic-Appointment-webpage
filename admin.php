@@ -276,7 +276,7 @@ $effectiveTime = getEffectiveTime();
                     <?php endfor; ?>
                 </div>
                 <label style="margin-top:6px;">Reason (optional)</label>
-                <input type="text" name="reason" placeholder="e.g. sick day" style="width:100%;max-width:526px;">
+                <input type="text" name="reason" placeholder="sick day" style="width:100%;max-width:526px;">
             </div>
         </div>
         <div style="display:flex;gap:12px;justify-content:space-between;position:relative;">
@@ -387,15 +387,15 @@ $effectiveTime = getEffectiveTime();
         <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;" onsubmit="return validateRecruitForm()" novalidate>
             <div>
                 <label>Name</label>
-                <input type="text" name="mech_name" placeholder="e.g. John Doe">
+                <input type="text" name="mech_name" placeholder="John Doe">
             </div>
             <div>
                 <label>Nickname</label>
-                <input type="text" name="mech_nickname" placeholder="e.g. Sparky">
+                <input type="text" name="mech_nickname" placeholder="Sparky">
             </div>
             <div>
                 <label>Specialties</label>
-                <input type="text" name="mech_specialties" placeholder="e.g. Engine, Transmission">
+                <input type="text" name="mech_specialties" placeholder="Engine, Transmission">
             </div>
             <div>
                 <label>Experience</label>
@@ -431,11 +431,11 @@ $effectiveTime = getEffectiveTime();
                     </div>
                     <div class="form-group">
                         <label>Catchphrase</label>
-                        <input type="text" name="mech_quote" id="modal-mech-quote" placeholder="e.g. I'll fix it fast!">
+                        <input type="text" name="mech_quote" id="modal-mech-quote" placeholder="I'll fix it fast!">
                     </div>
                     <div class="form-group">
                         <label>Specialties</label>
-                        <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="e.g. Engine, Transmission">
+                        <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="Engine, Transmission">
                     </div>
                     <div class="form-group" style="display:flex;align-items:center;gap:10px;">
                         <label>Experience</label>
@@ -448,7 +448,7 @@ $effectiveTime = getEffectiveTime();
                     </div>
                 </form>
             </div>
-            <div style="border-left:2px dashed var(--ink);align-self:stretch;"></div>
+            <div style="border-left:2px dashed var(--teal);align-self:stretch;"></div>
             <div class="flex-1">
                 <h3 style="font-family:var(--font-sub);font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;">Vacations</h3>
                 <div id="vacation-list" style="margin-bottom:10px;"></div>

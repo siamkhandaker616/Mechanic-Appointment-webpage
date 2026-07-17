@@ -126,29 +126,29 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             <div class="col">
                 <div class="form-group">
                     <label for="name">Your Name</label>
-                    <input type="text" id="name" name="name" placeholder="e.g. John Smith" data-validate="required" data-err-required="Name is required." value="<?= htmlspecialchars($savedPost['name'] ?? '') ?>">
+                    <input type="text" id="name" name="name" placeholder="Your Full Legal Name" data-validate="required" data-err-required="Name is required." value="<?= htmlspecialchars($savedPost['name'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="e.g. 555-0199" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Valid phone #s only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
+                    <input type="tel" id="phone" name="phone" placeholder="Enter phone number carefully" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Valid phone #s only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="address">Address</label>
-                    <textarea id="address" name="address" placeholder="e.g. 123 Main Street, Metropolis" data-validate="required" data-err-required="Address is required."><?= htmlspecialchars($savedPost['address'] ?? '') ?></textarea>
+                    <textarea id="address" name="address" placeholder="123 Main Street, Metropolis" data-validate="required" data-err-required="Address is required."><?= htmlspecialchars($savedPost['address'] ?? '') ?></textarea>
                 </div>
             </div>
             <div class="col">
                 <div class="form-group">
                     <label for="license_no">Car License Number</label>
-                    <input type="text" id="license_no" name="license_no" placeholder="e.g. ABC-1234" data-validate="required" data-err-required="License number is required." value="<?= htmlspecialchars($savedPost['license_no'] ?? '') ?>">
+                    <input type="text" id="license_no" name="license_no" placeholder="Your License Plate Number" data-validate="required" data-err-required="License number is required." value="<?= htmlspecialchars($savedPost['license_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="engine_no">Car Engine Number</label>
-                    <input type="text" id="engine_no" name="engine_no" placeholder="e.g. 8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
+                    <input type="text" id="engine_no" name="engine_no" placeholder="8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="car_model">Car Model <span style="font-weight:normal;">(optional)</span></label>
-                    <input type="text" id="car_model" name="car_model" placeholder="e.g. Ford Mustang" value="<?= htmlspecialchars($savedPost['car_model'] ?? '') ?>">
+                    <input type="text" id="car_model" name="car_model" placeholder="Ford Mustang" value="<?= htmlspecialchars($savedPost['car_model'] ?? '') ?>">
                 </div>
             </div>
         </div>
@@ -188,11 +188,8 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 
         <div class="form-group">
             <label>Available Slots</label>
-            <div style="display:flex;gap:16px;align-items:flex-start;">
-                <div id="slot-container" class="slot-grid" style="flex:1;">
-                    <p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>
-                </div>
-                <button type="button" class="btn btn-sm btn-pink" onclick="openEditBooking()" style="margin-top:4px;">Edit Booking</button>
+            <div id="slot-container" class="slot-grid">
+                <p style="font-style:italic;color:#888;">Select a date and mechanic to see slots.</p>
             </div>
             <input type="hidden" name="slot_index" id="slot_index" value="">
         </div>
@@ -201,6 +198,12 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             <button type="submit" class="btn btn-pink">Book Appointment</button>
             <a href="#" class="btn btn-sm btn-outline" onclick="requirePwNewTab('admin.php');return false;">Admin Panel</a>
         </div>
+        <div style="margin-top:4px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;">
+                <span>Made an error earlier? You can still </span>
+                <button type="button" class="btn btn-sm btn-jade" onclick="openEditBooking()" style="margin:0;">Fix It!</button>
+            </span>
+        </div>
     </form>
 </div>
 
@@ -208,8 +211,12 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
     <img class="doodle doodle-oil-help" src="images/doodles/oil-can.svg" alt="">
     <h2>Help &amp; Info</h2>
     <details>
-        <summary>How do I book?</summary>
+        <summary>How do I book an appointment?</summary>
         <p>Fill in your info and your car's details, pick a date, choose one of our mechanics, and select an available time slot. Hit "Book Appointment" and you're all set.</p>
+    </details>
+    <details>
+        <summary>Can I edit my booking after making it?</summary>
+        <p>Yes! Click <strong>Fix It</strong> below the form, enter the phone number you used when booking, select the appointment you want to change, and update your name, address, or car details. The date, time slot, and mechanic stay the same.</p>
     </details>
     <details>
         <summary>How many cars can I book per day?</summary>
@@ -220,8 +227,12 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <p>The system will suggest the nearest available options — either a different time with the same mechanic, or a similarly skilled mechanic at your chosen time.</p>
     </details>
     <details>
-        <summary>Do I need an account?</summary>
+        <summary>Do I need to create an account?</summary>
         <p>No. Just provide your phone number — it's how we identify returning customers.</p>
+    </details>
+    <details>
+        <summary>I entered the wrong phone number, what now?</summary>
+        <p>The system matches bookings by phone number. If you typed it wrong during booking, you won't be able to look it up. Contact the shop directly or ask our admin staff to update it.</p>
     </details>
     <details>
         <summary>How do I check a mechanic's work schedule?</summary>
@@ -269,7 +280,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <div class="burst burst-right">PHONE!</div>
         <h2>Quick Book</h2>
         <p style="margin:8px 0 16px;">Enter your phone number to pull up your last booking.</p>
-        <input type="tel" id="qb-phone-input" placeholder="e.g. 09123456789" style="width:100%;font-size:1rem;">
+        <input type="tel" id="qb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
         <p id="qb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="lookupQuickBook()">Look Up</button>
@@ -296,7 +307,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Booking</h2>
         <p style="margin:8px 0 16px;">Enter your phone number to find your booking.</p>
-        <input type="tel" id="eb-phone-input" placeholder="e.g. 09123456789" style="width:100%;font-size:1rem;">
+        <input type="tel" id="eb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
         <p id="eb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="lookupEditBooking()">Look Up</button>
@@ -328,30 +339,30 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
                 <div class="flex-1">
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" id="eb-name" name="name" placeholder="e.g. John Smith">
+                        <input type="text" id="eb-name" name="name" placeholder="John Smith">
                     </div>
                     <div class="form-group">
                         <label>Address</label>
-                        <textarea id="eb-address" name="address" placeholder="e.g. 123 Main Street"></textarea>
+                        <textarea id="eb-address" name="address" placeholder="123 Main Street"></textarea>
                     </div>
                     <div class="form-group">
                         <label>Phone</label>
                         <input type="text" id="eb-display-phone" readonly style="background:var(--paper);cursor:default;">
                     </div>
                 </div>
-                <div style="border-left:2px dashed var(--ink);align-self:stretch;"></div>
+                <div style="border-left:2px dashed var(--teal);align-self:stretch;"></div>
                 <div class="flex-1">
                     <div class="form-group">
                         <label>Car License Number</label>
-                        <input type="text" id="eb-license" name="license_no" placeholder="e.g. ABC-1234">
+                        <input type="text" id="eb-license" name="license_no" placeholder="ABC-1234">
                     </div>
                     <div class="form-group">
                         <label>Car Engine Number</label>
-                        <input type="text" id="eb-engine" name="engine_no" placeholder="e.g. 8NR-TS2021">
+                        <input type="text" id="eb-engine" name="engine_no" placeholder="8NR-TS2021">
                     </div>
                     <div class="form-group">
                         <label>Car Model <span style="font-weight:normal;">(optional)</span></label>
-                        <input type="text" id="eb-model" name="car_model" placeholder="e.g. Ford Mustang">
+                        <input type="text" id="eb-model" name="car_model" placeholder="Ford Mustang">
                     </div>
                     <div style="margin-top:8px;padding:6px 8px;background:var(--cream);border-radius:6px;font-size:0.85rem;">
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
