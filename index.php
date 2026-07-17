@@ -90,7 +90,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <div class="omg omg-bot">CLICK</div>
 
 <header>
-    <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png" alt="Mayhem Mobility Tagline" class="tagline"></h1>
+    <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png?v=1" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
 </header>
 <script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
