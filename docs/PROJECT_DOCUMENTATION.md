@@ -27,11 +27,12 @@ The project is built with PHP 8+, MySQL (MariaDB), and vanilla JavaScript. It do
 ## 3. File Structure
 
 ```text
-Assignment 3/
+22299030_CSE391_A3/
   index.php               Booking page (customer-facing)
   admin.php               Admin panel (management interface)
   availability.php        AJAX endpoint for slot availability
-  config.php              DB credentials, constants, slot labels
+  config.php              DB credentials, constants, slot labels (user-created from config.example.php)
+  custom-select.js        Custom-themed <select> replacement with key-tag trigger & dropdown
   functions.php           All business logic, DB queries, handler functions
   spotlight.js            Spotlight of Shame validation mini-game
   script.js               Client-side logic (booking + admin, ~1096 lines)
@@ -58,9 +59,9 @@ Assignment 3/
       pow.svg             Appointment confirmation burst
       bg.webp             Background texture
     doodles/
-      *.svg               Decorative SVGs (gear, eye-open/closed, burst-vroom,
-                          hero-helmet, hourglass, lightning, oil-can,
-                          spark-plug, speech-bubble-1/2/3, stiletto, super-shield,
+      *.svg               Decorative SVGs (gear, eye-open/closed,
+                          hourglass, lightning, oil-can,
+                          speech-bubble-1/2/3, stiletto, super-shield,
                           wonder-tiara, wrench, magnifying-glass,
                           magnifying-glass-hover)
     bursts/
@@ -313,7 +314,7 @@ Phone fields (`.field-phone`) re-randomise their burst word on every invalid inp
 
 ### 7.8 Decorative Doodle Icons
 
-Eighteen icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages (all hand-drawn — see §7.6):
+Fifteen icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages (all hand-drawn — see §7.6):
 
 `gear.svg` (gear icon, rotates on hover), `eye-open.svg` / `eye-closed.svg` (password visibility toggle), `burst-vroom.svg` (admin section header VROOM burst), `hero-helmet.svg` (mechanic card badge), `hourglass.svg` (simulated time panel), `lightning.svg` (flash message accent), `oil-can.svg` (car form section icon), `spark-plug.svg` (engine/slot decoration), `speech-bubble-1.svg` / `speech-bubble-2.svg` / `speech-bubble-3.svg` (quote tooltip indicators), `stiletto.svg` (danger/destructive marker), `super-shield.svg` (confirmation/protection icon), `wonder-tiara.svg` (hero/reward accent), `wrench.svg` (mechanic icon), `magnifying-glass.svg` / `magnifying-glass-hover.svg` (search toggle states).
 
@@ -386,7 +387,7 @@ A rough count of the customization effort:
 
 - **~2139 lines** of CSS across a single stylesheet
 - **6 font faces**, self-hosted from `.woff2`/`.ttf` files
-- **18 hand-drawn SVG doodles** in `images/doodles/`
+- **15 hand-drawn SVG doodles** in `images/doodles/`
 - **5 hand-drawn SVG error bursts** in `images/bursts/`
 - **1 hand-drawn SVG confirmation burst** in `images/icons/`
 - **20+ burst labels** applied across panels and modals (BOOK!, PHONE!, TIME!, GIGS!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, NOPE!, GONE!, FREE!, NICE TRY!, LOCKED!, FIND!, PICK!, FIX!, HEY!, DONE!)
