@@ -34,9 +34,9 @@ Assignment 3/
   config.php              DB credentials, constants, slot labels
   functions.php           All business logic, DB queries, handler functions
   spotlight.js            Spotlight of Shame validation mini-game
-  script.js               Client-side logic (booking + admin)
-  datepicker.js           Custom-themed date picker widget
-  style.css               Full stylesheet (~1930 lines)
+  script.js               Client-side logic (booking + admin, ~1096 lines)
+  datepicker.js            Custom-themed date picker widget (~288 lines)
+  style.css               Full stylesheet (~2139 lines)
   README.md               Quick-start guide
   sql/
     schema.sql            Full database schema (9 tables)
@@ -56,11 +56,13 @@ Assignment 3/
     icons/
       tagline.png         Header tagline
       pow.svg             Appointment confirmation burst
+      bg.webp             Background texture
     doodles/
       *.svg               Decorative SVGs (gear, eye-open/closed, burst-vroom,
                           hero-helmet, hourglass, lightning, oil-can,
-                          spark-plug, speech-bubble, stiletto, super-shield,
-                          wonder-tiara, wrench)
+                          spark-plug, speech-bubble-1/2/3, stiletto, super-shield,
+                          wonder-tiara, wrench, magnifying-glass,
+                          magnifying-glass-hover)
     bursts/
       blank.svg, bzzt.svg, nada.svg, nope.svg, zilch.svg
 ```
@@ -117,7 +119,7 @@ Called by the booking page to fetch slot availability for a mechanic on a given 
 - **`mechanic_vacations`** — id, mechanic_id, start_date, end_date, reason
 - **`clients`** — id, name, phone (unique), address, created_at
 - **`cars`** — id, client_id, license_no (unique), engine_no, model, created_at
-- **`appointments`** — id, client_id, car_id, mechanic_id, date, slot_index, status, cancelled_at, admin_notes, timestamps (unique on car+date)
+- **`appointments`** — id, client_id, car_id, mechanic_id, date, slot_index, status, cancelled_at, admin_notes, timestamps (partial unique on car+date for non-cancelled rows)
 - **`reviews`** — id, appointment_id (unique), rating 1-5, comment, created_at
 - **`sim_config`** — id (singleton), use_simulated_time, simulated_datetime
 
@@ -146,7 +148,7 @@ Called by the booking page to fetch slot availability for a mechanic on a given 
 
 **What it does:** The All Mechanics table shows every mechanic with name, nickname, specialties, years of experience, and status (Active / On Leave / Inactive). Active mechanics can be Edited (name, nickname, quote, specialties, exp — name and exp are password-locked), have their weekly Schedule configured (day × slot checkboxes), or be Fired (soft-delete, becomes Inactive). Inactive mechanics can be Restored (rehired) or Removed (hard-delete). New mechanics are registered via a collapsible form. After hiring, the Edit modal auto-opens so the admin can fill in details and set the schedule. Vacations are managed inline within the Edit modal — pick start/end dates and optionally a reason.
 
-**How it works (implementer notes):** `addMechanic()` inserts the mechanic and creates a 7-day schedule with all slots false (the admin must configure availability via the Schedule modal). `fireMechanic()` sets `is_active = 0`. `removeMechanic()` hard-deletes from all related tables. The new-hire auto-open mechanic modal is driven by a JS block in `admin.php` that checks `$_GET['new_mechanic']` and calls `openMechModalById()`. Vacations are stored in `mechanic_vacations` and checked via `isMechanicOnVacation()`.
+**How it works (implementer notes):** `addMechanic()` inserts the mechanic and creates a 7-day schedule with all slots false (the admin must configure availability via the Schedule modal). `fireMechanic()` sets `is_active = 0`. `removeMechanic()` hard-deletes from all related tables. The new-hire auto-open mechanic modal is driven by a JS block in `admin.php` that checks `$_GET['new_mechanic']` and calls `openMechModalById()`. A hidden `_new_hire_name` input carries the new hire's name through forms (update info, schedule, vacation) so the server redirects with a hired message. Vacations are stored in `mechanic_vacations` and checked via `isMechanicOnVacation()`. A client-side guard in `addVacation()` blocks sending a mechanic on vacation if they have no enabled schedule slots — the admin must set availability via the Schedule button first.
 
 ### 6.5 Admin — Schedule Overrides
 
@@ -162,13 +164,22 @@ Called by the booking page to fetch slot availability for a mechanic on a given 
 
 ### 6.7 Password Gate
 
-**What it does:** Destructive actions (cancel/remove appointments, fire/remove mechanics, edit appointments, unlock sensitive fields) require an admin password. A modal pops up asking for the password, which is verified via AJAX. On success, the action executes. On failure, an error is shown inside the modal and the user can retry.
+**What it does:** Destructive or sensitive actions require an admin password. A modal pops up asking for the password, which is verified via AJAX. On success, the action executes. On failure, an error is shown inside the modal and the user can retry. The modal supports Escape to close and Enter to confirm.
 
-**Actions that require password:** Cancel appointment, Remove cancelled appointment, Remove all cancelled, Fire mechanic, Remove mechanic, Edit appointment, Unlock name/exp in Edit Mechanic modal.
+**Actions that require password:** Cancel appointment, Remove cancelled appointment, Remove all cancelled, Fire mechanic, Remove mechanic, Edit appointment, Unblock override, Rebook appointment, Archive Completed, Unlock name/exp in Edit Mechanic modal.
 
-**Actions that do NOT require password:** Restore mechanic, Unblock override, Remove vacation, Hire mechanic, Sim toggle, Schedule update, Add vacation, Override slot.
+**Actions that do NOT require password:** Restore mechanic, Remove vacation, Hire mechanic, Sim toggle, Schedule update, Add vacation.
 
-**How it works (implementer notes):** `requirePw(actionUrl)` sets `_pendingAction` and opens the modal. `confirmPw()` sends `verify_pw=1&admin_pw=X` via XHR to `admin.php` (or `index.php` for the admin link). Server compares against `ADMIN_PW` constant (`'meow meow'` default) and returns `{success: bool}`. On success, the pending URL is followed or form submitted.
+**How it works (implementer notes):**
+
+Three entry points:
+- `requirePw(actionUrl, newTab?)` — for link-style actions. Sets `_pendingAction` (and optionally `_pendingNewTab`) and opens the modal. Used by Cancel, Fire, Remove, Unblock, Rebook, Archive Completed.
+- `requirePwForField(fieldId)` — for unlocking read-only fields (name, experience). Sets `_pendingField` and opens the modal. On success, the field becomes writable.
+- `requirePwForForm(form)` — for form submissions (override slot). Sets `_pendingForm` and opens the modal. On success, a hidden `admin_pw` input is appended and the form is submitted.
+
+`confirmPw()` sends `verify_pw=1&admin_pw=X` via XHR to `admin.php`. Server compares against `ADMIN_PW` constant and returns `{success: bool}`. On success, the pending action is followed. On failure, an error is shown and the user can retry. The confirm button is disabled during the request and always restored via `onloadend` (handles success, network error, or abort).
+
+A global `keydown` listener closes the password modal on Escape and triggers confirmation on Enter.
 
 ### 6.8 Status Auto-Advance
 
@@ -218,7 +229,7 @@ Pairs are deliberately mismatched: teal buttons with gold text, rust banners wit
 
 ### 7.3 Font System
 
-Six self-hosted fonts — no Google Fonts CDN, no external requests:
+Six self-hosted font files — five actively used, one (Action Man Shaded Italic) a leftover from an earlier iteration:
 
 | Font | Use | Fallback Chain |
 |------|-----|----------------|
@@ -227,11 +238,11 @@ Six self-hosted fonts — no Google Fonts CDN, no external requests:
 | **Permanent Marker** (WOFF2) | Accents, quote text | `cursive, "Comic Sans MS"` |
 | **Walter Turncoat** (WOFF2) | Body text, form labels, table content | `cursive, sans-serif` |
 | **Action Man Bold** (TTF) | Burst graphics, onomatopoeia | `Impact, sans-serif` |
-| **Action Man Shaded Italic** (TTF) | Decorative burst text | `cursive, serif` |
+| ~~Action Man Shaded Italic (TTF)~~ | (orphan — file exists but not referenced in any stylesheet) | — |
 
 The self-hosting was deliberate: Google Fonts would break the offline XAMPP experience, introduce latency, and leak user data. Fonts were downloaded, converted to WOFF2 for compression, and served from `/fonts/`. The fallback chains ensure each font is replaced by a visually similar system font in the same generic category.
 
-Between the six font faces, only **one** (`<h1>` headline) uses a standard serif keyword — everything else maps to `cursive` or `fantasy`, pushing the page further into hand-drawn territory even when the custom font fails to load.
+Between the five active font faces, only **one** (`<h1>` headline) uses a standard serif keyword — everything else maps to `cursive` or `fantasy`, pushing the page further into hand-drawn territory even when the custom font fails to load.
 
 ### 7.4 Ben-Day Dots
 
@@ -258,13 +269,13 @@ Every section on both pages is wrapped in a `.panel` — a box that reads like a
 
 Key panels decorated this way: booking panel, mechanic cards, each admin section (appointments, mechanics, overrides, schedule), modals, the flash message box.
 
-### 7.6 Hand-Drawn Burst SVGs
+### 7.6 Hand-Drawn SVGs
 
-The most labour-intensive visual assets are the seven hand-drawn burst SVGs — the comic-style "wrong answer" graphics that appear during the Spotlight of Shame.
+All SVG image assets — bursts, doodles, and icons — are original vector artwork drawn by hand, not AI-generated or auto-traced. Every curve was placed point by point.
 
 #### Spotlight Error Bursts (`images/bursts/`)
 
-Five original SVGs created for the spotlight validation mini-game. Each started as a pencil sketch, then hand-traced as vector paths in Inkscape — not auto-traced from raster images, not AI-generated, not clip art. Every curve was placed point by point.
+Five SVGs created for the spotlight validation mini-game:
 
 | File | Design Detail |
 |------|---------------|
@@ -278,7 +289,7 @@ Each SVG was then hand-optimised: path data minified (decimal precision reduced,
 
 #### Confirmation Burst (`images/icons/pow.svg`)
 
-The "POW!" graphic shown on the booking confirmation panel. Originally hand-drawn as a PNG raster sketch, then manually re-traced as clean SVG paths, optimised through SVGO, and inlined into the page. It represents the payoff — where the error bursts are negative feedback, POW! is the celebratory burst that tells the customer they succeeded.
+The "POW!" graphic shown on the booking confirmation panel. Traced as clean SVG paths, optimised through SVGO, and inlined into the page. It represents the payoff — where the error bursts are negative feedback, POW! is the celebratory burst that tells the customer they succeeded.
 
 ### 7.7 CSS Burst Labels & Animation System
 
@@ -286,9 +297,9 @@ The "POW!" graphic shown on the booking confirmation panel. Originally hand-draw
 
 A separate system from the hand-drawn SVGs — these are pure CSS star shapes created via `clip-path: polygon()` (24-point star) with text content:
 
-- 15 labels used across the site: BOOK!, TIME!, LIST!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, GONE!, FREE!, LOCKED!
-- Each set in Action Man Shaded Italic, rotated 2–5°, positioned absolutely to overlap the panel/modal border (the comic book convention of a sound effect bleeding out of the panel)
-- Colours vary by context: gold text on pink burst, white text on teal burst, ink text on gold burst
+- 20+ labels used across the site: BOOK!, PHONE!, TIME!, GIGS!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, NOPE!, GONE!, FREE!, NICE TRY!, LOCKED!, FIND!, PICK!, FIX!, HEY!, DONE!
+- Each set in Action Man Bold (`var(--font-action)`), rotated 2–5°, positioned absolutely to overlap the panel/modal border (the comic book convention of a sound effect bleeding out of the panel)
+- Default colour is `var(--ink)`; some instances override inline (`background:var(--pink)` for NOPE! on some modals, `background:var(--gold)` with `color:var(--ink)` for HEY! and DONE!)
 
 **Spotlight burst animation:**
 
@@ -302,9 +313,9 @@ Phone fields (`.field-phone`) re-randomise their burst word on every invalid inp
 
 ### 7.8 Decorative Doodle Icons
 
-Thirteen hand-drawn icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages. Each was drawn as a single SVG path (no auto-trace), then minified:
+Eighteen icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages (all hand-drawn — see §7.6):
 
-`gear.svg` (gear icon, rotates on hover), `eye-open.svg` / `eye-closed.svg` (password visibility toggle), `burst-vroom.svg` (admin section header VROOM burst), `hero-helmet.svg` (mechanic card badge), `hourglass.svg` (simulated time panel), `lightning.svg` (flash message accent), `oil-can.svg` (car form section icon), `spark-plug.svg` (engine/slot decoration), `speech-bubble.svg` (quote tooltip indicator), `stiletto.svg` (danger/destructive marker), `super-shield.svg` (confirmation/protection icon), `wonder-tiara.svg` (hero/reward accent), `wrench.svg` (mechanic icon).
+`gear.svg` (gear icon, rotates on hover), `eye-open.svg` / `eye-closed.svg` (password visibility toggle), `burst-vroom.svg` (admin section header VROOM burst), `hero-helmet.svg` (mechanic card badge), `hourglass.svg` (simulated time panel), `lightning.svg` (flash message accent), `oil-can.svg` (car form section icon), `spark-plug.svg` (engine/slot decoration), `speech-bubble-1.svg` / `speech-bubble-2.svg` / `speech-bubble-3.svg` (quote tooltip indicators), `stiletto.svg` (danger/destructive marker), `super-shield.svg` (confirmation/protection icon), `wonder-tiara.svg` (hero/reward accent), `wrench.svg` (mechanic icon), `magnifying-glass.svg` / `magnifying-glass-hover.svg` (search toggle states).
 
 These are secondary to the hand-drawn bursts but follow the same ethos: bespoke vector artwork, no stock assets, fully accessible.
 
@@ -322,7 +333,7 @@ Styled in Action Man Bold, large font size (4.5rem+), rotated 5–15°, opacity 
 The gear icon (`images/doodles/gear.svg`) in the admin page header rotates on hover (`transform: rotate(90deg)`, `transition: transform 0.5s`). The dropdown panel beneath it uses:
 
 - `var(--cream)` background with a dot pattern overlay
-- `var(--border)` (`2px solid var(--ink)`) plus `var(--shadow-md)`
+- `var(--border)` (`3px solid var(--ink)`) plus `var(--shadow-md)`
 - A "⚙ SETTINGS" header in `--font-display` (Bangers) with a pink dashed underline
 - The spotlight toggle `input[type="checkbox"]` is replaced by a `.custom-checkbox`
 
@@ -331,13 +342,15 @@ The gear icon (`images/doodles/gear.svg`) in the admin page header rotates on ho
 The `.custom-checkbox` class replaces native checkbox appearance with a themed alternative:
 
 - `appearance: none` — removes native browser styling
-- `var(--paper)` background, `2px solid var(--ink)` border, `2px 2px 0 var(--ink)` hard shadow
-- When checked: `var(--teal-light)` fill with a gold checkmark (painted via `::after` content `✓` in `--gold`)
-- Shared by the spotlight toggle on admin.php and the sim time toggle — any future toggle will use the same class
+- `20×20px`, matching the standard checkbox size
+- `var(--paper)` background, `var(--border)` (`3px solid var(--ink)`)
+- Hover state: `var(--teal-light)` background
+- When checked: `var(--teal)` dark teal fill with a gold lightning bolt SVG (via `background-image`, no `::after` text)
+- Shared by the spotlight toggle, doodles toggle, background toggle, animations toggle, and the sim time toggle on admin.php — any future toggle will use the same class
 
 ### 7.11 Speech Bubbles & Tooltips
 
-**Standard bubbles** (`.bubble`): Cyan fill (`var(--cyan)`), `2px dashed var(--ink)` border, triangular tail (`::before`/`::after`). Used for mechanic quotes on hover — the tail aligns to the left side of the card.
+**Standard bubbles** (`.bubble`): Cyan fill (`var(--cyan)`), `var(--border)` (`3px solid var(--ink)`), triangular tail (`::before`/`::after`). Used for mechanic quotes on hover — the tail aligns to the left side of the card.
 
 **Jagged bubbles** (`.jagged-bubble`): Cyan fill, ink border, but the top edge is jagged (CSS `clip-path` with teeth). Used for the date error message.
 
@@ -347,9 +360,9 @@ The `.custom-checkbox` class replaces native checkbox appearance with a themed a
 
 ### 7.12 Buttons & Tables
 
-**Buttons** (`.btn`): `var(--ink)` background, `var(--gold)` text, `2px solid var(--ink)` border, `3px 3px 0 var(--ink)` hard shadow. Hover lifts shadow to `5px 5px`. Active pushes shadow to `1px 1px` for a pressed effect. Variants: `--pink` (pop/confirm), `--rust` (danger/destroy), `--outline` (inverted), `--sm` (compact), `--recruit` (green hire).
+**Buttons** (`.btn`): `var(--teal)` background, `var(--gold)` text, `var(--border)` (`3px solid var(--ink)`), `var(--shadow-lg)` (`5px 5px 0 var(--ink)`). Hover lifts to `8px 8px 0 var(--ink)` and lightens background to `var(--teal-light)`. Active pushes shadow to `var(--shadow-sm)` (`3px 3px 0`). All buttons have a trailing `►` via `::after` that shifts right on hover. Variants: `--pink` (pop/confirm), `--rust` (danger/destroy), `--outline` (inverted, transparent bg), `--sm` (compact), `--recruit` (green hire, flashing), `--jade` (green confirm).
 
-**Tables**: Comic-themed throughout — `var(--cream)` alternating with `var(--paper)` stripes (`tr.stripe-even`), `var(--navy)` headers with white text, `2px solid var(--ink)` borders, `2px 2px 0 var(--ink)` on headers. Status badges (`.status-badge`) use colour-coded pills (teal = scheduled, gold = in_progress, navy = completed, rust = cancelled).
+**Tables**: Comic-themed throughout — `var(--cyan)` rows with `#c6dddd` stripe (`tr.stripe-even`), `var(--navy)` headers with `var(--gold)` text, `var(--border)` (`3px solid var(--ink)`). Status badges (`.status-badge`) use colour-coded pills: `status-scheduled` (teal/gold), `status-in_progress` (pink/gold), `status-completed` (gold/ink, rotated -1deg with marker font), `status-cancelled` (rust/gold).
 
 ### 7.13 Inline Error Text
 
@@ -371,15 +384,15 @@ The date picker (`datepicker.js`, 320 lines) is a fully custom widget — no `<i
 
 A rough count of the customization effort:
 
-- **~1930 lines** of CSS across a single stylesheet
+- **~2139 lines** of CSS across a single stylesheet
 - **6 font faces**, self-hosted from `.woff2`/`.ttf` files
-- **13 hand-drawn SVG doodles** in `images/doodles/`
+- **18 hand-drawn SVG doodles** in `images/doodles/`
 - **5 hand-drawn SVG error bursts** in `images/bursts/`
 - **1 hand-drawn SVG confirmation burst** in `images/icons/`
-- **15 burst labels** applied across panels and modals (BOOK!, TIME!, LIST!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, GONE!, FREE!, LOCKED!)
+- **20+ burst labels** applied across panels and modals (BOOK!, PHONE!, TIME!, GIGS!, LOCK!, HELD!, HIRE!, EDIT!, WEEK!, BLOCKED!, WHOA!, FIRED!, NOPE!, GONE!, FREE!, NICE TRY!, LOCKED!, FIND!, PICK!, FIX!, HEY!, DONE!)
 - **6 onomatopoeia watermarks** (3 per page, VROOM/KAPOW/CLICK + POW/ZOWIE/BAM)
-- **8+ CSS custom properties** for the colour palette
-- **~15 CSS animation keyframe sets** (panel slide, burst pop/fade/scroll-hide, shame-banner slide, tooltip pop, modal fade, gear rotate, spinner)
+- **36 CSS custom properties** in the `:root` block for the colour palette, fonts, and effects
+- **16 CSS animation keyframe sets** (pour-oil, wobble-mech, wobble-mech-flip, comicPop, popIn, burst-pop, recflic, vacay-pop, float, whamFlash, pow-pop, shakyPop, shame-slide, error-pop, error-fade, shake)
 - **Ben-Day dots** via layered `radial-gradient()` on `<body>`, overlay curtains, and dropdown
 - **No CSS framework** — every selector is hand-written for this specific design
 
