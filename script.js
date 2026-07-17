@@ -5,6 +5,15 @@ if (typeof window.SPOTLIGHT_DISABLED === 'undefined') {
 
 /* === UTILITIES === */
 
+function debounce(fn, ms) {
+    var timer = null;
+    return function() {
+        var ctx = this, args = arguments;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function() { timer = null; fn.apply(ctx, args); }, ms);
+    };
+}
+
 function htmlspecialchars(s) {
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(s));
@@ -202,6 +211,7 @@ function fetchAvailability() {
         updateVacationBadges(dateEl.value);
         return;
     }
+    container.innerHTML = '<div class="burst burst-right" style="font-size:0.6rem;position:static;margin:0 auto 8px;animation:popIn 0.2s ease-out;">LOADING!</div><p style="font-style:italic;color:#888;text-align:center;">Checking slots&hellip;</p>';
     updateVacationBadges(dateEl.value);
     var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
     var reqId = ++_fetchId;
@@ -303,8 +313,6 @@ function clearFilters() {
     if (fromWrap) fromWrap.querySelector('.datepicker-display').value = '';
     var toWrap = document.getElementById('filter-date-to').closest('.datepicker-wrap');
     if (toWrap) toWrap.querySelector('.datepicker-display').value = '';
-    document.getElementById('filter-status').selectedIndex = 0;
-    document.getElementById('filter-mechanic').selectedIndex = 0;
     var mechWrap = document.getElementById('filter-mechanic').closest('.custom-select-wrap');
     if (mechWrap) {
         var triggerText = mechWrap.querySelector('.custom-select-trigger-inner .label');
@@ -322,6 +330,38 @@ function clearFilters() {
         if (first2) first2.classList.add('selected');
     }
     filterAppTable();
+}
+
+var filterAppTableDebounced = debounce(function() {
+    filterAppTable();
+}, 200);
+
+/* === UNSAVED CHANGES GUARD === */
+
+var _unsavedCb = null;
+function confirmUnsaved(callback) {
+    var form = document.getElementById('booking-form');
+    if (!form) { callback(); return true; }
+    var hasVal = false;
+    for (var i = 0; i < form.elements.length; i++) {
+        var el = form.elements[i];
+        if (el.type === 'text' || el.type === 'tel' || el.type === 'textarea' || el.type === 'date') {
+            if (el.value.trim()) { hasVal = true; break; }
+        }
+    }
+    if (!hasVal) { callback(); return true; }
+    _unsavedCb = callback;
+    document.getElementById('unsaved-modal').classList.remove('hidden');
+    return false;
+}
+function confirmUnsavedGo() {
+    document.getElementById('unsaved-modal').classList.add('hidden');
+    var cb = _unsavedCb; _unsavedCb = null;
+    if (cb) cb();
+}
+function cancelUnsaved() {
+    document.getElementById('unsaved-modal').classList.add('hidden');
+    _unsavedCb = null;
 }
 
 /* === ADMIN === */
@@ -500,11 +540,15 @@ function togglePwVisibility() {
 }
 function confirmPw() {
     var pw = document.getElementById('admin-pw-input').value;
+    var btn = document.querySelector('#pw-modal .modal-btn-row .btn-pink');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+    function restoreBtn() { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; } }
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '', true);
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     xhr.onload = function() {
-        var resp = JSON.parse(xhr.responseText);
+        restoreBtn();
+        try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('pw-error').textContent = 'Invalid server response.'; document.getElementById('pw-error').style.display = 'block'; return; }
         if (resp.success) {
             document.getElementById('pw-modal').classList.add('hidden');
             if (_pendingField) {
@@ -541,6 +585,12 @@ function confirmPw() {
             document.getElementById('admin-pw-input').focus();
         }
     };
+    xhr.onerror = function() {
+        restoreBtn();
+        document.getElementById('pw-error').textContent = 'Network error. Try again.';
+        document.getElementById('pw-error').style.display = 'block';
+    };
+    xhr.onloadend = restoreBtn;
     xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
 }
 function closePwModal() {
@@ -602,6 +652,7 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
     });
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
+    document.getElementById('mech-modal').classList.remove('hidden');
 }
 function closeMechModal(event) {
     if (event.target === event.currentTarget) {
@@ -699,7 +750,7 @@ function closeFireModal(event) { if (event.target === event.currentTarget) docum
 function showRemoveModal(id) { _pendingAction = '?remove=' + id; document.getElementById('remove-modal').classList.remove('hidden'); }
 function closeRemoveModal(event) { if (event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
 function showUnblockModal(id, name, date) {
-    document.getElementById('unblock-confirm-link').href = '?unblock=' + id;
+    _pendingAction = '?unblock=' + id;
     document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
     document.getElementById('unblock-modal').classList.remove('hidden');
 }
@@ -754,7 +805,26 @@ function addVacation() {
         return;
     }
     var vacs = VACATION_DATA[id] || [];
-    if (vacs.length >= 3) { document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
+    var sched = SCHEDULE_DATA[id];
+    var hasAvailability = false;
+    if (sched) {
+        for (var dow in sched) {
+            if (sched.hasOwnProperty(dow) && sched[dow]) {
+                for (var si = 0; si < sched[dow].length; si++) {
+                    if (sched[dow][si]) { hasAvailability = true; break; }
+                }
+            }
+            if (hasAvailability) break;
+        }
+    }
+    if (!hasAvailability) {
+        var mechName = document.getElementById('modal-mech-name') ? document.getElementById('modal-mech-name').value : 'This mechanic';
+        document.getElementById('vac-limit-heading').textContent = 'No Schedule — No Vacation!';
+        document.getElementById('vac-limit-msg').innerHTML = mechName + ' has zero availability on the books — can\'t send \'em packing if they\'ve never turned a wrench! Set up a schedule via the <strong>Schedule</strong> button first.';
+        document.getElementById('vac-limit-modal').classList.remove('hidden');
+        return;
+    }
+    if (vacs.length >= 3) { document.getElementById('vac-limit-heading').textContent = 'Maximum Vacations Reached'; document.getElementById('vac-limit-msg').innerHTML = 'A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!'; document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
     var reason = document.getElementById('vac-reason').value;
     var newHireName = window._newHireName || '';
     var f = document.createElement('form');
@@ -1072,14 +1142,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /* Admin page */
-    if (document.getElementById('pw-modal')) {
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !document.getElementById('pw-modal').classList.contains('hidden')) closePwModal();
-            if (e.key === 'Enter' && !document.getElementById('pw-modal').classList.contains('hidden')) confirmPw();
-        });
-
-    }
+    /* Global keyboard shortcuts */
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay').forEach(function(m) {
+                if (!m.classList.contains('hidden')) m.classList.add('hidden');
+            });
+        }
+        if (e.key === 'Enter') {
+            var pw = document.getElementById('pw-modal');
+            if (pw && !pw.classList.contains('hidden')) confirmPw();
+        }
+    });
 
     /* Speech bubble cycling */
     var sb = document.getElementById('speech-bubble');

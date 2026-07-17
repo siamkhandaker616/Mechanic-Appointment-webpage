@@ -519,10 +519,10 @@ function isMechanicOnVacation(int $mechanicId, string $date): bool {
 
 /* === FLASH MESSAGING === */
 
-function flashAndRedirect(string $msg, string $type = 'success'): never {
+function flashAndRedirect(string $msg, string $type = 'success', string $url = 'admin.php'): never {
     $_SESSION['flash_msg'] = $msg;
     $_SESSION['flash_type'] = $type;
-    header('Location: admin.php');
+    header('Location: ' . $url);
     exit;
 }
 
@@ -569,6 +569,8 @@ function handleRemoveAllCompleted(): never {
 }
 
 function handleRemove(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
@@ -578,6 +580,8 @@ function handleRemove(): never {
 }
 
 function handleCancel(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     $id = (int)$_GET['cancel'];
     saveBackupIfSim($id);
     if (cancelAppointment($id)) {
@@ -639,6 +643,8 @@ function handleReBookConfirm(): never {
 }
 
 function handleFire(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     $db = getDB();
     $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['fire']]);
@@ -758,7 +764,7 @@ function handleEditBooking(): never {
     $stmt = $db->prepare("UPDATE cars SET license_no = ?, engine_no = ?, model = ? WHERE id = ?");
     $stmt->execute([$licenseNo, $engineNo, $model, $appt['car_id']]);
 
-    flashAndRedirect('Booking updated!');
+    flashAndRedirect('Booking updated!', 'success', 'index.php');
 }
 
 function restoreBackupData(): void {

@@ -10,7 +10,9 @@ $conflictList = [];
 /* === AJAX PASSWORD VERIFICATION === */
 if (isset($_POST['verify_pw'])) {
     header('Content-Type: application/json');
-    echo json_encode(['success' => ($_POST['admin_pw'] ?? '') === ADMIN_PW]);
+    $ok = ($_POST['admin_pw'] ?? '') === ADMIN_PW;
+    if ($ok) $_SESSION['admin_verified'] = time();
+    echo json_encode(['success' => $ok]);
     exit;
 }
 
@@ -143,7 +145,7 @@ $effectiveTime = getEffectiveTime();
         <span class="sim-group">
             <input type="checkbox" name="use_sim" value="1" id="use-sim" class="custom-checkbox" <?= $useSim ? 'checked' : '' ?> onchange="this.form.submit()">
             <input type="hidden" name="sim_toggle" value="1">
-            <label for="use-sim"><pre style= "font-family:'Walter Turncoat';"> Use simulated time</pre></label>
+            <label for="use-sim" style="font-family:var(--font-hand);">&nbsp;&nbsp;Use simulated time</label>
         </span>
         </form>
     </div>
@@ -281,7 +283,7 @@ $effectiveTime = getEffectiveTime();
         </div>
         <div style="display:flex;gap:12px;justify-content:space-between;position:relative;">
             <div id="override-error" class="field-error" style="display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;white-space:nowrap;"></div>
-            <button type="submit" name="override_slot" class="btn btn-rust">Save Override</button>
+            <button type="submit" name="override_slot" class="btn btn-rust" onclick="return requirePwForForm(this.form)">Save Override</button>
             <?php if (!empty($overrides)): ?>
             <button type="button" class="btn btn-sm btn-outline" onclick="toggleOverrides()" id="overrides-toggle">Show All Blocks</button>
             <?php endif; ?>
@@ -414,17 +416,17 @@ $effectiveTime = getEffectiveTime();
     <div class="modal-box" onclick="event.stopPropagation()" style="max-width:650px;">
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Mechanic</h2>
-        <div style="display:flex;gap:12px;align-items:stretch;">
+        <div style="display:flex;gap:28px;align-items:stretch;">
             <div class="flex-1">
                 <form method="post" id="mech-modal-form" onsubmit="return checkSimGuard()">
                     <input type="hidden" name="mech_id" id="modal-mech-id">
-                    <input type="hidden" name="_new_hire_name" id="new-hire-name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
+                    <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
                     <div style="display:flex;gap:12px;">
-                        <div class="form-group" class="flex-1">
+                        <div class="form-group">
                             <label>Name</label>
                             <input type="text" name="mech_name" id="modal-mech-name" readonly style="width:100%;background:var(--paper);cursor:pointer;" onclick="requirePwForField('modal-mech-name')">
                         </div>
-                        <div class="form-group" class="flex-1">
+                        <div class="form-group">
                             <label>Nickname</label>
                             <input type="text" name="mech_nickname" id="modal-mech-nickname" style="width:100%;">
                         </div>
@@ -440,7 +442,7 @@ $effectiveTime = getEffectiveTime();
                     <div class="form-group" style="display:flex;align-items:center;gap:10px;">
                         <label>Experience</label>
                         <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')" data-stepper="edit">
-                        <button type="button" class="btn btn-sm" style="margin-left:auto;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
+                        <button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;font-size:0.8rem;padding:6px 14px;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
@@ -538,7 +540,7 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="cancel-modal" onclick="closeCancelModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('cancel-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">WHOA!</div>
+        <div class="burst burst-left">WHOA!</div>
         <h2 class="modal-h2">Cancel Appointment ?</h2>
         <p class="modal-body-p">This can't be undone. Are you sure?</p>
         <div class="modal-btn-row">
@@ -551,10 +553,10 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="fire-modal" onclick="closeFireModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('fire-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">FIRED!</div>
+        <div class="burst burst-left">FIRED!</div>
         <h2 class="modal-h2" id="fire-modal-title">Fire Mechanic?</h2>
         <p class="modal-body-p" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
-        <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;color:var(--dark);display:none;"></p>
+        <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;display:none;"></p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Fire</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Forget it</button>
@@ -565,7 +567,7 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="rebook-mech-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('rebook-mech-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">NOPE!</div>
+        <div class="burst burst-left">NOPE!</div>
         <h2 style="margin-top:30px;margin-bottom:50px;" id="rebook-mech-heading"></h2>
         <div style="display:flex;gap:16px;align-items:center;">
             <div class="flex-1">
@@ -587,7 +589,7 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="sim-block-modal" onclick="closeSimBlockModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="closeSimBlockModal()">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">NOPE!</div>
+        <div class="burst burst-left">NOPE!</div>
         <h2 class="modal-h2">Sim Mode Active</h2>
         <p class="modal-body-p">Sim mode is active — you're playing with fake time, not making real decisions. Exit sim mode first.</p>
         <div class="modal-btn-row">
@@ -599,7 +601,7 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="remove-modal" onclick="closeRemoveModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('remove-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">GONE!</div>
+        <div class="burst burst-left">GONE!</div>
         <h2 class="modal-h2">Remove Appointment?</h2>
         <p class="modal-body-p">This permanently deletes the record. Are you sure?</p>
         <div class="modal-btn-row">
@@ -612,11 +614,11 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="unblock-modal" onclick="closeUnblockModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('unblock-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">FREE!</div>
+        <div class="burst burst-left">FREE!</div>
         <h2 class="modal-h2">Remove Override?</h2>
         <p class="modal-body-p" id="unblock-msg">This will unblock the slots for this date.</p>
         <div class="modal-btn-row">
-            <a href="#" id="unblock-confirm-link" class="btn btn-sm btn-rust">Yes, Unblock</a>
+            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Unblock</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
@@ -625,9 +627,9 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay hidden" id="vac-limit-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('vac-limit-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" style="background:var(--pink);">NICE</br>TRY!</div>
-        <h2 style="margin-top:30px;">Maximum Vacations Reached</h2>
-        <p class="modal-body-p">A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!</p>
+        <div class="burst burst-left" style="background:var(--pink);">NICE<br>TRY!</div>
+        <h2 style="margin-top:30px;" id="vac-limit-heading">Maximum Vacations Reached</h2>
+        <p class="modal-body-p" id="vac-limit-msg">A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!</p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('vac-limit-modal').classList.add('hidden')">Fine!</button>
         </div>
@@ -672,9 +674,9 @@ $effectiveTime = getEffectiveTime();
         <h2>Filter Appointments</h2>
         <div class="row" style="align-items:flex-start;">
             <div class="col col-form">
-                <input type="text" id="filter-name" placeholder="Name" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
-                <input type="text" id="filter-phone" placeholder="Phone" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
-                <input type="text" id="filter-car" placeholder="Car" oninput="filterAppTable()" style="width:100%;background:var(--paper);">
+                <input type="text" id="filter-name" placeholder="Name" oninput="filterAppTableDebounced()" style="width:100%;background:var(--paper);">
+                <input type="text" id="filter-phone" placeholder="Phone" oninput="filterAppTableDebounced()" style="width:100%;background:var(--paper);">
+                <input type="text" id="filter-car" placeholder="Car" oninput="filterAppTableDebounced()" style="width:100%;background:var(--paper);">
             </div>
             <div class="col col-form">
                 <select id="filter-status" class="custom-select" onchange="filterAppTable()">

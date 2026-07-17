@@ -6,7 +6,9 @@ require_once __DIR__ . '/functions.php';
 /* === AJAX PASSWORD VERIFICATION === */
 if (isset($_POST['verify_pw'])) {
     header('Content-Type: application/json');
-    echo json_encode(['success' => ($_POST['admin_pw'] ?? '') === ADMIN_PW]);
+    $ok = ($_POST['admin_pw'] ?? '') === ADMIN_PW;
+    if ($ok) $_SESSION['admin_verified'] = time();
+    echo json_encode(['success' => $ok]);
     exit;
 }
 
@@ -196,12 +198,12 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <button type="submit" class="btn btn-pink">Book Appointment</button>
-            <a href="#" class="btn btn-sm btn-outline" onclick="requirePwNewTab('admin.php');return false;">Admin Panel</a>
+            <a href="#" class="btn btn-sm btn-outline" onclick="confirmUnsaved(function(){requirePwNewTab('admin.php');});return false;">Admin Panel</a>
         </div>
         <div style="margin-top:4px;">
             <span style="display:inline-flex;align-items:center;gap:4px;">
-                <span>Made an error earlier? You can still </span>
-                <button type="button" class="btn btn-sm btn-jade" onclick="openEditBooking()" style="margin:0;">Fix It!</button>
+                <span>Made an error earlier? You can </span>
+                <button type="button" class="btn btn-sm btn-jade" onclick="confirmUnsaved(function(){openEditBooking();})" style="margin:0;">Fix It!</button>
             </span>
         </div>
     </form>
@@ -239,8 +241,8 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <p>Each mechanic card shows the days they work with colored dots below their name. A green dot (<span style="display:inline-block;width:12px;height:12px;background:var(--teal);vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're available that day &bull; a gray dot (<span style="display:inline-block;width:12px;height:12px;background:#e8e8e8;border:2px solid #bbb;vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're off. If a mechanic is on vacation, an <strong>ON VACATION</strong> badge will also appear.</p>
     </details>
 </div>
-</div>
 <?php endif; ?>
+</div>
 
 <!-- === INLINE SCRIPT === -->
 <script>
@@ -292,7 +294,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 <div class="modal-overlay hidden" id="qb-fail-modal" onclick="closeQbFailModal(event)">
     <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()">
         <button type="button" class="modal-close" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-left" class="modal-burst-below">NOPE!</div>
+        <div class="burst burst-left">NOPE!</div>
         <h2 class="modal-h2">Not Found</h2>
         <p class="modal-body-p" id="qb-fail-msg">That number ain't in our grease-stained ledger, pal. First time? Fill out the form.</p>
         <div class="modal-btn-row">
@@ -335,7 +337,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <form id="eb-form" method="post" action="">
             <input type="hidden" name="edit_booking" value="1">
             <input type="hidden" name="appointment_id" id="eb-appt-id">
-            <div style="display:flex;gap:12px;align-items:stretch;">
+            <div style="display:flex;gap:28px;align-items:stretch;">
                 <div class="flex-1">
                     <div class="form-group">
                         <label>Name</label>
@@ -378,6 +380,18 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-edit-modal').classList.add('hidden')">Cancel</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="unsaved-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+    <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+        <div class="burst burst-right" style="font-size:0.5rem;background:var(--gold);color:var(--ink);">HEY!</div>
+        <h2>Unsaved Changes</h2>
+        <p style="margin:8px 0 16px;">You have form data that will be lost. Leave anyway?</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-pink" onclick="confirmUnsavedGo()">Leave</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="cancelUnsaved()">Stay</button>
+        </div>
     </div>
 </div>
 

@@ -131,11 +131,12 @@ body {
 
 /* === TYPOGRAPHY === */
 
-h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
+h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
 
 h1 {
     font-family: var(--font-display);
     font-size: 3.2rem;
+    text-transform: uppercase;
     line-height: 1;
     margin-top: 20px;
     margin-bottom: 2px;
@@ -253,26 +254,28 @@ header {
     text-align: left;
 }
 input[type="checkbox"].custom-checkbox {
-    appearance: none; -webkit-appearance: none;
-    width: 15px; height: 20px; cursor: pointer;
-    border: 2px solid var(--ink);
-    background: var(--paper);
-    box-shadow: 2px 2px 0 var(--ink);
-    transition: 0.1s ease;
-    position: relative;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    cursor: pointer;
     flex-shrink: 0;
+    background: var(--paper);
+    border: var(--border);
+    position: relative;
+    vertical-align: middle;
+    transition: background 0.1s;
+}
+input[type="checkbox"].custom-checkbox:hover {
+    background: var(--teal-light);
 }
 input[type="checkbox"].custom-checkbox:checked {
-    background: var(--teal-light);
-    border-color: var(--teal);
-}
-input[type="checkbox"].custom-checkbox:checked::after {
-    content: "✓";
-    position: absolute;
-    top: -2px; left: 2px;
-    font-size: 1rem;
-    color: var(--gold);
-    font-weight: bold;
+    background: var(--teal);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f5c518'%3E%3Cpolygon points='13,2 4,14 11,14 10,22 19,11 12,11'/%3E%3C/svg%3E");
+    background-size: 12px;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 header::after {
@@ -296,7 +299,7 @@ header::after {
 
 .row {
     display: flex;
-    gap: 20px;
+    gap: 45px;
     flex-wrap: wrap;
 }
 
@@ -801,7 +804,6 @@ textarea {
 /* === UTILITY CLASSES === */
 
 .modal-btn-row { display:flex; gap:12px; margin-top:20px; justify-content:flex-end; }
-.modal-burst-below { margin-bottom:12px; }
 .modal-body-p { margin:16px 0; }
 .modal-h2 { margin-top:30px; margin-left:5px; }
 .th-center { text-align:center; }
@@ -1016,9 +1018,6 @@ textarea {
     width: auto;
     line-height: 1.5;
 }
-.slot-tooltip.hidden {
-    display: none;
-}
 .slot-tooltip::before {
     content: "";
     position: absolute;
@@ -1091,10 +1090,6 @@ textarea {
     line-height: 1.4;
     pointer-events: none;
     outline: 1px solid transparent;
-}
-
-.quote-tooltip.hidden {
-    display: none;
 }
 
 .quote-tooltip.comic-pop {
@@ -1486,10 +1481,6 @@ tr:last-child td {
     animation: popIn 0.2s ease-out;
 }
 
-.modal-overlay.hidden {
-    display: none;
-}
-
 .modal-box {
     background: var(--cream);
     border: 4px solid var(--ink);
@@ -1577,10 +1568,6 @@ tr:last-child td {
     width: 300px;
     margin-top: 6px;
     animation: popIn 0.15s ease-out;
-}
-
-.datepicker-popup.hidden {
-    display: none;
 }
 
 .datepicker-popup--dt {
@@ -1721,7 +1708,7 @@ tr:last-child td {
 
 .dp-day.dp-selected {
     background: var(--pink);
-    color: white;
+    color: var(--gold);
     border-color: var(--ink);
 }
 
@@ -2269,7 +2256,6 @@ tr:last-child td {
     text-shadow: 2px 2px 0 var(--ink);
 }
 .shame-banner small { font-family: var(--font-sub); opacity: 0.8; color: var(--cream); font-size: 0.8rem; }
-.shame-banner.hidden { display: none; }
 .hidden { display: none !important; }
 
 /* === ANIMATIONS === */

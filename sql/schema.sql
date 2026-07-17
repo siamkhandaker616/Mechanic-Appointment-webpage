@@ -87,7 +87,7 @@ CREATE TABLE appointments (
     backup_data TEXT DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_car_date (car_id, appointment_date),
+    UNIQUE KEY uq_car_date (car_id, appointment_date, (CASE WHEN status != 'cancelled' THEN 1 END)),
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE,
     FOREIGN KEY (mechanic_id) REFERENCES mechanics(id) ON DELETE CASCADE
