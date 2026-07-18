@@ -88,7 +88,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <link rel="preload" href="fonts/Bangers.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/WalterTurncoat-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css?v=<?= time() ?>">
-
+<link rel="icon" type="image/x-icon" href="images/icons/favicon.ico">
 </head>
 <body>
 
