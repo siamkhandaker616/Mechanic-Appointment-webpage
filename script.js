@@ -769,6 +769,7 @@ function toggleUpdateApptBtn(el) {
 }
 function closeScheduleModal(event) { if (event.target === event.currentTarget) { document.getElementById('schedule-modal').classList.add('hidden'); document.getElementById('mech-modal').classList.remove('hidden'); } }
 function validateOverrideForm() {
+    if (!checkSimGuard()) return false;
     var err = document.getElementById('override-error');
     var mech = document.querySelector('[name="override_mechanic"]').value;
     var date = document.querySelector('[name="override_date"]').value;

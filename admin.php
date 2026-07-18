@@ -556,7 +556,7 @@ $effectiveTime = getEffectiveTime();
         <button type="button" class="modal-close" onclick="document.getElementById('cancel-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left">WHOA!</div>
         <h2 class="modal-h2">Cancel Appointment ?</h2>
-        <p class="modal-body-p">This can't be undone. Are you sure?</p>
+        <p class="modal-body-p">You can rebook it later, but sure?</p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-rust" id="cancel-confirm-btn">Yes, Cancel</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Forget it</button>

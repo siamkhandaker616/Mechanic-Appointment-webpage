@@ -987,6 +987,7 @@ function handleAddVacation(): never {
 }
 
 function handleOverrideSlot(): never {
+    guardAgainstSim();
     $db = getDB();
     $mechId = (int)($_POST['override_mechanic'] ?? 0);
     $date = $_POST['override_date'] ?? '';
