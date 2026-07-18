@@ -560,6 +560,15 @@ function flashAndRedirect(string $msg, string $type = 'success', string $url = '
     exit;
 }
 
+function ajaxFlash(string $msg, string $type = 'success', string $url = 'admin.php'): never {
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    if ($isAjax) {
+        echo json_encode(['ok' => $type === 'success', 'msg' => $msg]);
+        exit;
+    }
+    flashAndRedirect($msg, $type, $url);
+}
+
 /* === SIM GUARDS & BACKUP === */
 
 function isSimMode(): bool {
@@ -569,7 +578,7 @@ function isSimMode(): bool {
 
 function guardAgainstSim(): void {
     if (isSimMode()) {
-        flashAndRedirect('Sim mode is active — you\'re playing with fake time, not making real decisions. Exit sim mode first.', 'error');
+        ajaxFlash('Sim mode is active — you\'re playing with fake time, not making real decisions. Exit sim mode first.', 'error');
     }
 }
 
@@ -591,7 +600,7 @@ function handleRemoveAllCancelled(): never {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
     $stmt->execute();
-    flashAndRedirect($stmt->rowCount() . ' cancelled appointment(s) removed.');
+    ajaxFlash($stmt->rowCount() . ' cancelled appointment(s) removed.');
 }
 
 function handleRemoveAllCompleted(): never {
@@ -599,29 +608,29 @@ function handleRemoveAllCompleted(): never {
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
     $stmt->execute();
-    flashAndRedirect($stmt->rowCount() . ' completed appointment(s) removed.');
+    ajaxFlash($stmt->rowCount() . ' completed appointment(s) removed.');
 }
 
 function handleRemove(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
     unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
     $stmt->execute([(int)$_GET['remove']]);
     $ok = $stmt->rowCount() > 0;
-    flashAndRedirect($ok ? 'Appointment removed.' : 'Appointment not found or not cancellable.', $ok ? 'success' : 'error');
+    ajaxFlash($ok ? 'Appointment removed.' : 'Appointment not found or not cancellable.', $ok ? 'success' : 'error');
 }
 
 function handleCancel(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
     unset($_SESSION['admin_verified']);
     $id = (int)$_GET['cancel'];
     saveBackupIfSim($id);
     if (cancelAppointment($id)) {
-        flashAndRedirect('Appointment cancelled.');
+        ajaxFlash('Appointment cancelled.');
     } else {
-        flashAndRedirect('Could not cancel — appointment may already be in progress or completed.', 'error');
+        ajaxFlash('Could not cancel — appointment may already be in progress or completed.', 'error');
     }
 }
 
@@ -632,17 +641,17 @@ function handleReBook(): never {
     $stmt->execute([$id]);
     $appt = $stmt->fetch();
     if (!$appt) {
-        flashAndRedirect('Appointment not found or not cancelled.', 'error');
+        ajaxFlash('Appointment not found or not cancelled.', 'error');
     }
     $effectiveTime = getEffectiveTime();
     $todayStr = $effectiveTime->format('Y-m-d');
     if ($appt['appointment_date'] < $todayStr) {
-        flashAndRedirect('Can\'t rebook a ghost — that date\'s already in the rearview.', 'error');
+        ajaxFlash('Can\'t rebook a ghost — that date\'s already in the rearview.', 'error');
     }
     if ($appt['appointment_date'] === $todayStr) {
         $currentHour = (int)$effectiveTime->format('G');
         if ($currentHour >= slotStartHour((int)$appt['slot_index'])) {
-            flashAndRedirect('Too slow — that time slot already drove off without you.', 'error');
+            ajaxFlash('Too slow — that time slot already drove off without you.', 'error');
         }
     }
     if (!$appt['is_active']) {
@@ -651,12 +660,22 @@ function handleReBook(): never {
         $mname = $mstmt->fetchColumn() ?: 'Unknown';
         $firstName = explode(' ', $mname)[0];
         $_SESSION['pending_rebook'] = ['id' => $id, 'old_first_name' => $firstName];
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        if ($isAjax) {
+            echo json_encode(['ok' => false, 'redirect' => 'admin.php?rebook_pick_mechanic=1']);
+            exit;
+        }
         header('Location: admin.php?rebook_pick_mechanic=1');
         exit;
     }
     saveBackupIfSim($id);
     $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "', cancelled_at = NULL WHERE id = ?");
     $stmt->execute([$id]);
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    if ($isAjax) {
+        echo json_encode(['ok' => true, 'msg' => 'Appointment rebooked successfully.']);
+        exit;
+    }
     flashAndRedirect('Appointment rebooked successfully.');
 }
 
@@ -689,10 +708,15 @@ function handleFire(): never {
 
 function handleRestore(): never {
     $db = getDB();
-    $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+    $stmt = $db->prepare("SELECT name, nickname, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['restore']]);
     $m = $stmt->fetch();
     restoreMechanic((int)$_GET['restore']);
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    if ($isAjax) {
+        echo json_encode(['ok' => true, 'msg' => ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!', 'mechanic' => $m ? ['name' => $m['name'], 'nickname' => $m['nickname'] ?? '', 'quote' => $m['quote'] ?? '', 'specialties' => $m['specialties'] ?? '', 'experience' => (int)$m['experience'], 'bookings' => 0] : null]);
+        exit;
+    }
     flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has rejoined!');
 }
 
@@ -703,7 +727,7 @@ function handleRemoveMechanic(): never {
     $stmt->execute([(int)$_GET['remove_mechanic']]);
     $m = $stmt->fetch();
     removeMechanic((int)$_GET['remove_mechanic']);
-    flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been removed permanently.');
+    ajaxFlash(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' has been removed permanently.');
 }
 
 function handleUnblock(): never {
@@ -711,18 +735,27 @@ function handleUnblock(): never {
     $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
     $stmt->execute([(int)$_GET['unblock']]);
     $ok = $stmt->rowCount() > 0;
-    flashAndRedirect($ok ? 'Override removed.' : 'Override not found.', $ok ? 'success' : 'error');
+    ajaxFlash($ok ? 'Override removed.' : 'Override not found.', $ok ? 'success' : 'error');
 }
 
 function handleRemoveVacation(): never {
     guardAgainstSim();
-    removeMechanicVacation((int)$_GET['remove_vacation']);
+    $vacId = (int)$_GET['remove_vacation'];
+    $stmt = getDB()->prepare("SELECT mechanic_id, start_date, end_date FROM mechanic_vacations WHERE id = ?");
+    $stmt->execute([$vacId]);
+    $vac = $stmt->fetch();
+    removeMechanicVacation($vacId);
     $name = trim($_GET['mech_name'] ?? '');
-    $firstName = $name ? explode(' ', $name)[0] : '';
-    if ($firstName) {
-        flashAndRedirect(htmlspecialchars($firstName) . ' has been called back in early from vacation.');
+    $firstName = $name ? explode(' ', $name)[0] : $name;
+    if ($firstName && $vac) {
+        $today = getEffectiveTime()->format('Y-m-d');
+        if ($vac['start_date'] <= $today && $vac['end_date'] >= $today) {
+            ajaxFlash(htmlspecialchars($firstName) . ' has been called back in early from vacation.');
+        } else {
+            ajaxFlash(htmlspecialchars($firstName) . '\'s vacation has been cancelled.');
+        }
     } else {
-        flashAndRedirect('Vacation removed.');
+        ajaxFlash('Vacation removed.');
     }
 }
 
@@ -907,7 +940,8 @@ function handleUpdateSchedule(): never {
     if ($newHireName) {
         flashAndRedirect($newHireName . ' has been hired!');
     }
-    flashAndRedirect(htmlspecialchars($mechName) . "'s schedule has been updated.");
+    $savedBoth = !empty($_POST['_saved_both']);
+    flashAndRedirect(htmlspecialchars($mechName) . ($savedBoth ? "'s info and schedule have been updated." : "'s schedule has been updated."));
 }
 
 function handleAddVacation(): never {
@@ -917,10 +951,10 @@ function handleAddVacation(): never {
     $end = $_POST['vac_end'] ?? '';
     $reason = trim($_POST['vac_reason'] ?? '') ?: null;
     if (!preg_match(DATE_REGEX, $start) || !preg_match(DATE_REGEX, $end)) {
-        flashAndRedirect('Invalid date format.', 'error');
+        ajaxFlash('Invalid date format.', 'error');
     }
     if ($start < getEffectiveTime()->format('Y-m-d')) {
-        flashAndRedirect('Vacation cannot start in the past.', 'error');
+        ajaxFlash('Vacation cannot start in the past.', 'error');
     }
     $newHireName = trim($_POST['_new_hire_name'] ?? '');
     if ($mechId && $start && $end && $start <= $end) {
@@ -930,22 +964,30 @@ function handleAddVacation(): never {
             $sn = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
             $sn->execute([$mechId]);
             $nm = $sn->fetchColumn();
-            flashAndRedirect(($nm ? htmlspecialchars($nm) . ' is already on vacation during those dates. Try again!' : 'Overlapping vacation found.'), 'error');
+            ajaxFlash(($nm ? htmlspecialchars($nm) . ' is already on vacation during those dates. Try again!' : 'Overlapping vacation found.'), 'error');
         }
         addMechanicVacation($mechId, $start, $end, $reason);
+        $newVacId = (int)getDB()->lastInsertId();
         if ($newHireName) {
-            flashAndRedirect($newHireName . ' has been hired!');
+            ajaxFlash($newHireName . ' has been hired!');
         }
         $stmt = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
         $stmt->execute([$mechId]);
         $m = $stmt->fetch();
-        flashAndRedirect(($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . fmtDate($start) . ' to ' . fmtDate($end) . '.');
+        $msg = ($m ? htmlspecialchars($m['name']) : 'Mechanic') . ' is on vacation ' . fmtDate($start) . ' to ' . fmtDate($end) . '.';
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        if ($isAjax) {
+            echo json_encode(['ok' => true, 'msg' => $msg, 'vacation' => ['id' => $newVacId, 'start_date' => $start, 'end_date' => $end, 'reason' => $reason]]);
+            exit;
+        }
+        flashAndRedirect($msg);
     } else {
-        flashAndRedirect('Invalid vacation dates.', 'error');
+        ajaxFlash('Invalid vacation dates.', 'error');
     }
 }
 
 function handleOverrideSlot(): never {
+    guardAgainstSim();
     $db = getDB();
     $mechId = (int)($_POST['override_mechanic'] ?? 0);
     $date = $_POST['override_date'] ?? '';

@@ -57,6 +57,7 @@
     --pink: #d63384;
     --violet: #c22875;
     --dust: #dbc444;
+    --amber: #c07030;
     --pink-glow: rgba(214, 51, 132, 0.3);
     --gold: #f5c518;
     --burst: #e524e2;
@@ -1248,7 +1249,7 @@ tr:last-child td {
     border: 2px solid var(--ink);
     transform: rotate(-1deg);
 }
-.status-cancelled { background: #c07030; color: var(--gold); }
+.status-cancelled { background: var(--amber); color: var(--ink); }
 
 /* === SIM BAR === */
 
@@ -2494,7 +2495,6 @@ body.no-anim *::after {
 @media print {
     @page { margin: 1cm; }
     body { background: white; padding: 0; }
-    .no-print { display: none !important; }
     header, .container > :not(.receipt-carbon-stack),
     .omg, .receipt-button-row { display: none !important; }
     .receipt-carbon-stack { max-width: 500px; }

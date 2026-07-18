@@ -68,6 +68,7 @@
 
                     var div = document.createElement('div');
                     div.className = 'custom-select-option';
+                    div.dataset.value = opts[idx].value;
 
                     var l = document.createElement('span');
                     l.textContent = opts[idx].text;
