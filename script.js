@@ -1080,7 +1080,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     localStorage.removeItem('spotlight_disabled');
                 }
-                location.reload();
             });
         }
         /* Doodles toggle */
