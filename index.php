@@ -43,11 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!isSlotAvailable((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
             $errors[] = 'Sorry, that slot was just taken. Pick another slot or mechanic above.';
         } else {
-            createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
+            $apptId = createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
             $_SESSION['confirmed'] = [
                 'date' => $_POST['date'],
                 'slot_index' => (int)$_POST['slot_index'],
                 'mechanic_id' => (int)$_POST['mechanic_id'],
+                'appointment_id' => $apptId,
             ];
             header('Location: index.php?confirmed=1');
             exit;
@@ -66,6 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['confirmed'])) {
     $confirmed = $_SESSION['confirmed'] ?? null;
     unset($_SESSION['confirmed']);
+    $appt = null;
+    if ($confirmed && isset($confirmed['appointment_id'])) {
+        $appt = getAppointmentById((int)$confirmed['appointment_id']);
+    }
 }
 
 $selectedMechId = (int)($savedPost['mechanic_id'] ?? ($confirmed['mechanic_id'] ?? 0));
@@ -99,8 +104,68 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 
 <div class="container">
 
-<?php if ($confirmed): ?>
-<!-- === CONFIRMATION === -->
+<?php if ($confirmed && $appt): ?>
+<!-- === RECEIPT === -->
+<?php $letters = ['A', 'B', 'C', 'D']; $dispId = $letters[(int)$appt['slot_index']] . $appt['id']; ?>
+<div class="panel receipt-carbon-stack">
+    <div class="receipt-copy-layer receipt-blue-copy"></div>
+    <div class="receipt-order">
+        <img src="images/icons/pow.svg" alt="POW!" class="pow-burst">
+        <div class="receipt-stub-head">
+            MAYHEM MOBILITY
+        </div>
+        <div class="receipt-perf"><span>✂ &ndash; TEAR HERE &ndash; ✂</span></div>
+        <div class="receipt-meta">
+            <span>#<?= htmlspecialchars($dispId) ?></span>
+            <span><?= htmlspecialchars(fmtDate($appt['appointment_date'])) ?></span>
+            <span>Status: <strong style="color:var(--jade);"><?= htmlspecialchars(ucfirst($appt['status'])) ?></strong></span>
+        </div>
+        <div class="receipt-fields">
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Customer</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['client_name']) ?></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Phone</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['phone']) ?></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">License No</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['license_no']) ?></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Engine No</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['engine_no']) ?></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Vehicle</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['model']) ?></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Mechanic</span>
+                <span class="receipt-field-value"><?= htmlspecialchars($appt['mechanic_name']) ?> <span class="receipt-mech-nick">(<?= htmlspecialchars($appt['mechanic_nickname']) ?>)</span></span>
+            </div>
+            <div class="receipt-field-row">
+                <span class="receipt-field-label">Appointment</span>
+                <span class="receipt-field-value"><span class="receipt-highlight"><?= htmlspecialchars($SLOT_NAMES[(int)$appt['slot_index']] ?? '') ?></span> &middot; <?= htmlspecialchars($SLOT_LABELS[(int)$appt['slot_index']] ?? '') ?></span>
+            </div>
+        </div>
+        <div class="receipt-important">
+            <strong>⚠ IMPORTANT</strong><br>
+            Bring this order on arrival &bull; Present to service desk<br>
+            <span class="receipt-cb-indicator"><img src="images/icons/gear-check.svg" width="30" height="30" style="position:absolute;top:-10px;left:-10px;" alt="✓"></span> Appointment confirmed
+        </div>
+        <div class="receipt-footer">
+            Mayhem Mobility &bull; Auto Repair &bull; Downtown &bull; Est. 1947
+        </div>
+        <div class="receipt-button-row">
+            <button class="btn" onclick="window.print()">🖨 PRINT RECEIPT</button>
+            <a href="index.php" class="btn btn-pink">Book Another</a>
+        </div>
+    </div>
+</div>
+<?php elseif ($confirmed): ?>
+<!-- === CONFIRMATION (fallback) === -->
 <div class="panel confirm-box">
     <img src="images/icons/pow.svg" alt="POW!" class="pow-burst">
     <h2>APPOINTMENT CONFIRMED!</h2>

@@ -316,7 +316,7 @@ Phone fields (`.field-phone`) re-randomise their burst word on every invalid inp
 
 Fifteen icon SVGs in `images/doodles/` serve as themed UI embellishments across both pages (all hand-drawn — see §7.6):
 
-`gear.svg` (gear icon, rotates on hover), `eye-open.svg` / `eye-closed.svg` (password visibility toggle), `burst-vroom.svg` (admin section header VROOM burst), `hero-helmet.svg` (mechanic card badge), `hourglass.svg` (simulated time panel), `lightning.svg` (flash message accent), `oil-can.svg` (car form section icon), `spark-plug.svg` (engine/slot decoration), `speech-bubble-1.svg` / `speech-bubble-2.svg` / `speech-bubble-3.svg` (quote tooltip indicators), `stiletto.svg` (danger/destructive marker), `super-shield.svg` (confirmation/protection icon), `wonder-tiara.svg` (hero/reward accent), `wrench.svg` (mechanic icon), `magnifying-glass.svg` / `magnifying-glass-hover.svg` (search toggle states).
+`gear.svg`, `eye-open.svg`, `eye-closed.svg`, `burst-vroom.svg`, `hero-helmet.svg`, `hourglass.svg`, `lightning.svg`, `oil-can.svg`, `spark-plug.svg`, `speech-bubble-1.svg`, `speech-bubble-2.svg`, `speech-bubble-3.svg`, `stiletto.svg`, `super-shield.svg`, `wonder-tiara.svg`, `wrench.svg`, `magnifying-glass.svg`, `magnifying-glass-hover.svg`.
 
 These are secondary to the hand-drawn bursts but follow the same ethos: bespoke vector artwork, no stock assets, fully accessible.
 

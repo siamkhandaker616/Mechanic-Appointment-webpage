@@ -52,6 +52,11 @@ function getMechanicsForSelect(): array {
 function isSlotAvailable(int $mechanicId, string $date, int $slotIndex): bool {
     if ($slotIndex < 0 || $slotIndex >= SLOT_COUNT) return false;
     $db = getDB();
+
+    $stmt = $db->prepare("SELECT 1 FROM mechanics WHERE id = ? AND is_active = 1");
+    $stmt->execute([$mechanicId]);
+    if (!$stmt->fetchColumn()) return false;
+
     $dow = (int)date('w', strtotime($date));
 
     $stmt = $db->prepare("SELECT slot_1, slot_2, slot_3, slot_4 FROM mechanic_schedule WHERE mechanic_id = ? AND day_of_week = ?");
@@ -217,15 +222,26 @@ function getLastAppointmentByPhone(string $phone): ?array {
     return $row ?: null;
 }
 
-function findNextAvailableSlot(int $mechanicId, string $fromDate = ''): ?array {
+function findNextAvailableSlot(?int $mechanicId = null, string $fromDate = ''): ?array {
     if (!$fromDate) {
         $fromDate = date('Y-m-d', strtotime('+1 day'));
     }
+
+    $mechanicIds = [];
+    if ($mechanicId !== null) {
+        $mechanicIds[] = $mechanicId;
+    } else {
+        $mechs = getMechanics();
+        $mechanicIds = array_column($mechs, 'id');
+    }
+
     for ($i = 0; $i < 30; $i++) {
         $date = date('Y-m-d', strtotime($fromDate . " +{$i} days"));
-        for ($s = 0; $s < SLOT_COUNT; $s++) {
-            if (isSlotAvailable($mechanicId, $date, $s)) {
-                return ['date' => $date, 'slot' => $s];
+        foreach ($mechanicIds as $mid) {
+            for ($s = 0; $s < SLOT_COUNT; $s++) {
+                if (isSlotAvailable($mid, $date, $s)) {
+                    return ['date' => $date, 'slot' => $s, 'mechanic_id' => $mid];
+                }
             }
         }
     }
@@ -343,6 +359,24 @@ function getAppointments(?string $status = null): array {
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
+}
+
+function getAppointmentById(int $id): ?array {
+    $db = getDB();
+    $stmt = $db->prepare("
+        SELECT a.id, a.mechanic_id, a.appointment_date, a.slot_index, a.status, a.created_at,
+               c.name AS client_name, c.phone,
+               car.license_no, car.engine_no, car.model,
+               m.name AS mechanic_name, m.nickname AS mechanic_nickname
+        FROM appointments a
+        JOIN clients c ON c.id = a.client_id
+        JOIN cars car ON car.id = a.car_id
+        JOIN mechanics m ON m.id = a.mechanic_id
+        WHERE a.id = ?
+    ");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
 }
 
 function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?int $excludeAppointmentId = null): array {

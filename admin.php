@@ -3,10 +3,6 @@
 session_start();
 require_once __DIR__ . '/functions.php';
 
-$msg = '';
-$msgType = '';
-$conflictList = [];
-
 /* === AJAX PASSWORD VERIFICATION === */
 if (isset($_POST['verify_pw'])) {
     header('Content-Type: application/json');
@@ -163,7 +159,8 @@ $effectiveTime = getEffectiveTime();
              onmouseover="this.src='images/doodles/magnifying-glass-hover.svg'"
              onmouseout="this.src='images/doodles/magnifying-glass.svg'"
              onclick="openSearchModal()">
-    </span>
+    <span id="filter-cross" class="filter-cross" onclick="clearFilters()">&times;</span>
+</span>
     <div class="ov-scroll-x">
     <table id="appt-table">
         <thead>
@@ -555,7 +552,7 @@ $effectiveTime = getEffectiveTime();
         <button type="button" class="modal-close" onclick="document.getElementById('fire-modal').classList.add('hidden')">&times;</button>
         <div class="burst burst-left">FIRED!</div>
         <h2 class="modal-h2" id="fire-modal-title">Fire Mechanic?</h2>
-        <p class="modal-body-p" id="fire-modal-msg">They'll be retired and won't appear for new bookings.</p>
+        <p class="modal-body-p">They'll be retired and won't appear for new bookings.</p>
         <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;display:none;"></p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Fire</button>

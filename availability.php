@@ -19,6 +19,9 @@ if ($action === 'quickbook') {
     }
     $dayAfter = date('Y-m-d', strtotime($last['appointment_date'] . ' +1 day'));
     $nextAvail = findNextAvailableSlot((int)$last['mechanic_id'], $dayAfter);
+    if (!$nextAvail) {
+        $nextAvail = findNextAvailableSlot(null, $dayAfter);
+    }
     echo json_encode([
         'found' => true,
         'client' => [
@@ -104,7 +107,6 @@ if (!$mechanic) {
     exit;
 }
 
-global $SLOT_LABELS;
 $slotAvailability = getMechanicSlotsAvailability($mechanicId, $date);
 $slots = [];
 for ($i = 0; $i < SLOT_COUNT; $i++) {
