@@ -187,7 +187,8 @@ $effectiveTime = getEffectiveTime();
                 data-car="<?= htmlspecialchars(strtolower($a['license_no'] . ' ' . ($a['model'] ?? ''))) ?>"
                 data-status="<?= $a['status'] ?>"
                 data-mechanic="<?= htmlspecialchars(strtolower($a['mechanic_name'])) ?>"
-                data-date="<?= $a['appointment_date'] ?>">
+                data-date="<?= $a['appointment_date'] ?>"
+                data-slot="<?= (int)$a['slot_index'] ?>">
                 <td><strong><?= fmtNameTwoLines($a['client_name']) ?></strong></td>
                 <td class="td-nowrap"><?= htmlspecialchars($a['phone']) ?></td>
                 <td class="td-car"><?= htmlspecialchars($a['license_no']) ?><br><small><?= htmlspecialchars($a['model']) ?></small></td>
@@ -200,7 +201,7 @@ $effectiveTime = getEffectiveTime();
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>, this)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
-                    <button type="button" class="btn btn-sm btn-jade" onclick="requirePw('?rebook=<?= $a['id'] ?>', false)">Rebook</button>
+                    <button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, <?= $a['id'] ?>)">Rebook</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(<?= $a['id'] ?>)">Remove</button>
                     <?php else: ?>
                     <span style="display:block;text-align:center;font-size:0.8rem;color:#888;">—</span>
@@ -280,10 +281,10 @@ $effectiveTime = getEffectiveTime();
         </div>
         <div style="display:flex;gap:12px;justify-content:space-between;position:relative;">
             <div id="override-error" class="field-error" style="display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;white-space:nowrap;"></div>
-            <button type="submit" name="override_slot" class="btn btn-rust" onclick="return requirePwForForm(this.form)">Save Override</button>
             <?php if (!empty($overrides)): ?>
             <button type="button" class="btn btn-sm btn-outline" onclick="toggleOverrides()" id="overrides-toggle">Show All Blocks</button>
             <?php endif; ?>
+            <button type="submit" name="override_slot" class="btn btn-rust" onclick="return validateOverrideForm() && requirePwForForm(this.form)">Save Override</button>
         </div>
     </form>
 </div>
@@ -516,17 +517,17 @@ $effectiveTime = getEffectiveTime();
 
 <?php if (!empty($conflictList)): ?>
 <div class="modal-overlay" id="conflict-modal" onclick="closeConflictModal(event)">
-    <div class="modal-box" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()" style="max-width:480px;">
         <button type="button" class="modal-close" onclick="document.getElementById('conflict-modal').classList.add('hidden')">&times;</button>
-        <div class="burst burst-right" style="background:var(--pink);font-size:0.6rem;">BLOCKED!</div>
-        <h2>Cancel These First</h2>
-        <p>The following appointments occupy slots you tried to override:</p>
+        <div class="burst burst-left" style="font-size:0.6rem;">BLOCKED!</div>
+        <h2 class="modal-h2">Cancel These First</h2>
+        <p class="modal-body-p">The following appointments occupy slots you tried to override:</p>
         <ul style="margin:16px 0;padding-left:20px;">
             <?php foreach ($conflictList as $name): ?>
             <li style="margin-bottom:6px;"><?= $name ?></li>
             <?php endforeach; ?>
         </ul>
-        <p style="font-size:0.85rem;color:var(--pink);">Cancel them from the table below, then try again.</p>
+        <p style="font-size:0.85rem;">Cancel them from the table below, then try again.</p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('conflict-modal').classList.add('hidden')">Got it</button>
         </div>
@@ -608,6 +609,18 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
+<div class="modal-overlay hidden" id="action-fail-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+    <div class="modal-box msg-box msg-error">
+        <button type="button" class="modal-close" onclick="document.getElementById('action-fail-modal').classList.add('hidden')">&times;</button>
+        <div class="burst burst-left" style="background:var(--pink);">NOPE!</div>
+        <h2 style="margin-top:30px;" id="action-fail-heading">Can't Do That</h2>
+        <p class="modal-body-p" id="action-fail-msg"></p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('action-fail-modal').classList.add('hidden')">OK</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay hidden" id="unblock-modal" onclick="closeUnblockModal(event)">
     <div class="modal-box msg-box msg-error">
         <button type="button" class="modal-close" onclick="document.getElementById('unblock-modal').classList.add('hidden')">&times;</button>
@@ -656,6 +669,7 @@ $effectiveTime = getEffectiveTime();
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
     <div class="modal-box msg-box msg-<?= htmlspecialchars($msgType) ?>">
         <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
+        <?php if ($msgType === 'error'): ?><div class="burst burst-left">NOPE!</div><?php endif; ?>
         <div class="msg-content"><?= htmlspecialchars($msg) ?></div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
@@ -745,6 +759,8 @@ var EFFECTIVE_DATE = TODAY;
 var SCHEDULE_DATA = <?= json_encode($scheduleData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 var SIM_MODE_ACTIVE = <?= json_encode($useSim) ?>;
+var EFFECTIVE_TIME = '<?= getEffectiveTime()->format('Y-m-d H:i:s') ?>';
+var DAY_NAMES = <?= json_encode($GLOBALS['DAY_NAMES_FULL']) ?>;
 </script>
 <script src="script.js"></script>
 <script src="datepicker.js"></script>

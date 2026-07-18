@@ -734,6 +734,24 @@ function validateOverrideForm() {
     if (!date) { err.textContent = 'Select a date first.'; err.style.display = 'block'; return false; }
     if (date < TODAY) { err.textContent = 'Date cannot be in the past.'; err.style.display = 'block'; return false; }
     if (slots.length === 0) { err.textContent = 'Block at least one slot.'; err.style.display = 'block'; return false; }
+    var mechId = parseInt(mech);
+    var sched = SCHEDULE_DATA[mechId];
+    var dow = new Date(date + 'T00:00:00').getDay();
+    var mechName = document.querySelector('[name="override_mechanic"] option:checked').textContent;
+    if (sched && !sched[dow]) { document.getElementById('action-fail-heading').textContent = 'NOPE!'; document.getElementById('action-fail-msg').textContent = mechName + ' does not work on ' + DAY_NAMES[dow] + ' — no override needed.'; document.getElementById('action-fail-modal').classList.remove('hidden'); return false; }
+    var vacs = VACATION_DATA[mechId] || [];
+    for (var vi = 0; vi < vacs.length; vi++) {
+        if (date >= vacs[vi].start_date && date <= vacs[vi].end_date) { document.getElementById('action-fail-heading').textContent = 'NOPE!'; document.getElementById('action-fail-msg').textContent = mechName + ' is on vacation — no override needed.'; document.getElementById('action-fail-modal').classList.remove('hidden'); return false; }
+    }
+    if (sched && sched[dow]) {
+        var slotVals = [];
+        slots.forEach(function(cb) { slotVals.push(parseInt(cb.value)); });
+        var blocked = [];
+        for (var si = 0; si < slotVals.length; si++) {
+            if (!sched[dow][slotVals[si]]) blocked.push(slotVals[si] + 1);
+        }
+        if (blocked.length > 0) { document.getElementById('action-fail-heading').textContent = 'NOPE!'; document.getElementById('action-fail-msg').textContent = mechName + ' is not scheduled for slot(s) ' + blocked.join(', ') + ' on ' + DAY_NAMES[dow] + ' — cannot block them.'; document.getElementById('action-fail-modal').classList.remove('hidden'); return false; }
+    }
     err.style.display = 'none';
     return true;
 }
@@ -852,6 +870,15 @@ function addVacation() {
         return;
     }
     if (vacs.length >= 3) { document.getElementById('vac-limit-heading').textContent = 'Maximum Vacations Reached'; document.getElementById('vac-limit-msg').innerHTML = 'A mechanic can only have <strong>3 active vacations</strong> at a time. Let them actually work once in a while!'; document.getElementById('vac-limit-modal').classList.remove('hidden'); return; }
+    for (var vi = 0; vi < vacs.length; vi++) {
+        if (start <= vacs[vi].end_date && end >= vacs[vi].start_date) {
+            var mechName = document.getElementById('modal-mech-name') ? document.getElementById('modal-mech-name').value : 'This mechanic';
+            document.getElementById('vac-limit-heading').textContent = 'Whoa there!';
+            document.getElementById('vac-limit-msg').innerHTML = mechName + ' is already soaking up the sun that week — try different dates!';
+            document.getElementById('vac-limit-modal').classList.remove('hidden');
+            return;
+        }
+    }
     var reason = document.getElementById('vac-reason').value;
     var newHireName = window._newHireName || '';
     var f = document.createElement('form');
@@ -863,6 +890,28 @@ function addVacation() {
 }
 function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
 function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+
+function rebookCheck(btn, id) {
+    var date = btn.closest('tr').dataset.date;
+    var today = EFFECTIVE_TIME.split(' ')[0];
+    if (date < today) {
+        document.getElementById('action-fail-heading').textContent = 'Ghost!';
+        document.getElementById('action-fail-msg').textContent = 'Can\'t rebook a ghost — that date\'s already in the rearview.';
+        document.getElementById('action-fail-modal').classList.remove('hidden');
+        return;
+    }
+    if (date === today) {
+        var slot = parseInt(btn.closest('tr').dataset.slot);
+        var currentHour = parseInt(EFFECTIVE_TIME.split(' ')[1].split(':')[0]);
+        if (currentHour >= (slot + 5) * 2) {
+            document.getElementById('action-fail-heading').textContent = 'Too Slow';
+            document.getElementById('action-fail-msg').textContent = 'Too slow — that time slot already drove off without you.';
+            document.getElementById('action-fail-modal').classList.remove('hidden');
+            return;
+        }
+    }
+    requirePw('?rebook=' + id, false);
+}
 
 /* === QUICK BOOK === */
 

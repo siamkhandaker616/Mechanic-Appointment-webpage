@@ -924,6 +924,14 @@ function handleAddVacation(): never {
     }
     $newHireName = trim($_POST['_new_hire_name'] ?? '');
     if ($mechId && $start && $end && $start <= $end) {
+        $stmt = getDB()->prepare("SELECT id FROM mechanic_vacations WHERE mechanic_id = ? AND start_date <= ? AND end_date >= ?");
+        $stmt->execute([$mechId, $end, $start]);
+        if ($stmt->fetchColumn() > 0) {
+            $sn = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
+            $sn->execute([$mechId]);
+            $nm = $sn->fetchColumn();
+            flashAndRedirect(($nm ? htmlspecialchars($nm) . ' is already on vacation during those dates. Try again!' : 'Overlapping vacation found.'), 'error');
+        }
         addMechanicVacation($mechId, $start, $end, $reason);
         if ($newHireName) {
             flashAndRedirect($newHireName . ' has been hired!');
