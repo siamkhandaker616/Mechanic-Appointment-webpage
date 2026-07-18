@@ -1249,7 +1249,7 @@ tr:last-child td {
     border: 2px solid var(--ink);
     transform: rotate(-1deg);
 }
-.status-cancelled { background: var(--amber); color: var(--gold); }
+.status-cancelled { background: var(--amber); color: var(--ink); }
 
 /* === SIM BAR === */
 
@@ -2495,7 +2495,6 @@ body.no-anim *::after {
 @media print {
     @page { margin: 1cm; }
     body { background: white; padding: 0; }
-    .no-print { display: none !important; }
     header, .container > :not(.receipt-carbon-stack),
     .omg, .receipt-button-row { display: none !important; }
     .receipt-carbon-stack { max-width: 500px; }

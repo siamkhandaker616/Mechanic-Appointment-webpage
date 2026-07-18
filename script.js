@@ -396,6 +396,8 @@ function cancelUnsaved() {
 var _pendingAction = '';
 var _pendingForm = null;
 var _pendingCallback = null;
+var _origEditValues = null;
+var _hadUnsavedChanges = false;
 
 /* === STEPPER === */
 
@@ -1077,35 +1079,19 @@ function removeAppointmentAjax(id) {
     });
 }
 
-function removeAllCancelledAjax() {
-    ajaxGet('?remove_all_cancelled', function(d) {
+function removeAllByStatus(status) {
+    var url = '?remove_all_' + status;
+    var btnIds = { cancelled: 'clear-cancelled-btn', completed: 'archive-completed-btn' };
+    ajaxGet(url, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
-            var rows = document.querySelectorAll('#appt-table tbody tr[data-status="cancelled"]');
+            var rows = document.querySelectorAll('#appt-table tbody tr[data-status="' + status + '"]');
             rows.forEach(function(r) {
                 var editRow = r.nextElementSibling;
                 if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
                 r.remove();
             });
-            var btn = document.getElementById('clear-cancelled-btn');
-            if (btn) btn.style.display = 'none';
-        } else {
-            showModal(d.msg, 'error');
-        }
-    });
-}
-
-function removeAllCompletedAjax() {
-    ajaxGet('?remove_all_completed', function(d) {
-        if (d.ok) {
-            showModal(d.msg, 'success');
-            var rows = document.querySelectorAll('#appt-table tbody tr[data-status="completed"]');
-            rows.forEach(function(r) {
-                var editRow = r.nextElementSibling;
-                if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
-                r.remove();
-            });
-            var btn = document.getElementById('archive-completed-btn');
+            var btn = document.getElementById(btnIds[status]);
             if (btn) btn.style.display = 'none';
         } else {
             showModal(d.msg, 'error');
@@ -1125,37 +1111,6 @@ function unblockOverrideAjax(id) {
                 var toggle = document.getElementById('overrides-toggle');
                 if (toggle) { toggle.textContent = 'Show All Blocks'; }
             }
-        } else {
-            showModal(d.msg, 'error');
-        }
-    });
-}
-
-function fireMechanicAjax(id, name) {
-    ajaxGet('?fire=' + id, function(d) {
-        if (d.ok) {
-            showModal(d.msg, 'success');
-            var tr = document.querySelector('tr[data-mech-id="' + id + '"]');
-            if (tr) {
-                var tdStatus = tr.querySelectorAll('td')[4];
-                tdStatus.innerHTML = '<span class="status-badge status-cancelled">Inactive</span>';
-                var tdActions = tr.querySelectorAll('td')[5];
-                tdActions.innerHTML = '<a href="#" class="btn btn-sm btn-jade" onclick="rehireMechanic(' + id + ', \'' + htmlspecialchars(name) + '\', this);return false;">Rehire</a> <a href="#" class="btn btn-sm btn-rust" onclick="requirePw(function(){removeMechanicAjax(' + id + ')});return false;">Remove</a>';
-            }
-            var nameLower = name.toLowerCase();
-            var apptRows = document.querySelectorAll('#appt-table tbody tr[data-appt-id]');
-            apptRows.forEach(function(r) {
-                if ((r.dataset.mechanic || '').toLowerCase() === nameLower && r.dataset.status === 'scheduled') {
-                    var apptId = parseInt(r.dataset.apptId);
-                    var tdActions = r.querySelectorAll('td')[7];
-                    var tdBadge = r.querySelector('.status-badge');
-                    if (tdBadge) { tdBadge.className = 'status-badge status-cancelled'; tdBadge.textContent = 'cancelled'; }
-                    if (tdActions) {
-                        tdActions.innerHTML = '<button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, ' + apptId + ')">Rebook</button> <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(' + apptId + ')">Remove</button>';
-                    }
-                    r.dataset.status = 'cancelled';
-                }
-            });
         } else {
             showModal(d.msg, 'error');
         }
@@ -1334,8 +1289,6 @@ function lookupEditBooking() {
                     card.addEventListener('click', function() { openEditModal(a); });
                     list.appendChild(card);
                 });
-                var err2 = document.getElementById('eb-select-error');
-                if (err2) err2.style.display = 'none';
                 document.getElementById('eb-select-modal').classList.remove('hidden');
             }
         })

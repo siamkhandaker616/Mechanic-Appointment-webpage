@@ -237,10 +237,10 @@ $effectiveTime = getEffectiveTime();
     <?php if ($cancelledCount > 0 || $completedCount > 0): ?>
     <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
         <?php if ($cancelledCount > 0): ?>
-        <a href="#" class="btn btn-sm btn-rust" id="clear-cancelled-btn" onclick="requirePw(function(){removeAllCancelledAjax()});return false;">Clear Cancelled</a>
+        <a href="#" class="btn btn-sm btn-rust" id="clear-cancelled-btn" onclick="requirePw(function(){removeAllByStatus('cancelled')});return false;">Clear Cancelled</a>
         <?php endif; ?>
         <?php if ($completedCount > 0): ?>
-        <a href="#" class="btn btn-sm btn-jade" id="archive-completed-btn" onclick="requirePw(function(){removeAllCompletedAjax()});return false;">Archive Completed</a>
+        <a href="#" class="btn btn-sm btn-jade" id="archive-completed-btn" onclick="requirePw(function(){removeAllByStatus('completed')});return false;">Archive Completed</a>
         <?php endif; ?>
     </div>
     <?php endif; ?>
@@ -512,7 +512,7 @@ $effectiveTime = getEffectiveTime();
                 </tbody>
             </table>
             <div style="display:flex;gap:12px;margin-top:16px;justify-content:flex-end;">
-                <button type="button" name="update_schedule" class="btn btn-sm" onclick="saveScheduleCheck()">Save Schedule</button>
+                <button type="button" class="btn btn-sm" onclick="saveScheduleCheck()">Save Schedule</button>
                 <button type="button" class="btn btn-sm btn-rust" onclick="document.getElementById('schedule-modal').classList.add('hidden');document.getElementById('mech-modal').classList.remove('hidden')">Cancel</button>
             </div>
         </form>
