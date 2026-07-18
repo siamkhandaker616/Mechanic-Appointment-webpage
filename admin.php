@@ -182,6 +182,7 @@ $effectiveTime = getEffectiveTime();
             <?php $aRowNum = 0; ?>
             <?php foreach ($appointments as $a): $aRowNum++; ?>
             <tr class="<?= $aRowNum % 2 === 0 ? 'stripe-even' : '' ?>"
+                data-appt-id="<?= (int)$a['id'] ?>"
                 data-name="<?= htmlspecialchars(strtolower($a['client_name'])) ?>"
                 data-phone="<?= htmlspecialchars($a['phone']) ?>"
                 data-car="<?= htmlspecialchars(strtolower($a['license_no'] . ' ' . ($a['model'] ?? ''))) ?>"
@@ -236,10 +237,10 @@ $effectiveTime = getEffectiveTime();
     <?php if ($cancelledCount > 0 || $completedCount > 0): ?>
     <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
         <?php if ($cancelledCount > 0): ?>
-        <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_all_cancelled');return false;">Clear Cancelled</a>
+        <a href="#" class="btn btn-sm btn-rust" id="clear-cancelled-btn" onclick="requirePw(function(){removeAllCancelledAjax()});return false;">Clear Cancelled</a>
         <?php endif; ?>
         <?php if ($completedCount > 0): ?>
-        <a href="#" class="btn btn-sm btn-jade" onclick="requirePw('?remove_all_completed');return false;">Archive Completed</a>
+        <a href="#" class="btn btn-sm btn-jade" id="archive-completed-btn" onclick="requirePw(function(){removeAllCompletedAjax()});return false;">Archive Completed</a>
         <?php endif; ?>
     </div>
     <?php endif; ?>
@@ -316,7 +317,7 @@ $effectiveTime = getEffectiveTime();
                     }
                 }
             ?>
-            <tr class="<?= $oRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
+            <tr class="<?= $oRowNum % 2 === 0 ? 'stripe-even' : '' ?>" data-override-id="<?= (int)$o['id'] ?>">
                 <td><strong><?= fmtNameTwoLines($o['mechanic_name']) ?></strong></td>
                 <td><?= htmlspecialchars(fmtDate($o['override_date'])) ?></td>
                 <td style="font-size:0.85rem;"><?= $blocked ? implode('<br>', $blocked) : '<em>none</em>' ?></td>
@@ -354,7 +355,7 @@ $effectiveTime = getEffectiveTime();
             <?php $_cancelCountStmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND status = 'scheduled'"); ?>
             <?php foreach ($allMechanics as $m): $mRowNum++; ?>
             <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], date('Y-m-d')); ?>
-            <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>">
+            <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>" data-mech-id="<?= $m['id'] ?>">
                 <td><strong><?= fmtNameTwoLines($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($m['specialties'] ?? '—') ?></td>
@@ -372,8 +373,8 @@ $effectiveTime = getEffectiveTime();
                     <?php $_cancelCountStmt->execute([$m['id']]); $_cc = (int)$_cancelCountStmt->fetchColumn(); ?>
                     <button type="button" class="btn btn-sm btn-rust" data-bookings="<?= $_cc ?>" onclick="showFireModal(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', this.dataset.bookings)">Fire</button>
                     <?php else: ?>
-                    <a href="?restore=<?= $m['id'] ?>" class="btn btn-sm btn-jade">Rehire</a>
-                    <a href="#" class="btn btn-sm btn-rust" onclick="requirePw('?remove_mechanic=<?= $m['id'] ?>');return false;">Remove</a>
+                    <button type="button" class="btn btn-sm btn-jade" onclick="rehireMechanic(<?= $m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>', this)">Rehire</button>
+                    <a href="#" class="btn btn-sm btn-rust" onclick="requirePw(function(){removeMechanicAjax(<?= $m['id'] ?>)});return false;">Remove</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -418,7 +419,8 @@ $effectiveTime = getEffectiveTime();
             <div class="flex-1">
                 <form method="post" id="mech-modal-form" onsubmit="return checkSimGuard()">
                     <input type="hidden" name="mech_id" id="modal-mech-id">
-                    <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
+            <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
+            <input type="hidden" name="update_schedule" value="1">
                     <div style="display:flex;gap:12px;">
                         <div class="form-group">
                             <label>Name</label>
@@ -485,6 +487,8 @@ $effectiveTime = getEffectiveTime();
             <input type="hidden" name="mech_specialties" id="sched-mech-specialties">
             <input type="hidden" name="mech_years" id="sched-mech-years">
             <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
+            <input type="hidden" name="update_schedule" value="1">
+            <input type="hidden" name="_saved_both" id="sched-saved-both" value="">
             <table style="font-size:0.8rem;">
                 <thead>
                     <tr>
@@ -508,10 +512,22 @@ $effectiveTime = getEffectiveTime();
                 </tbody>
             </table>
             <div style="display:flex;gap:12px;margin-top:16px;justify-content:flex-end;">
-                <button type="submit" name="update_schedule" class="btn btn-sm">Save Schedule</button>
-                <button type="button" class="btn btn-sm btn-rust" onclick="document.getElementById('schedule-modal').classList.add('hidden')">Cancel</button>
+                <button type="button" name="update_schedule" class="btn btn-sm" onclick="saveScheduleCheck()">Save Schedule</button>
+                <button type="button" class="btn btn-sm btn-rust" onclick="document.getElementById('schedule-modal').classList.add('hidden');document.getElementById('mech-modal').classList.remove('hidden')">Cancel</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="schedule-confirm-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+    <div class="modal-box" style="background:var(--amber);max-width:420px;">
+        <button type="button" class="modal-close" onclick="document.getElementById('schedule-confirm-modal').classList.add('hidden')">&times;</button>
+        <h2 class="modal-h2">Unsaved Changes</h2>
+        <p class="modal-body-p">You have unsaved changes to this mechanic's info. What would you like to do?</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-jade" onclick="submitScheduleForm(false)">Save Both</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="submitScheduleForm(true)">Just Schedule</button>
+        </div>
     </div>
 </div>
 
@@ -542,7 +558,7 @@ $effectiveTime = getEffectiveTime();
         <h2 class="modal-h2">Cancel Appointment ?</h2>
         <p class="modal-body-p">This can't be undone. Are you sure?</p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Cancel</button>
+            <button type="button" class="btn btn-sm btn-rust" id="cancel-confirm-btn">Yes, Cancel</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
@@ -556,7 +572,7 @@ $effectiveTime = getEffectiveTime();
         <p class="modal-body-p">They'll be retired and won't appear for new bookings.</p>
         <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;display:none;"></p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction, false)">Yes, Fire</button>
+            <button type="button" class="btn btn-sm btn-rust" onclick="document.getElementById('fire-modal').classList.add('hidden');requirePw(_pendingAction, false)">Yes, Fire</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fire-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
@@ -603,7 +619,7 @@ $effectiveTime = getEffectiveTime();
         <h2 class="modal-h2">Remove Appointment?</h2>
         <p class="modal-body-p">This permanently deletes the record. Are you sure?</p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Remove</button>
+            <button type="button" class="btn btn-sm btn-rust" id="remove-confirm-btn">Yes, Remove</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('remove-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
@@ -628,7 +644,7 @@ $effectiveTime = getEffectiveTime();
         <h2 class="modal-h2">Remove Override?</h2>
         <p class="modal-body-p" id="unblock-msg">This will unblock the slots for this date.</p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-rust" onclick="requirePw(_pendingAction)">Yes, Unblock</button>
+            <button type="button" class="btn btn-sm btn-rust" id="unblock-confirm-btn">Yes, Unblock</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('unblock-modal').classList.add('hidden')">Forget it</button>
         </div>
     </div>
@@ -665,19 +681,16 @@ $effectiveTime = getEffectiveTime();
     </div>
 </div>
 
-<?php if ($msg): ?>
-<div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
-    <div class="modal-box msg-box msg-<?= htmlspecialchars($msgType) ?>">
+<div class="modal-overlay hidden" id="msg-modal" onclick="closeMsgModal(event)">
+    <div class="modal-box msg-box msg-success">
         <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
-        <?php if ($msgType === 'error'): ?><div class="burst burst-left">NOPE!</div><?php endif; ?>
-        <div class="msg-content"><?= htmlspecialchars($msg) ?></div>
+        <div class="burst burst-left hidden" id="msg-modal-burst">NOPE!</div>
+        <div class="msg-content" id="msg-modal-content"></div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
         </div>
     </div>
 </div>
-<?php endif; ?>
-
 <div class="modal-overlay hidden" id="search-modal" onclick="closeSearchModal(event)">
     <div class="modal-box" style="max-width:580px;" onclick="event.stopPropagation()">
         <button type="button" class="modal-close" onclick="closeSearchModal()">&times;</button>
@@ -764,5 +777,6 @@ var DAY_NAMES = <?= json_encode($GLOBALS['DAY_NAMES_FULL']) ?>;
 </script>
 <script src="script.js"></script>
 <script src="datepicker.js"></script>
+<?php if ($msg): ?><script>showModal(<?= json_encode($msg) ?>, <?= json_encode($msgType) ?>);</script><?php endif; ?>
 </body>
 </html>

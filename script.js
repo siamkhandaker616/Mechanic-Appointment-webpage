@@ -395,6 +395,7 @@ function cancelUnsaved() {
 
 var _pendingAction = '';
 var _pendingForm = null;
+var _pendingCallback = null;
 
 /* === STEPPER === */
 
@@ -531,9 +532,14 @@ function closeSimBlockModal(event) {
         document.getElementById('sim-block-modal').classList.add('hidden');
     }
 }
-function requirePw(actionUrl, guardSim) {
+function requirePw(actionOrCallback, guardSim) {
     if (guardSim !== false && !checkSimGuard()) return;
-    _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; _pendingNewTab = false; openPwModal();
+    if (typeof actionOrCallback === 'function') {
+        _pendingCallback = actionOrCallback; _pendingAction = ''; _pendingForm = null; _pendingField = null; _pendingNewTab = false;
+    } else {
+        _pendingAction = actionOrCallback; _pendingForm = null; _pendingField = null; _pendingNewTab = false; _pendingCallback = null;
+    }
+    openPwModal();
 }
 function requirePwNewTab(actionUrl) {
     _pendingAction = actionUrl; _pendingForm = null; _pendingField = null; _pendingNewTab = true; openPwModal();
@@ -588,6 +594,9 @@ function confirmPw() {
                     : _pendingField;
                 if (tgt) tgt.focus();
                 _pendingField = null;
+            } else if (_pendingCallback) {
+                _pendingCallback();
+                _pendingCallback = null;
             } else if (_pendingAction) {
                 if (_pendingNewTab) {
                     window.open(_pendingAction, '_blank');
@@ -622,7 +631,7 @@ function confirmPw() {
 }
 function closePwModal() {
     document.getElementById('pw-modal').classList.add('hidden');
-    _pendingAction = ''; _pendingForm = null; _pendingField = null; _pendingNewTab = false;
+    _pendingAction = ''; _pendingForm = null; _pendingField = null; _pendingNewTab = false; _pendingCallback = null;
 }
 
 /* === TOGGLES === */
@@ -659,6 +668,7 @@ function openMechModal(btn) {
     });
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
+    _origEditValues = { name: btn.dataset.mname, nickname: btn.dataset.mnick, quote: btn.dataset.mquote, specialties: btn.dataset.mspec, experience: btn.dataset.experience };
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function openMechModalById(id, name, nickname, quote, specialties, experience) {
@@ -679,6 +689,7 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
     });
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
+    _origEditValues = { name: name, nickname: nickname, quote: quote, specialties: specialties, experience: String(experience) };
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function closeMechModal(event) {
@@ -697,8 +708,17 @@ function closeMechModal(event) {
 }
 /* === SCHEDULE MODAL === */
 
+function hasUnsavedEditChanges() {
+    return _origEditValues && (document.getElementById('modal-mech-name').value !== _origEditValues.name
+        || document.getElementById('modal-mech-nickname').value !== _origEditValues.nickname
+        || document.getElementById('modal-mech-quote').value !== _origEditValues.quote
+        || document.getElementById('modal-mech-specialties').value !== _origEditValues.specialties
+        || document.getElementById('modal-mech-exp').value !== _origEditValues.experience);
+}
 function openScheduleModal(id, name) {
     if (!checkSimGuard()) return;
+    _hadUnsavedChanges = hasUnsavedEditChanges();
+    document.getElementById('mech-modal').classList.add('hidden');
     document.getElementById('schedule-mech-id').value = id;
     document.getElementById('schedule-mech-name').textContent = 'Schedule — ' + name;
     document.getElementById('sched-mech-name').value = document.getElementById('modal-mech-name').value;
@@ -712,6 +732,27 @@ function openScheduleModal(id, name) {
     cbs.forEach(function(cb) { var dow = parseInt(cb.dataset.dow); var slot = parseInt(cb.dataset.slot); if (sched[dow] && sched[dow][slot]) cb.checked = true; });
     document.getElementById('schedule-modal').classList.remove('hidden');
 }
+function saveScheduleCheck() {
+    if (!checkSimGuard()) return;
+    if (_hadUnsavedChanges) {
+        document.getElementById('schedule-confirm-modal').classList.remove('hidden');
+    } else {
+        document.getElementById('schedule-form').submit();
+    }
+}
+function submitScheduleForm(useOriginal) {
+    if (!checkSimGuard()) return;
+    document.getElementById('schedule-confirm-modal').classList.add('hidden');
+    document.getElementById('sched-saved-both').value = useOriginal ? '' : '1';
+    if (useOriginal && _origEditValues) {
+        document.getElementById('sched-mech-name').value = _origEditValues.name;
+        document.getElementById('sched-mech-nickname').value = _origEditValues.nickname;
+        document.getElementById('sched-mech-quote').value = _origEditValues.quote;
+        document.getElementById('sched-mech-specialties').value = _origEditValues.specialties;
+        document.getElementById('sched-mech-years').value = _origEditValues.experience;
+    }
+    document.getElementById('schedule-form').submit();
+}
 function toggleUpdateApptBtn(el) {
     var form = el.closest('form');
     var btn = form.querySelector('[name="update_appointment"]');
@@ -724,7 +765,7 @@ function toggleUpdateApptBtn(el) {
     btn.disabled = !changed;
     btn.classList.toggle('disabled', !changed);
 }
-function closeScheduleModal(event) { if (event.target === event.currentTarget) document.getElementById('schedule-modal').classList.add('hidden'); }
+function closeScheduleModal(event) { if (event.target === event.currentTarget) { document.getElementById('schedule-modal').classList.add('hidden'); document.getElementById('mech-modal').classList.remove('hidden'); } }
 function validateOverrideForm() {
     var err = document.getElementById('override-error');
     var mech = document.querySelector('[name="override_mechanic"]').value;
@@ -788,16 +829,22 @@ function showBurstOver(el) {
 
 /* === CONFIRMATION MODALS === */
 
-function showCancelModal(id) { _pendingAction = '?cancel=' + id; document.getElementById('cancel-modal').classList.remove('hidden'); }
+function showCancelModal(id) {
+    document.getElementById('cancel-modal').classList.remove('hidden');
+    document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); requirePw(function(){ cancelAppointmentAjax(id); }, false); };
+}
 function closeCancelModal(event) { if (event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
 function showFireModal(id, name, count) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; var el = document.getElementById('fire-modal-cancel-count'); if (count > 0) { el.textContent = count + ' booking' + (count > 1 ? 's' : '') + ' will be cancelled.'; el.style.display = 'block'; } else { el.style.display = 'none'; } document.getElementById('fire-modal').classList.remove('hidden'); }
 function closeFireModal(event) { if (event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
-function showRemoveModal(id) { _pendingAction = '?remove=' + id; document.getElementById('remove-modal').classList.remove('hidden'); }
+function showRemoveModal(id) {
+    document.getElementById('remove-modal').classList.remove('hidden');
+    document.getElementById('remove-confirm-btn').onclick = function() { document.getElementById('remove-modal').classList.add('hidden'); requirePw(function(){ removeAppointmentAjax(id); }); };
+}
 function closeRemoveModal(event) { if (event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
 function showUnblockModal(id, name, date) {
-    _pendingAction = '?unblock=' + id;
     document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
     document.getElementById('unblock-modal').classList.remove('hidden');
+    document.getElementById('unblock-confirm-btn').onclick = function() { document.getElementById('unblock-modal').classList.add('hidden'); requirePw(function(){ unblockOverrideAjax(id); }); };
 }
 function closeUnblockModal(event) { if (event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
 /* === VACATIONS === */
@@ -815,7 +862,7 @@ function renderVacations(id, mechName) {
             if (v.reason) label += ' (' + htmlspecialchars(v.reason) + ')';
             html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:4px 8px;background:var(--cyan);border:2px solid var(--ink);font-size:0.8rem;">';
             html += '<span style="flex:1;">' + label + '</span>';
-            html += '<a href="?remove_vacation=' + v.id + '&mech_name=' + encodeURIComponent(mechName || '') + '" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;" onclick="return checkSimGuard()">End</a>';
+            html += '<button type="button" class="btn btn-sm btn-rust" style="font-size:0.65rem;padding:2px 8px;" data-vac-id="' + v.id + '" data-mech-name="' + htmlspecialchars(mechName || '') + '" onclick="removeVacation(this)">End</button>';
             html += '</div>';
         });
         list.innerHTML = html;
@@ -880,16 +927,248 @@ function addVacation() {
         }
     }
     var reason = document.getElementById('vac-reason').value;
-    var newHireName = window._newHireName || '';
-    var f = document.createElement('form');
-    f.method = 'POST';
-    f.style.display = 'none';
-    f.innerHTML = '<input name="add_vacation" value="1"><input name="vac_mech_id" value="' + htmlspecialchars(id) + '"><input name="vac_start" value="' + htmlspecialchars(start) + '"><input name="vac_end" value="' + htmlspecialchars(end) + '"><input name="vac_reason" value="' + htmlspecialchars(reason) + '">' + (newHireName ? '<input name="_new_hire_name" value="' + htmlspecialchars(newHireName) + '">' : '');
-    document.body.appendChild(f);
-    f.submit();
+    var fd = new FormData();
+    fd.set('add_vacation', '1');
+    fd.set('vac_mech_id', id);
+    fd.set('vac_start', start);
+    fd.set('vac_end', end);
+    fd.set('vac_reason', reason);
+    if (window._newHireName) fd.set('_new_hire_name', window._newHireName);
+    fetch('', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.ok) {
+                VACATION_DATA[id] = VACATION_DATA[id] || [];
+                var vac = d.vacation || { id: Date.now(), start_date: start, end_date: end, reason: reason || null };
+                VACATION_DATA[id].push(vac);
+                VACATION_DATA[id].sort(function(a, b) { return a.start_date < b.start_date ? -1 : 1; });
+                renderVacations(parseInt(id), document.getElementById('modal-mech-name').value);
+                ['vac-start', 'vac-end'].forEach(function(x) {
+                    var p = DatePicker.instances.find(function(p) { return p.input.id === x; });
+                    if (p) p.clear(); else document.getElementById(x).value = '';
+                });
+                document.getElementById('vac-reason').value = '';
+                showModal(d.msg, 'success');
+            } else {
+                showModal(d.msg, 'error');
+            }
+        })
+        .catch(function() { showModal('Could not reach server.', 'error'); });
 }
 function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
 function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+
+/* === AJAX ACTIONS === */
+
+function ajaxGet(url, cb) {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (cb) cb(d); })
+        .catch(function() { showModal('Could not reach server.', 'error'); });
+}
+
+function removeVacation(btn) {
+    if (!checkSimGuard()) return;
+    var id = parseInt(btn.dataset.vacId);
+    var mechName = btn.dataset.mechName;
+    ajaxGet('?remove_vacation=' + id + '&mech_name=' + encodeURIComponent(mechName || ''), function(d) {
+        if (d.ok) {
+            var mechId = parseInt(document.getElementById('modal-mech-id').value);
+            var vacs = VACATION_DATA[mechId] || [];
+            for (var i = 0; i < vacs.length; i++) {
+                if (vacs[i].id == id) { vacs.splice(i, 1); break; }
+            }
+            renderVacations(mechId, document.getElementById('modal-mech-name').value);
+            var mechRow = document.querySelector('tr[data-mech-id="' + mechId + '"]');
+            if (mechRow) {
+                var statusCell = mechRow.querySelectorAll('td')[4];
+                if (statusCell && statusCell.textContent.trim() === 'On Leave') {
+                    var stillOnLeave = false;
+                    var today = EFFECTIVE_DATE;
+                    var remaining = VACATION_DATA[mechId] || [];
+                    for (var j = 0; j < remaining.length; j++) {
+                        if (remaining[j].start_date <= today && remaining[j].end_date >= today) {
+                            stillOnLeave = true;
+                            break;
+                        }
+                    }
+                    if (!stillOnLeave) {
+                        statusCell.innerHTML = '<span class="status-badge status-scheduled">Active</span>';
+                    }
+                }
+            }
+            showModal(d.msg, 'success');
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function rehireMechanic(id, name, el) {
+    ajaxGet('?restore=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = el.closest('tr');
+            if (!tr) return;
+            tr.dataset.mechId = id;
+            var tdStatus = tr.querySelectorAll('td')[4];
+            var onLeave = false;
+            var today = EFFECTIVE_DATE;
+            var vacs = VACATION_DATA[id] || [];
+            for (var j = 0; j < vacs.length; j++) {
+                if (vacs[j].start_date <= today && vacs[j].end_date >= today) { onLeave = true; break; }
+            }
+            tdStatus.innerHTML = onLeave ? '<span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>' : '<span class="status-badge status-scheduled">Active</span>';
+            var tdActions = tr.querySelectorAll('td')[5];
+            var booked = d.mechanic ? d.mechanic.bookings : 0;
+            var m = d.mechanic || {};
+            tdActions.innerHTML =
+                '<button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="' + id + '" data-mname="' + htmlspecialchars(m.name || name) + '" data-mnick="' + htmlspecialchars(m.nickname || '') + '" data-mquote="' + htmlspecialchars(m.quote || '') + '" data-mspec="' + htmlspecialchars(m.specialties || '') + '" data-experience="' + m.experience + '">Edit</button> '
+                + '<button type="button" class="btn btn-sm btn-rust" data-bookings="' + booked + '" onclick="showFireModal(' + id + ', \'' + htmlspecialchars(name) + '\', this.dataset.bookings)">Fire</button>';
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function removeMechanicAjax(id) {
+    ajaxGet('?remove_mechanic=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('tr[data-mech-id="' + id + '"]');
+            if (tr) tr.remove();
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function cancelAppointmentAjax(id) {
+    ajaxGet('?cancel=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
+            if (tr) {
+                var tdActions = tr.querySelectorAll('td')[7];
+                tdActions.innerHTML = '<button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, ' + id + ')">Rebook</button> <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(' + id + ')">Remove</button>';
+                var tdStatus = tr.querySelector('.status-badge');
+                if (tdStatus) { tdStatus.className = 'status-badge status-cancelled'; tdStatus.textContent = 'cancelled'; }
+                tr.dataset.status = 'cancelled';
+            }
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function removeAppointmentAjax(id) {
+    ajaxGet('?remove=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
+            if (tr) {
+                var editRow = tr.nextElementSibling;
+                if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
+                tr.remove();
+            }
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function removeAllCancelledAjax() {
+    ajaxGet('?remove_all_cancelled', function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var rows = document.querySelectorAll('#appt-table tbody tr[data-status="cancelled"]');
+            rows.forEach(function(r) {
+                var editRow = r.nextElementSibling;
+                if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
+                r.remove();
+            });
+            var btn = document.getElementById('clear-cancelled-btn');
+            if (btn) btn.style.display = 'none';
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function removeAllCompletedAjax() {
+    ajaxGet('?remove_all_completed', function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var rows = document.querySelectorAll('#appt-table tbody tr[data-status="completed"]');
+            rows.forEach(function(r) {
+                var editRow = r.nextElementSibling;
+                if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
+                r.remove();
+            });
+            var btn = document.getElementById('archive-completed-btn');
+            if (btn) btn.style.display = 'none';
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function unblockOverrideAjax(id) {
+    ajaxGet('?unblock=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('#overrides-panel table tbody tr[data-override-id="' + id + '"]');
+            if (tr) tr.remove();
+            var remaining = document.querySelectorAll('#overrides-panel table tbody tr').length;
+            if (remaining === 0) {
+                document.getElementById('overrides-panel').style.display = 'none';
+                var toggle = document.getElementById('overrides-toggle');
+                if (toggle) { toggle.textContent = 'Show All Blocks'; }
+            }
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function fireMechanicAjax(id, name) {
+    ajaxGet('?fire=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('tr[data-mech-id="' + id + '"]');
+            if (tr) {
+                var tdStatus = tr.querySelectorAll('td')[4];
+                tdStatus.innerHTML = '<span class="status-badge status-cancelled">Inactive</span>';
+                var tdActions = tr.querySelectorAll('td')[5];
+                tdActions.innerHTML = '<a href="#" class="btn btn-sm btn-jade" onclick="rehireMechanic(' + id + ', \'' + htmlspecialchars(name) + '\', this);return false;">Rehire</a> <a href="#" class="btn btn-sm btn-rust" onclick="requirePw(function(){removeMechanicAjax(' + id + ')});return false;">Remove</a>';
+            }
+            var nameLower = name.toLowerCase();
+            var apptRows = document.querySelectorAll('#appt-table tbody tr[data-appt-id]');
+            apptRows.forEach(function(r) {
+                if ((r.dataset.mechanic || '').toLowerCase() === nameLower && r.dataset.status === 'scheduled') {
+                    var apptId = parseInt(r.dataset.apptId);
+                    var tdActions = r.querySelectorAll('td')[7];
+                    var tdBadge = r.querySelector('.status-badge');
+                    if (tdBadge) { tdBadge.className = 'status-badge status-cancelled'; tdBadge.textContent = 'cancelled'; }
+                    if (tdActions) {
+                        tdActions.innerHTML = '<button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, ' + apptId + ')">Rebook</button> <button type="button" class="btn btn-sm btn-rust" onclick="showRemoveModal(' + apptId + ')">Remove</button>';
+                    }
+                    r.dataset.status = 'cancelled';
+                }
+            });
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function showModal(msg, type) {
+    var m = document.getElementById('msg-modal');
+    m.querySelector('.modal-box').className = 'modal-box msg-box msg-' + type;
+    document.getElementById('msg-modal-burst').style.display = type === 'error' ? '' : 'none';
+    document.getElementById('msg-modal-content').textContent = msg;
+    m.classList.remove('hidden');
+}
 
 function rebookCheck(btn, id) {
     var date = btn.closest('tr').dataset.date;
@@ -910,7 +1189,35 @@ function rebookCheck(btn, id) {
             return;
         }
     }
-    requirePw('?rebook=' + id, false);
+    requirePw(function() { rebookAppointmentAjax(id); }, false);
+}
+
+function rebookAppointmentAjax(id) {
+    ajaxGet('?rebook=' + id, function(d) {
+        if (d.redirect) {
+            window.location.href = d.redirect;
+        } else if (d.ok) {
+            updateApptRowScheduled(id);
+            showModal(d.msg, 'success');
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function updateApptRowScheduled(id) {
+    var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
+    if (!tr) return;
+    tr.dataset.status = 'scheduled';
+    var tdBadge = tr.querySelector('.status-badge');
+    if (tdBadge) {
+        tdBadge.className = 'status-badge status-scheduled';
+        tdBadge.textContent = 'scheduled';
+    }
+    var tdActions = tr.querySelectorAll('td')[7];
+    if (tdActions) {
+        tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
+    }
 }
 
 /* === QUICK BOOK === */
