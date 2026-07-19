@@ -1341,6 +1341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     localStorage.removeItem('spotlight_disabled');
                 }
+                if (window.setSpotlightDisabled) window.setSpotlightDisabled(this.checked);
             });
         }
         /* Doodles toggle */
@@ -1404,6 +1405,122 @@ document.addEventListener('DOMContentLoaded', function() {
                 dropdown.classList.add('hidden');
             }
         });
+    }
+
+    /* === Display Tuning Overlay (runs on every page) === */
+    var displayOverlay = document.getElementById('display-overlay');
+    var displayTuningSat = 1;
+    var displayTuningTemp = 0;
+    if (displayOverlay) {
+        function displayTempColor(t) {
+            if (t >= 0) { var f = t / 100; return [150 * f, 100 * f, 0, 0.08 * f]; }
+            else        { var f = -t / 100; return [0, 50 * f, 150 * f, 0.08 * f]; }
+        }
+        function displayUpdateOverlay(sat, temp) {
+            if (sat == 1 && temp == 0) { displayOverlay.style.display = 'none'; return; }
+            var c = displayTempColor(temp);
+            displayOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;' +
+                'pointer-events:none;z-index:999999;' +
+                'backdrop-filter:saturate(' + sat + ');' +
+                'background-color:rgba(' + c.join(',') + ');display:"";';
+        }
+        function displayLoadOverlay() {
+            var saved;
+            try { saved = JSON.parse(localStorage.getItem('displayTuning')); } catch(e) {}
+            if (saved && typeof saved.sat != 'undefined' && typeof saved.temp != 'undefined') {
+                displayTuningSat = parseFloat(saved.sat);
+                displayTuningTemp = parseInt(saved.temp);
+                displayUpdateOverlay(displayTuningSat, displayTuningTemp);
+            } else {
+                displayOverlay.style.display = 'none';
+            }
+        }
+        displayLoadOverlay();
+    }
+
+    /* === Display Tuning Sliders (admin page only) === */
+    var satSlider = document.getElementById('sat-slider');
+    var tempSlider = document.getElementById('temp-slider');
+    if (satSlider && tempSlider && displayOverlay) {
+        function displaySyncSlider(id) {
+            var slider = document.getElementById(id);
+            var custom = document.querySelector('.display-custom-slider[data-for="' + id + '"]');
+            if (!custom) return;
+            var min = parseFloat(slider.min);
+            var max = parseFloat(slider.max);
+            var pct = (parseFloat(slider.value) - min) / (max - min) * 100;
+            custom.querySelector('.display-custom-track').style.width = pct + '%';
+            custom.querySelector('.display-custom-thumb').style.left = pct + '%';
+        }
+        function displayInitSlider(custom) {
+            var id = custom.getAttribute('data-for');
+            var slider = document.getElementById(id);
+            var dragging = false;
+            function updateFromEvent(e) {
+                var rect = custom.getBoundingClientRect();
+                var x = (e.clientX || e.touches[0].clientX) - rect.left;
+                var pct = Math.max(0, Math.min(100, x / rect.width * 100));
+                var min = parseFloat(slider.min);
+                var max = parseFloat(slider.max);
+                var val = min + pct / 100 * (max - min);
+                if (slider.step) {
+                    var step = parseFloat(slider.step);
+                    val = Math.round(val / step) * step;
+                    val = Math.max(min, Math.min(max, val));
+                }
+                slider.value = val;
+                slider.dispatchEvent(new Event('input'));
+            }
+            custom.addEventListener('mousedown', function(e) {
+                dragging = true;
+                updateFromEvent(e);
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (dragging) updateFromEvent(e);
+            });
+            document.addEventListener('mouseup', function() { dragging = false; });
+            custom.addEventListener('touchstart', function(e) {
+                dragging = true;
+                updateFromEvent(e);
+                e.preventDefault();
+            });
+            document.addEventListener('touchmove', function(e) {
+                if (dragging) updateFromEvent(e);
+            });
+            document.addEventListener('touchend', function() { dragging = false; });
+        }
+        function displaySave() {
+            try { localStorage.setItem('displayTuning', JSON.stringify({sat: satSlider.value, temp: tempSlider.value})); } catch(e) {}
+        }
+        function displayLoadSliders() {
+            var saved;
+            try { saved = JSON.parse(localStorage.getItem('displayTuning')); } catch(e) {}
+            if (saved && typeof saved.sat != 'undefined' && typeof saved.temp != 'undefined') {
+                satSlider.value = saved.sat;
+                tempSlider.value = saved.temp;
+                displayUpdateOverlay(parseFloat(saved.sat), parseInt(saved.temp));
+            } else {
+                displayOverlay.style.display = 'none';
+            }
+            displaySyncSlider('sat-slider');
+            displaySyncSlider('temp-slider');
+        }
+        document.querySelectorAll('.display-custom-slider').forEach(displayInitSlider);
+        satSlider.value = displayTuningSat;
+        tempSlider.value = displayTuningTemp;
+        satSlider.addEventListener('input', function() { displayUpdateOverlay(parseFloat(satSlider.value), parseInt(tempSlider.value)); displaySave(); displaySyncSlider('sat-slider'); });
+        tempSlider.addEventListener('input', function() { displayUpdateOverlay(parseFloat(satSlider.value), parseInt(tempSlider.value)); displaySave(); displaySyncSlider('temp-slider'); });
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.display-reset-btn');
+            if (!btn) return;
+            var slider = document.getElementById(btn.getAttribute('data-slider'));
+            var defaults = { 'sat-slider': 1, 'temp-slider': 0 };
+            slider.value = defaults[slider.id];
+            slider.dispatchEvent(new Event('input'));
+        });
+        displaySyncSlider('sat-slider');
+        displaySyncSlider('temp-slider');
     }
 
     /* Thank-you modal — spotlight completion */

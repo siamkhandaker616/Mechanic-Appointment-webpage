@@ -114,6 +114,30 @@ $effectiveTime = getEffectiveTime();
             <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>
             <label><input type="checkbox" id="bg-toggle" class="custom-checkbox"> background</label>
             <label><input type="checkbox" id="animations-toggle" class="custom-checkbox"> animations</label>
+            <div class="settings-divider"></div>
+            <div class="settings-header">Display Tuning</div>
+            <input type="range" id="sat-slider" min="0" max="2" step="0.01" value="1" hidden>
+            <input type="range" id="temp-slider" min="-100" max="100" step="1" value="0" hidden>
+            <div class="display-row">
+                <label>Saturation</label>
+                <div class="display-slider-row">
+                    <div class="display-custom-slider" data-for="sat-slider">
+                        <div class="display-custom-track"></div>
+                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
+                    </div>
+                    <button class="display-reset-btn" data-slider="sat-slider">↺</button>
+                </div>
+            </div>
+            <div class="display-row">
+                <label>Warmth</label>
+                <div class="display-slider-row">
+                    <div class="display-custom-slider" data-for="temp-slider">
+                        <div class="display-custom-track"></div>
+                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
+                    </div>
+                    <button class="display-reset-btn" data-slider="temp-slider">↺</button>
+                </div>
+            </div>
         </div>
     </div>
 </header>
@@ -778,5 +802,6 @@ var DAY_NAMES = <?= json_encode($GLOBALS['DAY_NAMES_FULL']) ?>;
 <script src="script.js"></script>
 <script src="datepicker.js"></script>
 <?php if ($msg): ?><script>showModal(<?= json_encode($msg) ?>, <?= json_encode($msgType) ?>);</script><?php endif; ?>
+<div id="display-overlay"></div>
 </body>
 </html>

@@ -2511,6 +2511,97 @@ body.no-anim *::after {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
+/* === DISPLAY TUNING OVERLAY === */
+#display-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 999999;
+}
+
+/* === DISPLAY TUNING SLIDERS (BAM Pow) === */
+.settings-divider {
+    height: 1px;
+    background: var(--pink);
+    opacity: 0.3;
+    margin: 12px 0 8px 0;
+}
+
+.display-row {
+    margin-top: 10px;
+    margin-left: 16px;
+}
+.display-row:first-of-type {
+    margin-top: 6px;
+}
+.display-row label {
+    display: block;
+    text-align: center;
+    font-family: var(--font-hand);
+    font-size: 0.7rem;
+    color: var(--ink);
+    margin-bottom: 4px;
+    margin-left: -35px;
+    cursor: default;
+}
+.display-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+}
+.display-custom-slider {
+    position: relative;
+    flex: 1;
+    height: 10px;
+    cursor: pointer;
+    border-radius: 6px;
+    background: var(--teal-dark);
+    touch-action: none;
+}
+.display-custom-slider .display-custom-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 6px;
+    background: var(--violet);
+    pointer-events: none;
+}
+.display-custom-slider .display-custom-thumb {
+    position: absolute;
+    top: calc(50% - 2px);
+    width: 40px;
+    height: auto;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+}
+.display-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--pink);
+    background: var(--cream);
+    color: var(--pink);
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 50%;
+    line-height: 1;
+    padding: 0;
+    flex-shrink: 0;
+}
+.display-reset-btn:hover {
+    background: var(--pink);
+    color: var(--cream);
+}
+
+
 /* === MOBILE === */
 
 @media (max-width: 768px) {

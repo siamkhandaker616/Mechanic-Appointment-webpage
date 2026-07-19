@@ -49,6 +49,8 @@ function validateBookingForm() {
 function launchSpotlight(errors) {
     _spotlightErrors = errors;
     _spotlightIndex = 0;
+    var gearEl = document.querySelector('.settings-gear');
+    if (gearEl) gearEl.style.display = 'none';
     (function smoothScroll(duration) {
         var startY = window.scrollY;
         if (startY === 0) return;
@@ -197,6 +199,8 @@ function dismissSpotlight(callback) {
         if (glow) glow.remove();
         if (burst) burst.remove();
         document.querySelectorAll('.overlay-curtain').forEach(function(c) { c.remove(); });
+        var gearEl = document.querySelector('.settings-gear');
+        if (gearEl) gearEl.style.display = '';
         if (callback) callback();
     }, 400);
 }
@@ -359,3 +363,5 @@ if (document.getElementById('booking-form')) {
         }
     });
 }
+
+window.setSpotlightDisabled = function(v) { window.SPOTLIGHT_DISABLED = v; };

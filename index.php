@@ -99,6 +99,40 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <header>
     <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png?v=3" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
+    <div class="settings-gear">
+        <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
+        <div class="settings-dropdown hidden" id="settings-dropdown">
+            <div class="settings-header">Disable —</div>
+            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Spotlight of Shame</label>
+            <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>
+            <label><input type="checkbox" id="bg-toggle" class="custom-checkbox"> background</label>
+            <label><input type="checkbox" id="animations-toggle" class="custom-checkbox"> animations</label>
+            <div class="settings-divider"></div>
+            <div class="settings-header">Display Tuning</div>
+            <input type="range" id="sat-slider" min="0" max="2" step="0.01" value="1" hidden>
+            <input type="range" id="temp-slider" min="-100" max="100" step="1" value="0" hidden>
+            <div class="display-row">
+                <label>Saturation</label>
+                <div class="display-slider-row">
+                    <div class="display-custom-slider" data-for="sat-slider">
+                        <div class="display-custom-track"></div>
+                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
+                    </div>
+                    <button class="display-reset-btn" data-slider="sat-slider">↺</button>
+                </div>
+            </div>
+            <div class="display-row">
+                <label>Warmth</label>
+                <div class="display-slider-row">
+                    <div class="display-custom-slider" data-for="temp-slider">
+                        <div class="display-custom-track"></div>
+                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
+                    </div>
+                    <button class="display-reset-btn" data-slider="temp-slider">↺</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </header>
 <script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
 
@@ -305,6 +339,10 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <summary>How do I check a mechanic's work schedule?</summary>
         <p>Each mechanic card shows the days they work with colored dots below their name. A green dot (<span style="display:inline-block;width:12px;height:12px;background:var(--teal);vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're available that day &bull; a gray dot (<span style="display:inline-block;width:12px;height:12px;background:#e8e8e8;border:2px solid #bbb;vertical-align:middle;margin:0 2px;border-radius:2px;"></span>) means they're off. If a mechanic is on vacation, an <strong>ON VACATION</strong> badge will also appear.</p>
     </details>
+    <details>
+        <summary>I don't like something about the website</summary>
+        <p>No worries! Click the ⚙ gear icon in the top-right corner — you can toggle doodles, the background, animations, the spotlight, and even tune the display colors to your liking. Tweak it till it feels right.</p>
+    </details>
 </div>
 <?php endif; ?>
 </div>
@@ -488,5 +526,6 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 </div>
 <?php endif; ?>
 
+<div id="display-overlay"></div>
 </body>
 </html>
