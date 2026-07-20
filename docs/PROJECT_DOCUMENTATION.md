@@ -31,6 +31,7 @@ The project is built with PHP 8+, MySQL (MariaDB), and vanilla JavaScript. It do
   index.php               Booking page (customer-facing)
   admin.php               Admin panel (management interface)
   availability.php        AJAX endpoint for slot availability
+  _settings_gear.php      HTML to access settings from both pages
   config.php              DB credentials, constants, slot labels (user-created from config.example.php)
   custom-select.js        Custom-themed <select> replacement with key-tag trigger & dropdown
   functions.php           All business logic, DB queries, handler functions
