@@ -168,9 +168,9 @@ Called by the booking page to fetch slot availability for a mechanic on a given 
 
 **What it does:** Destructive or sensitive actions require an admin password. A modal pops up asking for the password, which is verified via AJAX. On success, the action executes. On failure, an error is shown inside the modal and the user can retry. The modal supports Escape to close and Enter to confirm.
 
-**Actions that require password:** Cancel appointment, Remove cancelled appointment, Remove all cancelled, Fire mechanic, Remove mechanic, Edit appointment, Unblock override, Rebook appointment, Archive Completed, Unlock name/exp in Edit Mechanic modal.
+**Actions that require password:** Cancel appointment, Remove cancelled appointment, Remove all cancelled, Fire mechanic, Remove mechanic, Edit appointment, Unblock override, Rebook appointment, Archive Completed, Restore mechanic, Remove vacation, Unlock name/exp in Edit Mechanic modal.
 
-**Actions that do NOT require password:** Restore mechanic, Remove vacation, Hire mechanic, Sim toggle, Schedule update, Add vacation.
+**Actions that do NOT require password:** Hire mechanic, Sim toggle, Schedule update, Add vacation.
 
 **How it works (implementer notes):**
 
