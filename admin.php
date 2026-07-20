@@ -4,13 +4,7 @@ session_start();
 require_once __DIR__ . '/functions.php';
 
 /* === AJAX PASSWORD VERIFICATION === */
-if (isset($_POST['verify_pw'])) {
-    header('Content-Type: application/json');
-    $ok = ($_POST['admin_pw'] ?? '') === ADMIN_PW;
-    if ($ok) $_SESSION['admin_verified'] = time();
-    echo json_encode(['success' => $ok]);
-    exit;
-}
+handleVerifyPw();
 
 /* === GET ACTION HANDLERS === */
 
@@ -25,6 +19,12 @@ if (isset($_GET['restore']))            handleRestore();
 if (isset($_GET['remove_mechanic']))    handleRemoveMechanic();
 if (isset($_GET['unblock']))            handleUnblock();
 if (isset($_GET['remove_vacation']))    handleRemoveVacation();
+if (isset($_GET['hire_closed'])) {
+    $name = $_GET['name'] ?? '';
+    $_SESSION['flash_msg'] = $name ? htmlspecialchars($name) . ' has been hired!' : 'New mechanic added.';
+    header('Location: admin.php');
+    exit;
+}
 
 /* === POST ACTION HANDLERS === */
 
@@ -41,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 /* === FLASH MESSAGES & DATA FETCHING === */
 
-$msg = $_SESSION['flash_msg'] ?? $_GET['msg'] ?? '';
-$msgType = $_SESSION['flash_type'] ?? ($_GET['msg'] ?? '' ? 'success' : '');
+$msg = $_SESSION['flash_msg'] ?? '';
+$msgType = $_SESSION['flash_type'] ?? '';
 $conflictList = $_SESSION['flash_conflicts'] ?? [];
 $pendingRebook = $_SESSION['pending_rebook'] ?? null;
 unset($_SESSION['flash_msg'], $_SESSION['flash_type'], $_SESSION['flash_conflicts'], $_SESSION['pending_rebook']);
@@ -75,10 +75,7 @@ $overrides = getDB()->query(
      ORDER BY mo.override_date DESC, m.name ASC"
 )->fetchAll();
 
-$stmt = getDB()->query("SELECT use_simulated_time, simulated_datetime FROM sim_config WHERE id = 1");
-$simConfig = $stmt->fetch();
-$useSim = $simConfig && $simConfig['use_simulated_time'];
-$simDt = $simConfig ? $simConfig['simulated_datetime'] : null;
+$useSim = isSimMode();
 $effectiveTime = getEffectiveTime();
 ?>
 <!-- === HTML === -->
@@ -106,40 +103,7 @@ $effectiveTime = getEffectiveTime();
         <a href="index.php" class="btn btn-sm btn-outline">Booking Page</a>
         <a href="admin.php" class="btn btn-sm btn-outline">Refresh</a>
     </div>
-    <div class="settings-gear">
-        <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
-        <div class="settings-dropdown hidden" id="settings-dropdown">
-            <div class="settings-header">Disable —</div>
-            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Spotlight of Shame</label>
-            <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>
-            <label><input type="checkbox" id="bg-toggle" class="custom-checkbox"> background</label>
-            <label><input type="checkbox" id="animations-toggle" class="custom-checkbox"> animations</label>
-            <div class="settings-divider"></div>
-            <div class="settings-header">Display Tuning</div>
-            <input type="range" id="sat-slider" min="0" max="2" step="0.01" value="1" hidden>
-            <input type="range" id="temp-slider" min="-100" max="100" step="1" value="0" hidden>
-            <div class="display-row">
-                <label>Saturation</label>
-                <div class="display-slider-row">
-                    <div class="display-custom-slider" data-for="sat-slider">
-                        <div class="display-custom-track"></div>
-                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
-                    </div>
-                    <button class="display-reset-btn" data-slider="sat-slider">↺</button>
-                </div>
-            </div>
-            <div class="display-row">
-                <label>Warmth</label>
-                <div class="display-slider-row">
-                    <div class="display-custom-slider" data-for="temp-slider">
-                        <div class="display-custom-track"></div>
-                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
-                    </div>
-                    <button class="display-reset-btn" data-slider="temp-slider">↺</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php require __DIR__ . '/_settings_gear.php'; ?>
 </header>
 <script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
 
@@ -159,7 +123,7 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </span>
         <span class="sim-group">
-            <input type="datetime-local" name="sim_datetime" data-placement="top" style="text-align:right" value="<?= $useSim && $simDt ? htmlspecialchars(date('Y-m-d\TH:i', strtotime($simDt))) : '' ?>">
+            <input type="datetime-local" name="sim_datetime" data-placement="top" style="text-align:right" value="<?= $useSim ? htmlspecialchars($effectiveTime->format('Y-m-d\TH:i')) : '' ?>">
             <button type="submit" name="toggle_sim" value="1" class="btn btn-sm" <?= $useSim ? '' : 'disabled' ?>>Set</button>
         </span>
         <span class="sim-group">

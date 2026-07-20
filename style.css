@@ -2597,7 +2597,7 @@ body.no-anim *::after {
     flex-shrink: 0;
 }
 .display-reset-btn:hover {
-    background: var(--pink);
+    background: var(--violet);
     color: var(--cream);
 }
 

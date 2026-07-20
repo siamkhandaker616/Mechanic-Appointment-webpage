@@ -1,6 +1,15 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+function handleVerifyPw(): void {
+    if (!isset($_POST['verify_pw'])) return;
+    header('Content-Type: application/json');
+    $ok = ($_POST['admin_pw'] ?? '') === ADMIN_PW;
+    if ($ok) $_SESSION['admin_verified'] = time();
+    echo json_encode(['success' => $ok]);
+    exit;
+}
+
 /* === FORMATTING HELPERS === */
 
 function fmtDate(string $date): string {
@@ -26,6 +35,10 @@ function slotIndexFromHour(int $hour): int {
     return intdiv($hour, 2) - 5;
 }
 
+function normalizePhone(string $phone): string {
+    return preg_replace('/[^\d]/', '', $phone);
+}
+
 /* === MECHANIC QUERIES === */
 
 function getMechanics(): array {
@@ -33,7 +46,7 @@ function getMechanics(): array {
 }
 
 function getMechanicById(int $id): ?array {
-    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, quote, doodle, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
+    $stmt = getDB()->prepare("SELECT id, name, nickname, bio, quote, doodle, specialties, years_experience AS experience FROM mechanics WHERE id = ? AND is_active = 1");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
 }
@@ -133,13 +146,22 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     $bookedDates = array_flip($bookedDates);
 
     $oneMonthAfter = date('Y-m-d', strtotime($date . ' +30 days'));
+    $preferredAdjacent = $slotIndex < SLOT_COUNT - 1 ? $slotIndex + 1 : $slotIndex - 1;
 
     $today = date('Y-m-d');
     for ($i = 1; $i <= 30; $i++) {
         $prev = date('Y-m-d', strtotime($date . " -$i days"));
         if ($prev <= $today) continue;
+        $found = [];
         if (!isset($bookedDates[$prev]) && isSlotAvailable($mechanicId, $prev, $slotIndex)) {
-            $result['prev'] = $prev;
+            $found[] = $slotIndex;
+        }
+        if (isSlotAvailable($mechanicId, $prev, $preferredAdjacent)) {
+            $found[] = $preferredAdjacent;
+        }
+        $found = array_values(array_unique($found));
+        if (!empty($found)) {
+            $result['prev'] = ['date' => $prev, 'slots' => $found];
             break;
         }
     }
@@ -147,8 +169,16 @@ function getNearbyDatesForMechanic(int $mechanicId, int $slotIndex, string $date
     for ($i = 1; $i <= 30; $i++) {
         $next = date('Y-m-d', strtotime($date . " +$i days"));
         if ($next > $oneMonthAfter) break;
+        $found = [];
         if (!isset($bookedDates[$next]) && isSlotAvailable($mechanicId, $next, $slotIndex)) {
-            $result['next'] = $next;
+            $found[] = $slotIndex;
+        }
+        if (isSlotAvailable($mechanicId, $next, $preferredAdjacent)) {
+            $found[] = $preferredAdjacent;
+        }
+        $found = array_values(array_unique($found));
+        if (!empty($found)) {
+            $result['next'] = ['date' => $next, 'slots' => $found];
             break;
         }
     }
@@ -205,7 +235,7 @@ function createAppointment(int $clientId, int $carId, int $mechanicId, string $d
 
 function getLastAppointmentByPhone(string $phone): ?array {
     $db = getDB();
-    $digits = preg_replace('/[^\d]/', '', $phone);
+    $digits = normalizePhone($phone);
     $stmt = $db->prepare("
         SELECT a.id, a.client_id, a.car_id, a.mechanic_id, a.appointment_date, a.slot_index, a.status,
                c.name AS client_name, c.phone, c.address,
@@ -596,6 +626,8 @@ function saveBackupIfSim(int $appointmentId): void {
 /* === ACTION HANDLERS === */
 
 function handleRemoveAllCancelled(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
@@ -604,6 +636,8 @@ function handleRemoveAllCancelled(): never {
 }
 
 function handleRemoveAllCompleted(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
@@ -683,12 +717,15 @@ function handleReBookConfirm(): never {
     $id = (int)$_GET['rebook_confirm'];
     $newMech = (int)$_GET['new_mech'];
     $db = getDB();
-    $stmt = $db->prepare("SELECT 1 FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
+    $stmt = $db->prepare("SELECT appointment_date, slot_index FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) flashAndRedirect('Appointment not found.', 'error');
+    $appt = $stmt->fetch();
+    if (!$appt) flashAndRedirect('Appointment not found.', 'error');
     $stmt = $db->prepare("SELECT 1 FROM mechanics WHERE id = ? AND is_active = 1");
     $stmt->execute([$newMech]);
     if (!$stmt->fetch()) flashAndRedirect('Invalid mechanic.', 'error');
+    $validation = validateSlotAssignment($newMech, $appt['appointment_date'], (int)$appt['slot_index'], $id);
+    if (!$validation['success']) flashAndRedirect($validation['message'], 'error');
     saveBackupIfSim($id);
     $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "', mechanic_id = ?, cancelled_at = NULL WHERE id = ?");
     $stmt->execute([$newMech, $id]);
@@ -707,6 +744,8 @@ function handleFire(): never {
 }
 
 function handleRestore(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     $db = getDB();
     $stmt = $db->prepare("SELECT name, nickname, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['restore']]);
@@ -721,6 +760,8 @@ function handleRestore(): never {
 }
 
 function handleRemoveMechanic(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
@@ -731,6 +772,8 @@ function handleRemoveMechanic(): never {
 }
 
 function handleUnblock(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
     $stmt->execute([(int)$_GET['unblock']]);
@@ -739,6 +782,8 @@ function handleUnblock(): never {
 }
 
 function handleRemoveVacation(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     guardAgainstSim();
     $vacId = (int)$_GET['remove_vacation'];
     $stmt = getDB()->prepare("SELECT mechanic_id, start_date, end_date FROM mechanic_vacations WHERE id = ?");
@@ -760,9 +805,8 @@ function handleRemoveVacation(): never {
 }
 
 function handleUpdateAppointment(): never {
-    if (($_POST['admin_pw'] ?? '') !== ADMIN_PW) {
-        flashAndRedirect('Invalid password.', 'error');
-    }
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
     $id = (int)($_POST['appointment_id'] ?? 0);
     saveBackupIfSim($id);
     $newDate = $_POST['new_date'] ?? '';
@@ -794,14 +838,21 @@ function handleUpdateAppointment(): never {
     $validation = validateSlotAssignment($finalMech, $finalDate, $finalSlot, $id);
     if (!$validation['success']) flashAndRedirect($validation['message'], 'error');
 
-    if ($dateChanged || $slotChanged) {
-        $stmt = $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ? WHERE id = ?");
-        $stmt->execute([$finalDate, $finalSlot, $id]);
-    }
+    $db->beginTransaction();
+    try {
+        if ($dateChanged || $slotChanged) {
+            $stmt = $db->prepare("UPDATE appointments SET appointment_date = ?, slot_index = ? WHERE id = ?");
+            $stmt->execute([$finalDate, $finalSlot, $id]);
+        }
 
-    if ($mechChanged) {
-        $stmt = $db->prepare("UPDATE appointments SET mechanic_id = ? WHERE id = ?");
-        $stmt->execute([$finalMech, $id]);
+        if ($mechChanged) {
+            $stmt = $db->prepare("UPDATE appointments SET mechanic_id = ? WHERE id = ?");
+            $stmt->execute([$finalMech, $id]);
+        }
+        $db->commit();
+    } catch (Exception $e) {
+        $db->rollBack();
+        flashAndRedirect('Update failed — try again.', 'error');
     }
 
     flashAndRedirect('Appointment updated.');

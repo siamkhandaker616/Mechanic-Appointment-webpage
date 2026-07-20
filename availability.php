@@ -7,7 +7,7 @@ header('Content-Type: application/json');
 $action = $_GET['action'] ?? '';
 
 if ($action === 'quickbook') {
-    $phone = preg_replace('/[^\d]/', '', $_GET['phone'] ?? '');
+    $phone = normalizePhone($_GET['phone'] ?? '');
     if (!$phone) {
         echo json_encode(['found' => false, 'message' => 'Phone number is required.']);
         exit;
@@ -41,7 +41,7 @@ if ($action === 'quickbook') {
 }
 
 if ($action === 'edit_lookup') {
-    $phone = preg_replace('/[^\d]/', '', $_GET['phone'] ?? '');
+    $phone = normalizePhone($_GET['phone'] ?? '');
     if (!$phone) {
         echo json_encode(['found' => false, 'message' => 'Phone number is required.']);
         exit;

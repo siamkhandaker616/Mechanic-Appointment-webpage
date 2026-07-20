@@ -4,13 +4,7 @@ session_start();
 require_once __DIR__ . '/functions.php';
 
 /* === AJAX PASSWORD VERIFICATION === */
-if (isset($_POST['verify_pw'])) {
-    header('Content-Type: application/json');
-    $ok = ($_POST['admin_pw'] ?? '') === ADMIN_PW;
-    if ($ok) $_SESSION['admin_verified'] = time();
-    echo json_encode(['success' => $ok]);
-    exit;
-}
+handleVerifyPw();
 
 /* === FLASH MESSAGES === */
 $flashMsg = $_SESSION['flash_msg'] ?? '';
@@ -34,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = validateAppointmentInput($_POST);
 
     if (empty($errors)) {
-        $phone = preg_replace('/[^\d]/', '', $_POST['phone']);
+        $phone = normalizePhone($_POST['phone']);
         $clientId = findOrCreateClient(trim($_POST['name']), $phone, trim($_POST['address']));
         $carId = findOrCreateCar($clientId, strtoupper(trim($_POST['license_no'])), strtoupper(trim($_POST['engine_no'])), trim($_POST['car_model'] ?? ''));
 
@@ -99,40 +93,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <header>
     <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png?v=3" alt="Mayhem Mobility Tagline" class="tagline"></h1>
     <p class="subtitle">Auto Repair &bull; Downtown &bull; Est. 1947</p>
-    <div class="settings-gear">
-        <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
-        <div class="settings-dropdown hidden" id="settings-dropdown">
-            <div class="settings-header">Disable —</div>
-            <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Spotlight of Shame</label>
-            <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>
-            <label><input type="checkbox" id="bg-toggle" class="custom-checkbox"> background</label>
-            <label><input type="checkbox" id="animations-toggle" class="custom-checkbox"> animations</label>
-            <div class="settings-divider"></div>
-            <div class="settings-header">Display Tuning</div>
-            <input type="range" id="sat-slider" min="0" max="2" step="0.01" value="1" hidden>
-            <input type="range" id="temp-slider" min="-100" max="100" step="1" value="0" hidden>
-            <div class="display-row">
-                <label>Saturation</label>
-                <div class="display-slider-row">
-                    <div class="display-custom-slider" data-for="sat-slider">
-                        <div class="display-custom-track"></div>
-                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
-                    </div>
-                    <button class="display-reset-btn" data-slider="sat-slider">↺</button>
-                </div>
-            </div>
-            <div class="display-row">
-                <label>Warmth</label>
-                <div class="display-slider-row">
-                    <div class="display-custom-slider" data-for="temp-slider">
-                        <div class="display-custom-track"></div>
-                        <img class="display-custom-thumb" src="images/doodles/star.svg" draggable="false">
-                    </div>
-                    <button class="display-reset-btn" data-slider="temp-slider">↺</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php require __DIR__ . '/_settings_gear.php'; ?>
 </header>
 <script>document.documentElement.style.setProperty('--header-h', document.querySelector('header').offsetHeight + 'px');</script>
 

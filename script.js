@@ -147,7 +147,9 @@ function showTooltip(el) {
     var t = document.getElementById('slot-tooltip');
     if (!t) { t = document.createElement('div'); t.id = 'slot-tooltip'; t.className = 'slot-tooltip'; document.body.appendChild(t); }
     var params = new URLSearchParams({ mechanic_id: currentMechId, date: date, slot_index: slotIndex });
+    var ttfId = ++_tooltipFetchId;
     fetch('availability.php?' + params).then(function(r) { return r.json(); }).then(function(data) {
+        if (ttfId !== _tooltipFetchId) return;
         var html = '<div class="tt-title">' + htmlspecialchars(data.mechanic_first_name) + ' is unavailable at that time. But here are some close alternatives for you:</div>';
         var hasMechSlots = (data.adjacent_slot !== null || data.nearby_prev_date || data.nearby_next_date);
         var hasOtherSlots = false;
@@ -174,10 +176,14 @@ function showTooltip(el) {
                 html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + date + '\', ' + data.adjacent_slot + ')"><span class="chip-label">' + SLOT_LABELS[data.adjacent_slot] + '</span></button>';
             }
             if (data.nearby_prev_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date + '\', ' + slotIndex + ')">' + fmtDate(data.nearby_prev_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+                data.nearby_prev_date.slots.forEach(function(s) {
+                    html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_prev_date.date + '\', ' + s + ')">' + fmtDate(data.nearby_prev_date.date) + ' <span class="chip-label">' + SLOT_LABELS[s] + '</span></button>';
+                });
             }
             if (data.nearby_next_date) {
-                html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date + '\', ' + slotIndex + ')">' + fmtDate(data.nearby_next_date) + ' <span class="chip-label">' + SLOT_LABELS[slotIndex] + '</span></button>';
+                data.nearby_next_date.slots.forEach(function(s) {
+                    html += '<button type="button" class="suggestion-chip" onclick="fillSuggestion(' + currentMechId + ', \'' + data.nearby_next_date.date + '\', ' + s + ')">' + fmtDate(data.nearby_next_date.date) + ' <span class="chip-label">' + SLOT_LABELS[s] + '</span></button>';
+                });
             }
             html += '</div>';
         }
@@ -200,6 +206,7 @@ function showTooltip(el) {
 }
 
 var _fetchId = 0;
+var _tooltipFetchId = 0;
 function fetchAvailability() {
     var mechIdEl = document.querySelector('input[name="mechanic_id"]:checked');
     var dateEl = document.getElementById('date');
@@ -210,7 +217,6 @@ function fetchAvailability() {
         updateVacationBadges(dateEl.value);
         return;
     }
-    container.innerHTML = '<div class="burst burst-right" style="font-size:0.6rem;position:static;margin:0 auto 8px;animation:popIn 0.2s ease-out;">LOADING!</div><p style="font-style:italic;color:#888;text-align:center;">Checking slots&hellip;</p>';
     updateVacationBadges(dateEl.value);
     var mechParams = new URLSearchParams({ mechanic_id: mechIdEl.value, date: dateEl.value });
     var reqId = ++_fetchId;
@@ -262,6 +268,17 @@ function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
         }
         setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
     })(slotIndex, 30);
+}
+
+function pollSlot(slot, tries) {
+    var chips = document.querySelectorAll('.slot-chip');
+    if (chips.length > 0 || tries <= 0) {
+        chips.forEach(function(c) {
+            if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
+        });
+        return;
+    }
+    setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
 }
 
 /* === TABLE FILTERS === */
@@ -652,11 +669,21 @@ function toggleOverrides() {
 }
 /* === MECHANIC MODAL === */
 
-function openMechModal(btn) {
+function lockStepperFields() {
     ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
         var f = document.getElementById(id);
         if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
     });
+}
+function clearVacationDates() {
+    ['vac-start', 'vac-end'].forEach(function(id) {
+        var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
+        if (picker) picker.clear(); else document.getElementById(id).value = '';
+    });
+}
+
+function openMechModal(btn) {
+    lockStepperFields();
     document.getElementById('modal-mech-id').value = btn.dataset.mid;
     document.getElementById('modal-mech-name').value = btn.dataset.mname;
     document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
@@ -664,20 +691,14 @@ function openMechModal(btn) {
     document.getElementById('modal-mech-specialties').value = btn.dataset.mspec;
     document.getElementById('modal-mech-exp').value = btn.dataset.experience;
     renderVacations(parseInt(btn.dataset.mid), btn.dataset.mname);
-    ['vac-start', 'vac-end'].forEach(function(id) {
-        var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
-        if (picker) picker.clear(); else document.getElementById(id).value = '';
-    });
+    clearVacationDates();
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
     _origEditValues = { name: btn.dataset.mname, nickname: btn.dataset.mnick, quote: btn.dataset.mquote, specialties: btn.dataset.mspec, experience: btn.dataset.experience };
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function openMechModalById(id, name, nickname, quote, specialties, experience) {
-    ['modal-mech-name', 'modal-mech-exp'].forEach(function(fid) {
-        var f = document.getElementById(fid);
-        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
-    });
+    lockStepperFields();
     document.getElementById('modal-mech-id').value = id;
     document.getElementById('modal-mech-name').value = name;
     document.getElementById('modal-mech-nickname').value = nickname;
@@ -685,26 +706,20 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
     document.getElementById('modal-mech-specialties').value = specialties;
     document.getElementById('modal-mech-exp').value = experience;
     renderVacations(parseInt(id), name);
-    ['vac-start', 'vac-end'].forEach(function(id) {
-        var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
-        if (picker) picker.clear(); else document.getElementById(id).value = '';
-    });
+    clearVacationDates();
     document.getElementById('vac-reason').value = '';
     var ve = document.getElementById('vac-error'); if (ve) ve.style.display = 'none';
     _origEditValues = { name: name, nickname: nickname, quote: quote, specialties: specialties, experience: String(experience) };
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function closeMechModal(event) {
-    if (event.target === event.currentTarget) {
-        ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
-            var f = document.getElementById(id);
-            if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
-        });
+    if (!event || event.target === event.currentTarget) {
+        lockStepperFields();
         document.getElementById('mech-modal').classList.add('hidden');
         if (window._newHireName) {
             var n = window._newHireName;
             window._newHireName = null;
-            window.location.href = 'admin.php?msg=' + encodeURIComponent(n + ' has been hired!');
+            window.location.href = 'admin.php?hire_closed=1&name=' + encodeURIComponent(n);
         }
     }
 }
@@ -767,7 +782,7 @@ function toggleUpdateApptBtn(el) {
     btn.disabled = !changed;
     btn.classList.toggle('disabled', !changed);
 }
-function closeScheduleModal(event) { if (event.target === event.currentTarget) { document.getElementById('schedule-modal').classList.add('hidden'); document.getElementById('mech-modal').classList.remove('hidden'); } }
+function closeScheduleModal(event) { if (!event || event.target === event.currentTarget) { document.getElementById('schedule-modal').classList.add('hidden'); document.getElementById('mech-modal').classList.remove('hidden'); } }
 function validateOverrideForm() {
     if (!checkSimGuard()) return false;
     var err = document.getElementById('override-error');
@@ -836,20 +851,20 @@ function showCancelModal(id) {
     document.getElementById('cancel-modal').classList.remove('hidden');
     document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); requirePw(function(){ cancelAppointmentAjax(id); }, false); };
 }
-function closeCancelModal(event) { if (event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
+function closeCancelModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
 function showFireModal(id, name, count) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; var el = document.getElementById('fire-modal-cancel-count'); if (count > 0) { el.textContent = count + ' booking' + (count > 1 ? 's' : '') + ' will be cancelled.'; el.style.display = 'block'; } else { el.style.display = 'none'; } document.getElementById('fire-modal').classList.remove('hidden'); }
-function closeFireModal(event) { if (event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
+function closeFireModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
 function showRemoveModal(id) {
     document.getElementById('remove-modal').classList.remove('hidden');
     document.getElementById('remove-confirm-btn').onclick = function() { document.getElementById('remove-modal').classList.add('hidden'); requirePw(function(){ removeAppointmentAjax(id); }); };
 }
-function closeRemoveModal(event) { if (event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
+function closeRemoveModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
 function showUnblockModal(id, name, date) {
     document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
     document.getElementById('unblock-modal').classList.remove('hidden');
     document.getElementById('unblock-confirm-btn').onclick = function() { document.getElementById('unblock-modal').classList.add('hidden'); requirePw(function(){ unblockOverrideAjax(id); }); };
 }
-function closeUnblockModal(event) { if (event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
+function closeUnblockModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
 /* === VACATIONS === */
 
 function renderVacations(id, mechName) {
@@ -946,10 +961,7 @@ function addVacation() {
                 VACATION_DATA[id].push(vac);
                 VACATION_DATA[id].sort(function(a, b) { return a.start_date < b.start_date ? -1 : 1; });
                 renderVacations(parseInt(id), document.getElementById('modal-mech-name').value);
-                ['vac-start', 'vac-end'].forEach(function(x) {
-                    var p = DatePicker.instances.find(function(p) { return p.input.id === x; });
-                    if (p) p.clear(); else document.getElementById(x).value = '';
-                });
+                clearVacationDates();
                 document.getElementById('vac-reason').value = '';
                 showModal(d.msg, 'success');
             } else {
@@ -958,8 +970,8 @@ function addVacation() {
         })
         .catch(function() { showModal('Could not reach server.', 'error'); });
 }
-function closeConflictModal(event) { if (event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
-function closeMsgModal(event) { if (event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+function closeConflictModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
+function closeMsgModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
 
 /* === AJAX ACTIONS === */
 
@@ -979,7 +991,7 @@ function removeVacation(btn) {
             var mechId = parseInt(document.getElementById('modal-mech-id').value);
             var vacs = VACATION_DATA[mechId] || [];
             for (var i = 0; i < vacs.length; i++) {
-                if (vacs[i].id == id) { vacs.splice(i, 1); break; }
+                if (vacs[i].id === id) { vacs.splice(i, 1); break; }
             }
             renderVacations(mechId, document.getElementById('modal-mech-name').value);
             var mechRow = document.querySelector('tr[data-mech-id="' + mechId + '"]');
@@ -1229,16 +1241,7 @@ function lookupQuickBook() {
             var mechId = data.next_available && data.next_available.mechanic_id ? data.next_available.mechanic_id : data.last_mechanic_id;
             selectMechanic(mechId);
             if (data.next_available) {
-                (function pollSlot(slot, tries) {
-                    var chips = document.querySelectorAll('.slot-chip');
-                    if (chips.length > 0 || tries <= 0) {
-                        chips.forEach(function(c) {
-                            if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
-                        });
-                        return;
-                    }
-                    setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
-                })(data.next_available.slot, 30);
+                pollSlot(data.next_available.slot, 30);
             }
             window.scrollTo({ top: 0, behavior: 'smooth' });
         })
@@ -1417,17 +1420,17 @@ document.addEventListener('DOMContentLoaded', function() {
             else        { var f = -t / 100; return [0, 50 * f, 150 * f, 0.08 * f]; }
         }
         function displayUpdateOverlay(sat, temp) {
-            if (sat == 1 && temp == 0) { displayOverlay.style.display = 'none'; return; }
+            if (sat === 1 && temp === 0) { displayOverlay.style.display = 'none'; return; }
             var c = displayTempColor(temp);
             displayOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;' +
                 'pointer-events:none;z-index:999999;' +
                 'backdrop-filter:saturate(' + sat + ');' +
-                'background-color:rgba(' + c.join(',') + ');display:"";';
+                'background-color:rgba(' + c.join(',') + ');display:block;';
         }
         function displayLoadOverlay() {
             var saved;
             try { saved = JSON.parse(localStorage.getItem('displayTuning')); } catch(e) {}
-            if (saved && typeof saved.sat != 'undefined' && typeof saved.temp != 'undefined') {
+            if (saved && typeof saved.sat !== 'undefined' && typeof saved.temp !== 'undefined') {
                 displayTuningSat = parseFloat(saved.sat);
                 displayTuningTemp = parseInt(saved.temp);
                 displayUpdateOverlay(displayTuningSat, displayTuningTemp);
@@ -1492,19 +1495,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         function displaySave() {
             try { localStorage.setItem('displayTuning', JSON.stringify({sat: satSlider.value, temp: tempSlider.value})); } catch(e) {}
-        }
-        function displayLoadSliders() {
-            var saved;
-            try { saved = JSON.parse(localStorage.getItem('displayTuning')); } catch(e) {}
-            if (saved && typeof saved.sat != 'undefined' && typeof saved.temp != 'undefined') {
-                satSlider.value = saved.sat;
-                tempSlider.value = saved.temp;
-                displayUpdateOverlay(parseFloat(saved.sat), parseInt(saved.temp));
-            } else {
-                displayOverlay.style.display = 'none';
-            }
-            displaySyncSlider('sat-slider');
-            displaySyncSlider('temp-slider');
         }
         document.querySelectorAll('.display-custom-slider').forEach(displayInitSlider);
         satSlider.value = displayTuningSat;
