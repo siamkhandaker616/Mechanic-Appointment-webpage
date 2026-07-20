@@ -744,7 +744,6 @@ function handleFire(): never {
 }
 
 function handleRestore(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
     unset($_SESSION['admin_verified']);
     $db = getDB();
     $stmt = $db->prepare("SELECT name, nickname, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
