@@ -810,6 +810,32 @@ textarea {
     outline-offset: 2px;
 }
 
+.btn-show-more {
+    display: block;
+    margin: 14px auto 0;
+    min-width: 220px;
+    text-align: center;
+    font-family: var(--font-hand);
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    color: var(--cyan);
+    background: var(--teal-light);
+    border: 2px solid var(--teal);
+    border-radius: 10px;
+    padding: 10px 28px;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.btn-show-more:hover {
+    background: var(--teal);
+    color: var(--gold);
+}
+.btn-show-more:active {
+    transform: scale(0.97);
+}
+.ov-scroll-x { transition: max-height 0.4s ease; }
+
 /* === UTILITY CLASSES === */
 
 .modal-btn-row { display:flex; gap:12px; margin-top:20px; justify-content:flex-end; }
@@ -2625,6 +2651,7 @@ body.no-anim *::after {
     flex-wrap: wrap;
     margin-bottom: 10px;
     justify-content: flex-end;
+    align-items: center;
 }
 .status-counter {
     display: inline-flex;
@@ -2660,12 +2687,13 @@ body.no-anim *::after {
 /* === FILTER COUNT === */
 
 .filter-count {
-    text-align: right;
     font-family: var(--font-hand);
-    font-size: 0.8rem;
-    color: #403838;
+    font-size: 0.85rem;
+    color: #7a7e8e;
     margin-top: 4px;
-    margin-bottom: 2px;
+    margin-right: auto;
+    position: relative;
+    top: 12px;
 }
 
 /* === DAY TOGGLE (Schedule Modal) === */

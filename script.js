@@ -335,6 +335,14 @@ function filterAppTable() {
     }
     updateStatusCounters();
     saveFilterState();
+    var hasFilter = name || phone || car || status || mechanic || dateFrom || dateTo;
+    var btn = document.getElementById('show-more-btn');
+    if (hasFilter) {
+        if (btn) btn.style.display = 'none';
+        showMoreExpanded = false;
+    } else {
+        paginateAppTable();
+    }
 }
 
 function openSearchModal() {
@@ -1137,9 +1145,15 @@ function removeMechanicAjax(id) {
 function updateStatusCounters() {
     var counts = {};
     var total = 0;
+    var anyFilterActive = isAnyFilterActive();
     document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
         var s = tr.dataset.status;
-        if (s && tr.style.display !== 'none') { counts[s] = (counts[s] || 0) + 1; total++; }
+        if (!s) return;
+        if (anyFilterActive) {
+            if (tr.style.display !== 'none') { counts[s] = (counts[s] || 0) + 1; total++; }
+        } else {
+            counts[s] = (counts[s] || 0) + 1; total++;
+        }
     });
     ['scheduled', 'in_progress', 'completed', 'cancelled'].forEach(function(s) {
         var n = counts[s] || 0;
@@ -1157,9 +1171,88 @@ function updateStatusCounters() {
     var tbody = document.querySelector('#appt-table tbody');
     var emptyRow = tbody ? tbody.querySelector('tr[data-empty]') : null;
     if (total === 0 && tbody && !emptyRow) {
-        tbody.innerHTML = '<tr data-empty><td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td></tr>';
+        var er = document.createElement('tr');
+        er.setAttribute('data-empty', '');
+        er.innerHTML = '<td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td>';
+        tbody.appendChild(er);
     } else if (total > 0 && emptyRow) {
         emptyRow.remove();
+    }
+}
+
+var SHOW_MORE_LIMIT = 8;
+var showMoreExpanded = false;
+var showMoreStoredHeight = 0;
+
+function isAnyFilterActive() {
+    var name = (document.getElementById('filter-name')?.value || '');
+    var phone = (document.getElementById('filter-phone')?.value || '');
+    var car = (document.getElementById('filter-car')?.value || '');
+    var status = document.getElementById('filter-status')?.value || '';
+    var mechanic = document.getElementById('filter-mechanic')?.value || '';
+    var dateFrom = document.getElementById('filter-date-from')?.value || '';
+    var dateTo = document.getElementById('filter-date-to')?.value || '';
+    return !!(name || phone || car || status || mechanic || dateFrom || dateTo);
+}
+
+function paginateAppTable() {
+    var btn = document.getElementById('show-more-btn');
+    if (!btn) return;
+    var rows = document.querySelectorAll('#appt-table tbody tr[data-name]');
+    if (rows.length <= SHOW_MORE_LIMIT) { btn.style.display = 'none'; return; }
+    showMoreExpanded = false;
+    btn.textContent = '\u25BA Show more \u25C4';
+    rows.forEach(function(tr, i) {
+        var hidden = i >= SHOW_MORE_LIMIT;
+        tr.style.display = hidden ? 'none' : '';
+        var editRow = tr.nextElementSibling;
+        if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = hidden ? 'none' : '';
+    });
+    btn.style.display = '';
+    showMoreStoredHeight = btn.closest('.ov-scroll-x') ? btn.closest('.ov-scroll-x').scrollHeight : 0;
+}
+
+function toggleShowMore() {
+    var btn = document.getElementById('show-more-btn');
+    if (!btn) return;
+    var container = btn.closest('.ov-scroll-x');
+    var rows = document.querySelectorAll('#appt-table tbody tr[data-name]');
+    if (showMoreExpanded) {
+        btn.textContent = '\u25BA Show more \u25C4';
+        container.style.maxHeight = container.scrollHeight + 'px';
+        container.offsetHeight;
+        container.style.maxHeight = showMoreStoredHeight + 'px';
+        container.style.overflow = 'hidden';
+        container.addEventListener('transitionend', function handler() {
+            container.removeEventListener('transitionend', handler);
+            rows.forEach(function(tr, i) {
+                if (i >= SHOW_MORE_LIMIT) {
+                    tr.style.display = 'none';
+                    var editRow = tr.nextElementSibling;
+                    if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = 'none';
+                }
+            });
+            container.style.maxHeight = '';
+            container.style.overflow = '';
+        });
+        showMoreExpanded = false;
+    } else {
+        rows.forEach(function(tr) {
+            tr.style.display = '';
+            var editRow = tr.nextElementSibling;
+            if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = '';
+        });
+        container.style.maxHeight = showMoreStoredHeight + 'px';
+        container.style.overflow = 'hidden';
+        container.offsetHeight;
+        container.style.maxHeight = container.scrollHeight + 'px';
+        container.addEventListener('transitionend', function handler() {
+            container.removeEventListener('transitionend', handler);
+            container.style.maxHeight = '';
+            container.style.overflow = '';
+        });
+        btn.textContent = '\u25BA Show less \u25C4';
+        showMoreExpanded = true;
     }
 }
 
@@ -1769,5 +1862,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateFilterCross();
         } catch(e) {}
     }, 0);
+
+    paginateAppTable();
 
 });

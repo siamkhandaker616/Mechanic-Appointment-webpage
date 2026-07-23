@@ -155,13 +155,13 @@ $effectiveTime = getEffectiveTime();
     </span>
     <?php if (count($appointments) > 0): ?>
     <div class="status-counters">
+        <div class="filter-count" id="filter-count"></div>
         <span class="status-counter counter-scheduled" id="counter-scheduled" style="<?= $scheduledCount > 0 ? '' : 'display:none' ?>">Scheduled <span class="count-num" id="count-scheduled"><?= $scheduledCount ?></span></span>
-        <span class="status-counter counter-inprogress" id="counter-in_progress" style="<?= $inProgressCount > 0 ? '' : 'display:none' ?>">In Progress <span class="count-num" id="count-in_progress"><?= $inProgressCount ?></span></span>
+        <span class="status-counter counter-inprogress" id="counter_in_progress" style="<?= $inProgressCount > 0 ? '' : 'display:none' ?>">In Progress <span class="count-num" id="count-in_progress"><?= $inProgressCount ?></span></span>
         <span class="status-counter counter-completed" id="counter-completed" style="<?= $completedCount > 0 ? '' : 'display:none' ?>">Completed <span class="count-num" id="count-completed"><?= $completedCount ?></span></span>
         <span class="status-counter counter-cancelled" id="counter-cancelled" style="<?= $cancelledCount > 0 ? '' : 'display:none' ?>">Cancelled <span class="count-num" id="count-cancelled"><?= $cancelledCount ?></span></span>
     </div>
     <?php endif; ?>
-    <div class="filter-count" id="filter-count"></div>
     <div class="ov-scroll-x">
     <table id="appt-table">
         <thead>
@@ -235,6 +235,9 @@ $effectiveTime = getEffectiveTime();
             <?php endif; ?>
         </tbody>
     </table>
+    <?php if (count($appointments) > 8): ?>
+    <button id="show-more-btn" class="btn-show-more" onclick="toggleShowMore()">► Show more ◄</button>
+    <?php endif; ?>
     <?php if (count($appointments) > 0): ?>
     <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
         <a href="#" class="btn btn-sm btn-rust" id="clear-cancelled-btn" style="<?= $cancelledCount > 0 ? '' : 'display:none' ?>" onclick="requirePw(function(){removeAllByStatus('cancelled')});return false;">Clear Cancelled</a>
