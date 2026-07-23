@@ -273,16 +273,7 @@ function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
         var card = document.querySelector('.mechanic-card.selected');
         if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    (function pollSlot(slot, tries) {
-        var chips = document.querySelectorAll('.slot-chip');
-        if (chips.length > 0 || tries <= 0) {
-            chips.forEach(function(c) {
-                if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
-            });
-            return;
-        }
-        setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
-    })(slotIndex, 30);
+    pollSlot(slotIndex, 30);
 }
 
 function pollSlot(slot, tries) {
@@ -787,9 +778,9 @@ function openScheduleModal(id, name) {
     document.getElementById('schedule-modal').classList.remove('hidden');
 }
 function toggleDaySlots(dow) {
-    document.querySelectorAll('#schedule-form .sched-cb[data-dow="' + dow + '"]').forEach(function(cb) {
-        cb.checked = !cb.checked;
-    });
+    var cbs = document.querySelectorAll('#schedule-form .sched-cb[data-dow="' + dow + '"]');
+    var allChecked = Array.from(cbs).every(function(cb) { return cb.checked; });
+    cbs.forEach(function(cb) { cb.checked = !allChecked; });
 }
 function saveScheduleCheck() {
     if (!checkSimGuard()) return;

@@ -310,7 +310,7 @@
         trigger.addEventListener('click', toggleDropdown);
 
         trigger.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Space') {
+            if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 toggleDropdown();
             } else if (e.key === 'Escape') {

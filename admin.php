@@ -164,7 +164,7 @@ $effectiveTime = getEffectiveTime();
     <div class="status-counters">
         <div class="filter-count" id="filter-count"></div>
         <span class="status-counter counter-scheduled" id="counter-scheduled" style="<?= $scheduledCount > 0 ? '' : 'display:none' ?>">Scheduled <span class="count-num" id="count-scheduled"><?= $scheduledCount ?></span></span>
-        <span class="status-counter counter-inprogress" id="counter_in_progress" style="<?= $inProgressCount > 0 ? '' : 'display:none' ?>">In Progress <span class="count-num" id="count-in_progress"><?= $inProgressCount ?></span></span>
+        <span class="status-counter counter-inprogress" id="counter-in_progress" style="<?= $inProgressCount > 0 ? '' : 'display:none' ?>">In Progress <span class="count-num" id="count-in_progress"><?= $inProgressCount ?></span></span>
         <span class="status-counter counter-completed" id="counter-completed" style="<?= $completedCount > 0 ? '' : 'display:none' ?>">Completed <span class="count-num" id="count-completed"><?= $completedCount ?></span></span>
         <span class="status-counter counter-cancelled" id="counter-cancelled" style="<?= $cancelledCount > 0 ? '' : 'display:none' ?>">Cancelled <span class="count-num" id="count-cancelled"><?= $cancelledCount ?></span></span>
     </div>
@@ -222,7 +222,7 @@ $effectiveTime = getEffectiveTime();
                     <div class="edit-inner">
                         <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
-                            <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= date('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleUpdateApptBtn(this)">
+                            <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= $effectiveTime->format('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleUpdateApptBtn(this)">
                              <select class="custom-select" name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleUpdateApptBtn(this)">
                                 <?php foreach ($SLOT_LABELS as $si => $sl): ?>
                                 <option value="<?= $si ?>" <?= $si === (int)$a['slot_index'] ? 'selected' : '' ?>><?= htmlspecialchars($sl) ?></option>
@@ -593,11 +593,15 @@ $effectiveTime = getEffectiveTime();
         <div style="display:flex;gap:16px;align-items:center;">
             <div class="flex-1">
                 <p style="margin:0 0 6px;font-size: 0.85rem">Pick a new mechanic for this job:</p>
+                <?php if (!empty($rebookMechSelect)): ?>
                 <select id="rebook-mech-select" class="custom-select fire-swap">
                     <?php foreach ($rebookMechSelect as $mid => $mname): ?>
                     <option value="<?= $mid ?>"><?= htmlspecialchars($mname) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <?php else: ?>
+                <p style="color:#c0392b;font-size:0.85rem;margin:0;">All mechanics are busy at that slot.</p>
+                <?php endif; ?>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
                 <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('rebook-mech-modal')">Forget it</button>
@@ -769,9 +773,13 @@ window.addEventListener('DOMContentLoaded', function() {
     var reason = <?= json_encode($pendingRebook['reason'] ?? 'fired') ?>;
     var name = <?= json_encode($pendingRebook['old_first_name']) ?>;
     document.getElementById('rebook-mech-heading').textContent = reason === 'busy' ? name + " is already booked at that time" : name + " doesn't work here anymore";
+    var rebookSel = document.getElementById('rebook-mech-select');
+    var rebookBtn = document.getElementById('rebook-confirm-btn');
+    if (!rebookSel || rebookSel.options.length === 0) { rebookBtn.disabled = true; rebookBtn.style.opacity = '0.5'; }
     document.getElementById('rebook-mech-modal').classList.remove('hidden');
-    document.getElementById('rebook-confirm-btn').addEventListener('click', function() {
-        var mech = document.getElementById('rebook-mech-select').value;
+    rebookBtn.addEventListener('click', function() {
+        var mech = rebookSel ? rebookSel.value : '';
+        if (!mech) return;
         window.location.href = '?rebook_confirm=<?= $pendingRebook['id'] ?>&new_mech=' + mech;
     });
 });
