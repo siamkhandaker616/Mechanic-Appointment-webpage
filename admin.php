@@ -361,7 +361,7 @@ $effectiveTime = getEffectiveTime();
             <?php $mRowNum = 0; ?>
             <?php $_cancelCountStmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND status = 'scheduled'"); ?>
             <?php foreach ($allMechanics as $m): $mRowNum++; ?>
-            <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], date('Y-m-d')); ?>
+            <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], $effectiveTime->format('Y-m-d')); ?>
             <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>" data-mech-id="<?= $m['id'] ?>">
                 <td><strong><?= fmtNameTwoLines($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>

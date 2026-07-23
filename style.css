@@ -822,14 +822,17 @@ textarea {
     background: var(--teal-light);
     border: 2px solid var(--teal);
     border-radius: 10px;
-    padding: 10px 28px;
+    padding: 10px 20px;
     cursor: pointer;
     box-shadow: var(--shadow-md);
+    opacity: 0.86;
     transition: background 0.2s, color 0.2s, transform 0.15s;
 }
 .btn-show-more:hover {
     background: var(--teal);
     color: var(--gold);
+    opacity: 1;
+    transform: scale(1.1);
 }
 .btn-show-more:active {
     transform: scale(0.97);
@@ -1348,15 +1351,13 @@ tr:last-child td {
     box-shadow: 4px 4px 0 var(--ink);
 }
 
-.recruitment-details summary {
-    list-style: none;
-    outline: none;
-}
 .recruitment-details summary::-webkit-details-marker {
     display: none;
 }
 
 .recruitment-details summary {
+    list-style: none;
+    outline: none;
     display: inline-flex;
     align-items: center;
     font-family: var(--font-action);
@@ -2442,7 +2443,8 @@ body.no-anim *::after {
 
 .filter-cross {
     display: none; font-size: 1.3rem; font-weight: bold; cursor: pointer;
-    color: var(--rust); margin-left: 600px; user-select: none; line-height: 1;
+    color: var(--rust); user-select: none; line-height: 1;
+    position: absolute; right: 60px; top: 40px;
 }
 .filter-cross:hover { color: var(--ink); }
 
@@ -2678,10 +2680,10 @@ body.no-anim *::after {
     font-size: 0.7rem;
     line-height: 1;
 }
-.counter-scheduled { background: #d4eeec; color: #555; }
-.counter-inprogress { background: #ffeaa7; color: #856404; }
+.counter-scheduled { background: #e3d6b1; color: #a58a31; }
+.counter-inprogress { background: #ffa7cc; color: #85045c; }
 .counter-completed { background: #a8e6cf; color: #155724; }
-.counter-cancelled { background: #ffcccc; color: #721c24; }
+.counter-cancelled { background: #f1afaf; color: #721c24; }
 
 /* === FILTER COUNT === */
 

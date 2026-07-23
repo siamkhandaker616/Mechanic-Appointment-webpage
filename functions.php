@@ -243,7 +243,7 @@ function getLastAppointmentByPhone(string $phone): ?array {
         FROM appointments a
         JOIN clients c ON c.id = a.client_id
         JOIN cars car ON car.id = a.car_id
-        WHERE REPLACE(REPLACE(c.phone, '-', ''), ' ', '') = ?
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') = ?
         ORDER BY a.appointment_date DESC, a.id DESC
         LIMIT 1
     ");

@@ -56,7 +56,7 @@ if ($action === 'edit_lookup') {
         JOIN clients c ON c.id = a.client_id
         JOIN cars car ON car.id = a.car_id
         JOIN mechanics m ON m.id = a.mechanic_id
-        WHERE REPLACE(REPLACE(c.phone, '-', ''), ' ', '') = ?
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') = ?
           AND a.status = '" . STATUS_SCHEDULED . "'
         ORDER BY a.appointment_date ASC, a.slot_index ASC
     ");
