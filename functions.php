@@ -744,6 +744,7 @@ function handleFire(): never {
 }
 
 function handleRestore(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
     unset($_SESSION['admin_verified']);
     $db = getDB();
     $stmt = $db->prepare("SELECT name, nickname, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
@@ -1015,6 +1016,15 @@ function handleAddVacation(): never {
             $sn->execute([$mechId]);
             $nm = $sn->fetchColumn();
             ajaxFlash(($nm ? htmlspecialchars($nm) . ' is already on vacation during those dates. Try again!' : 'Overlapping vacation found.'), 'error');
+        }
+        $apptStmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date BETWEEN ? AND ? AND status IN ('" . STATUS_SCHEDULED . "', '" . STATUS_IN_PROGRESS . "')");
+        $apptStmt->execute([$mechId, $start, $end]);
+        $apptCount = (int)$apptStmt->fetchColumn();
+        if ($apptCount > 0) {
+            $sn2 = getDB()->prepare("SELECT name FROM mechanics WHERE id = ?");
+            $sn2->execute([$mechId]);
+            $nm2 = $sn2->fetchColumn();
+            ajaxFlash(($nm2 ? htmlspecialchars($nm2) . ' has ' . $apptCount . ' upcoming appointment(s) during those dates — reschedule them first!' : $apptCount . ' appointment(s) conflict with these dates.'), 'error');
         }
         addMechanicVacation($mechId, $start, $end, $reason);
         $newVacId = (int)getDB()->lastInsertId();

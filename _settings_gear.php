@@ -1,6 +1,6 @@
     <div class="settings-gear">
         <img src="images/doodles/gear.svg" alt="Settings" id="settings-btn">
-        <div class="settings-dropdown hidden" id="settings-dropdown">
+        <div class="settings-dropdown" id="settings-dropdown">
             <div class="settings-header">Disable —</div>
             <label><input type="checkbox" id="spotlight-toggle" class="custom-checkbox"> Spotlight of Shame</label>
             <label><input type="checkbox" id="doodles-toggle" class="custom-checkbox"> decorative doodles</label>

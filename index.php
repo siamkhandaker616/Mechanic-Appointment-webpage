@@ -357,12 +357,12 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 
 <div class="modal-overlay hidden" id="qb-fail-modal" onclick="closeQbFailModal(event)">
     <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()">
-        <button type="button" class="modal-close" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">&times;</button>
+        <button type="button" class="modal-close" onclick="hideModal('qb-fail-modal')">&times;</button>
         <div class="burst burst-left">NOPE!</div>
         <h2 class="modal-h2">Not Found</h2>
         <p class="modal-body-p" id="qb-fail-msg">That number ain't in our grease-stained ledger, pal. First time? Fill out the form.</p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('qb-fail-modal').classList.add('hidden')">OK</button>
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="hideModal('qb-fail-modal')">OK</button>
         </div>
     </div>
 </div>
@@ -382,19 +382,19 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
     </div>
 </div>
 
-<div class="modal-overlay hidden" id="eb-select-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+<div class="modal-overlay hidden" id="eb-select-modal" onclick="if (event.target===event.currentTarget) hideModal('eb-select-modal')">
     <div class="modal-box" style="max-width:420px;" onclick="event.stopPropagation()">
         <div class="burst burst-right">PICK!</div>
         <h2>Select Booking to Edit</h2>
         <p style="margin:8px 0 16px;">You have multiple bookings. Pick one to edit.</p>
         <div id="eb-select-list" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div class="modal-btn-row" style="margin-top:12px;">
-            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-select-modal').classList.add('hidden')">Cancel</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('eb-select-modal')">Cancel</button>
         </div>
     </div>
 </div>
 
-<div class="modal-overlay hidden" id="eb-edit-modal" onclick="if (event.target===event.currentTarget) this.classList.add('hidden')">
+<div class="modal-overlay hidden" id="eb-edit-modal" onclick="if (event.target===event.currentTarget) hideModal('eb-edit-modal')">
     <div class="modal-box" style="max-width:620px;" onclick="event.stopPropagation()">
         <div class="burst burst-right">FIX!</div>
         <h2>Edit Your Booking</h2>
@@ -441,13 +441,13 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
             </div>
             <div class="modal-btn-row" style="margin-top:16px;">
                 <button type="submit" class="btn btn-sm btn-pink">Save Changes</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-edit-modal').classList.add('hidden')">Cancel</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('eb-edit-modal')">Cancel</button>
             </div>
         </form>
     </div>
 </div>
 
-<div class="modal-overlay hidden" id="unsaved-modal" onclick="if(event.target===event.currentTarget)this.classList.add('hidden')">
+<div class="modal-overlay hidden" id="unsaved-modal" onclick="if(event.target===event.currentTarget)hideModal('unsaved-modal')">
     <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
         <div class="burst burst-right" style="font-size:0.5rem;background:var(--gold);color:var(--ink);">HEY!</div>
         <h2>Unsaved Changes</h2>
@@ -466,7 +466,7 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
         <small>(or refresh like a coward)</small>
     </div>
 
-<div class="modal-overlay hidden" id="thank-you-modal" onclick="document.getElementById('thank-you-modal').classList.add('hidden')">
+<div class="modal-overlay hidden" id="thank-you-modal" onclick="hideModal('thank-you-modal')">
     <div class="modal-box" style="background:var(--pink);border-color:var(--gold);" onclick="event.stopPropagation()">
         <div class="burst burst-right" style="background:var(--gold);color:var(--ink);">DONE!</div>
         <p style="text-align:center;font-weight:bold;font-size:1.5rem;color:var(--gold);text-shadow:2px 2px 0 var(--ink);margin-top:40px;">Thank you!!!</p>
@@ -478,10 +478,10 @@ var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
 <?php if ($flashMsg): ?>
 <div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
     <div class="modal-box msg-box msg-<?= htmlspecialchars($flashType) ?>">
-        <button type="button" class="modal-close" onclick="document.getElementById('msg-modal').classList.add('hidden')">&times;</button>
+        <button type="button" class="modal-close" onclick="hideModal('msg-modal')">&times;</button>
         <div class="msg-content"><?= htmlspecialchars($flashMsg) ?></div>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="document.getElementById('msg-modal').classList.add('hidden')">OK</button>
+            <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="hideModal('msg-modal')">OK</button>
         </div>
     </div>
 </div>
