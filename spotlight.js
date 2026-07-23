@@ -29,7 +29,7 @@ function validateBookingForm() {
                 errors.push({ el: el, msg: el.dataset.errPhone || 'Invalid phone format.' });
                 break;
             }
-            if (rule === 'alphanumeric' && val && !/^[a-zA-Z0-9]+$/.test(val)) {
+            if (rule === 'alphanumeric' && val && !/^[a-zA-Z0-9\-]+$/.test(val)) {
                 errors.push({ el: el, msg: el.dataset.errAlphanumeric || 'Alphanumeric only.' });
                 break;
             }
@@ -212,7 +212,7 @@ function revalidateField(el) {
         var rule = rules[r];
         if (rule === 'required' && !val) return el.dataset.errRequired || 'This field is required.';
         if (rule === 'phone' && val && !/^[\d\s\-\+\(\)]+$/.test(val)) return el.dataset.errPhone || 'Invalid phone format.';
-        if (rule === 'alphanumeric' && val && !/^[a-zA-Z0-9]+$/.test(val)) return el.dataset.errAlphanumeric || 'Alphanumeric only.';
+        if (rule === 'alphanumeric' && val && !/^[a-zA-Z0-9\-]+$/.test(val)) return el.dataset.errAlphanumeric || 'Alphanumeric only.';
     }
     return null;
 }

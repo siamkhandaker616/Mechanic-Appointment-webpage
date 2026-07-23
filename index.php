@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = validateAppointmentInput($_POST);
 
     if (empty($errors)) {
-        $phone = normalizePhone($_POST['phone']);
+        $phone = trim($_POST['phone']);
         $clientId = findOrCreateClient(trim($_POST['name']), $phone, trim($_POST['address']));
         $carId = findOrCreateCar($clientId, strtoupper(trim($_POST['license_no'])), strtoupper(trim($_POST['engine_no'])), trim($_POST['car_model'] ?? ''));
 
@@ -206,7 +206,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
                 </div>
                 <div class="form-group">
                     <label for="engine_no">Car Engine Number</label>
-                    <input type="text" id="engine_no" name="engine_no" placeholder="8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
+                    <input type="text" id="engine_no" name="engine_no" placeholder="8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric and hyphens only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="car_model">Car Model <span style="font-weight:normal;">(optional)</span></label>

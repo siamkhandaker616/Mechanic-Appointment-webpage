@@ -62,6 +62,13 @@ foreach ($appointments as $appt) {
 }
 $mechanics = getMechanics();
 $mechanicsForSelect = getMechanicsForSelect();
+$rebookMechSelect = $mechanicsForSelect;
+if (isset($_GET['rebook_pick_mechanic']) && $pendingRebook && !empty($pendingRebook['date']) && isset($pendingRebook['slot'])) {
+    $conflictStmt = getDB()->prepare("SELECT mechanic_id FROM appointments WHERE appointment_date = ? AND slot_index = ? AND status = '" . STATUS_SCHEDULED . "'");
+    $conflictStmt->execute([$pendingRebook['date'], $pendingRebook['slot']]);
+    $busyIds = $conflictStmt->fetchAll(PDO::FETCH_COLUMN);
+    $rebookMechSelect = array_diff_key($mechanicsForSelect, array_flip($busyIds));
+}
 $allMechanics = getAllMechanics();
 $scheduleData = [];
 foreach ($allMechanics as $m) {
@@ -587,7 +594,7 @@ $effectiveTime = getEffectiveTime();
             <div class="flex-1">
                 <p style="margin:0 0 6px;font-size: 0.85rem">Pick a new mechanic for this job:</p>
                 <select id="rebook-mech-select" class="custom-select fire-swap">
-                    <?php foreach ($mechanicsForSelect as $mid => $mname): ?>
+                    <?php foreach ($rebookMechSelect as $mid => $mname): ?>
                     <option value="<?= $mid ?>"><?= htmlspecialchars($mname) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -759,7 +766,9 @@ window.addEventListener('DOMContentLoaded', function() {
 <?php endif; endif; ?>
 <?php if (isset($_GET['rebook_pick_mechanic']) && $pendingRebook): ?>
 window.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('rebook-mech-heading').textContent = <?= json_encode($pendingRebook['old_first_name']) ?> + " doesn't work here anymore";
+    var reason = <?= json_encode($pendingRebook['reason'] ?? 'fired') ?>;
+    var name = <?= json_encode($pendingRebook['old_first_name']) ?>;
+    document.getElementById('rebook-mech-heading').textContent = reason === 'busy' ? name + " is already booked at that time" : name + " doesn't work here anymore";
     document.getElementById('rebook-mech-modal').classList.remove('hidden');
     document.getElementById('rebook-confirm-btn').addEventListener('click', function() {
         var mech = document.getElementById('rebook-mech-select').value;

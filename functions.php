@@ -463,7 +463,7 @@ function validateAppointmentInput(array $data): array {
 
     if (empty(trim($data['license_no'] ?? ''))) $errors[] = 'Car license number is required.';
     if (empty(trim($data['engine_no'] ?? ''))) $errors[] = 'Car engine number is required.';
-    elseif (!preg_match('/^[a-zA-Z0-9]+$/', $data['engine_no'])) $errors[] = 'Engine number must be alphanumeric.';
+    elseif (!preg_match('/^[a-zA-Z0-9\-]+$/', $data['engine_no'])) $errors[] = 'Engine number must be alphanumeric.';
 
     if (empty($data['date'] ?? '')) $errors[] = 'Appointment date is required.';
     elseif (!preg_match(DATE_REGEX, $data['date'])) $errors[] = 'Invalid date format.';
@@ -693,7 +693,22 @@ function handleReBook(): never {
         $mstmt->execute([(int)$appt['mechanic_id']]);
         $mname = $mstmt->fetchColumn() ?: 'Unknown';
         $firstName = explode(' ', $mname)[0];
-        $_SESSION['pending_rebook'] = ['id' => $id, 'old_first_name' => $firstName];
+        $_SESSION['pending_rebook'] = ['id' => $id, 'old_first_name' => $firstName, 'reason' => 'fired', 'date' => $appt['appointment_date'], 'slot' => (int)$appt['slot_index']];
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        if ($isAjax) {
+            echo json_encode(['ok' => false, 'redirect' => 'admin.php?rebook_pick_mechanic=1']);
+            exit;
+        }
+        header('Location: admin.php?rebook_pick_mechanic=1');
+        exit;
+    }
+    $validation = validateSlotAssignment((int)$appt['mechanic_id'], $appt['appointment_date'], (int)$appt['slot_index'], $id);
+    if (!$validation['success']) {
+        $mstmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
+        $mstmt->execute([(int)$appt['mechanic_id']]);
+        $mname = $mstmt->fetchColumn() ?: 'Unknown';
+        $firstName = explode(' ', $mname)[0];
+        $_SESSION['pending_rebook'] = ['id' => $id, 'old_first_name' => $firstName, 'reason' => 'busy', 'date' => $appt['appointment_date'], 'slot' => (int)$appt['slot_index']];
         $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
         if ($isAjax) {
             echo json_encode(['ok' => false, 'redirect' => 'admin.php?rebook_pick_mechanic=1']);
