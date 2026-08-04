@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isCarBookedOnDate($carId, $_POST['date'])) {
             $errors[] = 'This car already has an appointment on this date.';
         } elseif (isSlotTakenByBooking((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
-            if (isLuckyPhone($phone)) {
+            if (isLuckyPhone($phone, $_POST['date'])) {
                 $apptId = createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'], STATUS_WAITING);
                 $_SESSION['confirmed'] = [
                     'date' => $_POST['date'],
@@ -163,7 +163,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <div class="receipt-important">
             <?php if ($isWaitlist): ?>
             <strong>⚠ WAITLIST</strong><br>
-            Your lucky number got you on the <strong>waitlist</strong> — we'll bump you in automatically if someone cancels.<br>
+            Your lucky number got you on the <strong>waitlist</strong> — you'll be first in line if the slot opens up.<br>
             <span class="receipt-cb-indicator"><img src="images/icons/gear-check.svg" width="30" height="30" style="position:absolute;top:-10px;left:-10px;" alt="?"></span> Hold tight
             <?php else: ?>
             <strong>⚠ IMPORTANT</strong><br>
@@ -191,7 +191,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <strong><?= htmlspecialchars(fmtDate($confirmed['date'])) ?></strong>,
         slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$confirmed['slot_index']] ?? '') ?></strong>
         with <strong><?= htmlspecialchars((getMechanicById((int)$confirmed['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
-        We'll bump you in automatically if someone cancels.
+        We'll notify you if the slot opens up.
         <?php else: ?>
         Your car is in good hands. We'll see you at
         <strong><?= htmlspecialchars(fmtDate($confirmed['date'])) ?></strong>,
@@ -347,10 +347,12 @@ var initialMechId = <?= $selectedMechId ?: '0' ?>;
 var initialDate = <?= json_encode($selectedDate) ?>;
 var initialSlot = <?= $selectedSlot !== '' ? json_encode((int)$selectedSlot) : 'null' ?>;
 var BURST_KEYS = ['blank','zilch','nada','bzzt','nope'];
+var LUCKY_RULES = <?= json_encode($GLOBALS['LUCKY_RULES']) ?>;
+var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
 </script>
-<script src="spotlight.js"></script>
-<script src="script.js"></script>
-<script src="datepicker.js"></script>
+<script src="spotlight.js?v=2"></script>
+<script src="script.js?v=2"></script>
+<script src="datepicker.js?v=2"></script>
 
 <div class="modal-overlay hidden" id="pw-modal" onclick="closePwModal(event)">
     <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">

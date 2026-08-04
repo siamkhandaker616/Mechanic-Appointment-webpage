@@ -91,6 +91,7 @@ $overrides = getDB()->query(
 
 $useSim = isSimMode();
 $effectiveTime = getEffectiveTime();
+$adminAuthed = !empty($_SESSION['admin_verified']);
 ?>
 <!-- === HTML === -->
 <!DOCTYPE html>
@@ -109,6 +110,24 @@ $effectiveTime = getEffectiveTime();
 <div class="omg omg-left">POW</div>
 <div class="omg omg-right">ZOWIE</div>
 <div class="omg omg-bot">BAM</div>
+
+<?php if (!$adminAuthed): ?>
+<div id="lock-overlay">
+    <div class="lock-content" onclick="event.stopPropagation()">
+        <div class="burst burst-right" style="font-size:0.7rem;">LOCKED!</div>
+        <h2>Mayhem Mobility</h2>
+        <p>This admin panel is password-protected. Enter the password to unlock it.</p>
+        <div style="position:relative;margin-top:18px;">
+            <input type="password" id="lock-pw-input" placeholder="Password" style="width:100%;font-size:1rem;padding-right:44px;background:var(--paper);" onkeydown="if(event.key==='Enter')confirmLock()">
+            <button type="button" id="lock-pw-toggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;line-height:1;" onclick="toggleLockPwVisibility()">
+                <img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">
+            </button>
+        </div>
+        <p id="lock-pw-error" style="color:var(--gold);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
+        <button type="button" class="btn btn-sm btn-pink" onclick="confirmLock()" style="margin-top:14px;">Unlock</button>
+    </div>
+</div>
+<?php endif; ?>
 
 <header>
     <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png?v=3" alt="Mayhem Mobility Tagline" class="tagline"></h1>
@@ -172,6 +191,13 @@ $effectiveTime = getEffectiveTime();
         <span class="status-counter counter-completed" id="counter-completed" style="<?= $completedCount > 0 ? '' : 'display:none' ?>">Completed <span class="count-num" id="count-completed"><?= $completedCount ?></span></span>
         <span class="status-counter counter-cancelled" id="counter-cancelled" style="<?= $cancelledCount > 0 ? '' : 'display:none' ?>">Cancelled <span class="count-num" id="count-cancelled"><?= $cancelledCount ?></span></span>
     </div>
+    <?php
+        $todayRule = luckyRuleForDate($effectiveTime->format('Y-m-d'));
+        $dayName = $DAY_NAMES_FULL[(int)$effectiveTime->format('w')];
+    ?>
+    <div style="text-align:right;"><div class="lucky-rule-bar">
+        <span class="lucky-rule-label">Today's Waitlist Rule (<?= $dayName ?>):</span> <?= htmlspecialchars($todayRule['label']) ?>
+    </div></div>
     <?php endif; ?>
     <div class="ov-scroll-x">
     <table id="appt-table">
@@ -215,7 +241,7 @@ $effectiveTime = getEffectiveTime();
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>, this)">Edit</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_WAITING): ?>
-                    <button type="button" class="btn btn-sm btn-jade" onclick="requirePw(function(){promoteWaitingAjax(<?= $a['id'] ?>);})">Promote</button>
+                    <button type="button" class="btn btn-sm btn-pink" onclick="guardThen(function(){promoteWaitingAjax(<?= $a['id'] ?>);})">Promote</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
                     <button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, <?= $a['id'] ?>)">Rebook</button>
@@ -228,7 +254,7 @@ $effectiveTime = getEffectiveTime();
             <tr class="edit-row" id="edit-<?= $a['id'] ?>">
                 <td colspan="8">
                     <div class="edit-inner">
-                        <form method="post" class="inline-form" onsubmit="return requirePwForForm(this)">
+                        <form method="post" class="inline-form" onsubmit="return checkSimGuard()">
                             <input type="hidden" name="appointment_id" value="<?= $a['id'] ?>">
                             <input type="date" name="new_date" value="<?= htmlspecialchars($a['appointment_date']) ?>" min="<?= $effectiveTime->format('Y-m-d') ?>" data-original-date="<?= htmlspecialchars($a['appointment_date']) ?>" onchange="toggleUpdateApptBtn(this)">
                              <select class="custom-select" name="new_slot" data-original-slot="<?= (int)$a['slot_index'] ?>" onchange="toggleUpdateApptBtn(this)">
@@ -400,7 +426,7 @@ $effectiveTime = getEffectiveTime();
 
     <details class="recruitment-details">
         <summary>Register New Mechanic</summary>
-        <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;" onsubmit="return validateRecruitForm()" novalidate>
+        <form method="post" style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;" onsubmit="return validateRecruitForm() && requirePwForForm(this)" novalidate>
             <div>
                 <label>Name</label>
                 <input type="text" name="mech_name" placeholder="John Doe">
@@ -439,7 +465,7 @@ $effectiveTime = getEffectiveTime();
                     <div style="display:flex;gap:12px;">
                         <div class="form-group">
                             <label>Name</label>
-                            <input type="text" name="mech_name" id="modal-mech-name" readonly style="width:100%;background:var(--paper);cursor:pointer;" onclick="requirePwForField('modal-mech-name')">
+                            <input type="text" name="mech_name" id="modal-mech-name" style="width:100%;">
                         </div>
                         <div class="form-group">
                             <label>Nickname</label>
@@ -456,7 +482,7 @@ $effectiveTime = getEffectiveTime();
                     </div>
                     <div class="form-group" style="display:flex;align-items:center;gap:10px;">
                         <label>Experience</label>
-                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;background:var(--paper);cursor:pointer;" readonly onclick="requirePwForField('modal-mech-exp')" data-stepper="edit">
+                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;" data-stepper="edit">
                         <button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;font-size:0.8rem;padding:6px 14px;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-top:8px;">
@@ -587,7 +613,7 @@ $effectiveTime = getEffectiveTime();
         <p class="modal-body-p">They'll be retired and won't appear for new bookings.</p>
         <p id="fire-modal-cancel-count" style="margin:0 0 16px;font-weight:bold;display:none;"></p>
         <div class="modal-btn-row">
-            <button type="button" class="btn btn-sm btn-rust" onclick="hideModal('fire-modal');requirePw(_pendingAction, false)">Yes, Fire</button>
+            <button type="button" class="btn btn-sm btn-rust" onclick="hideModal('fire-modal');window.location.href=_pendingAction">Yes, Fire</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('fire-modal')">Forget it</button>
         </div>
     </div>
@@ -800,9 +826,16 @@ var VACATION_DATA = <?= json_encode($vacationData, JSON_HEX_TAG | JSON_HEX_AMP |
 var SIM_MODE_ACTIVE = <?= json_encode($useSim) ?>;
 var EFFECTIVE_TIME = '<?= getEffectiveTime()->format('Y-m-d H:i:s') ?>';
 var DAY_NAMES = <?= json_encode($GLOBALS['DAY_NAMES_FULL']) ?>;
+var ADMIN_AUTHED = <?= json_encode($adminAuthed) ?>;
+if (!ADMIN_AUTHED) {
+    window.addEventListener('DOMContentLoaded', function() {
+        var inp = document.getElementById('lock-pw-input');
+        if (inp) inp.focus();
+    });
+}
 </script>
-<script src="script.js"></script>
-<script src="datepicker.js"></script>
+<script src="script.js?v=2"></script>
+<script src="datepicker.js?v=2"></script>
 <?php if ($msg): ?><script>showModal(<?= json_encode($msg) ?>, <?= json_encode($msgType) ?>);</script><?php endif; ?>
 <div id="display-overlay"></div>
 </body>

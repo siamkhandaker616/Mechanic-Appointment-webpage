@@ -244,14 +244,15 @@ function fetchAvailability() {
             var booked = slot.booked ? '1' : '0';
             html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '" data-booked="' + booked + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
         });
-        html += '<div class="waitlist-notice" id="waitlist-notice" style="display:none;">Lucky number! You can grab an already-booked slot as a <strong>WAITLIST</strong> — you\'ll get bumped in automatically if someone cancels.</div>';
+        html += '<div class="waitlist-notice" id="waitlist-notice" style="display:none;"></div>';
         container.innerHTML = html;
         container.querySelectorAll('.slot-chip').forEach(function(chip) {
             if (chip.classList.contains('taken')) {
                 chip.addEventListener('click', function(e) {
                     e.stopPropagation();
                     var phoneEl = document.getElementById('phone');
-                    if (phoneEl && this.dataset.booked === '1' && isLuckyPhone(phoneEl.value)) {
+                    var dateEl = document.getElementById('date');
+                    if (phoneEl && this.dataset.booked === '1' && isLuckyPhone(phoneEl.value, dateEl ? dateEl.value : TODAY)) {
                         selectSlot(this, parseInt(this.dataset.slot));
                     } else {
                         var t = document.getElementById('slot-tooltip');
@@ -273,22 +274,46 @@ function selectSlot(el, index) {
     document.getElementById('slot_index').value = index;
 }
 
-function isLuckyPhone(phone) {
+function isLuckyPhone(phone, date) {
     var digits = (phone || '').replace(/\D/g, '');
+    if (digits.length < 1) return false;
+    var rule = LUCKY_RULES[new Date(date || TODAY).getDay()];
+    if (!rule) rule = { op: 'sum3', target: 21 };
+    var target = parseInt(rule.target, 10);
+    if (rule.op === 'prod3') {
+        if (digits.length < 3) return false;
+        var last3 = digits.slice(-3);
+        var prod = parseInt(last3.charAt(0), 10) * parseInt(last3.charAt(1), 10) * parseInt(last3.charAt(2), 10);
+        return prod === target;
+    }
+    if (rule.op === 'edge') {
+        var first = parseInt(digits.charAt(0), 10);
+        var last  = parseInt(digits.charAt(digits.length - 1), 10);
+        return (first + last) === target;
+    }
     if (digits.length < 3) return false;
-    var lastThree = digits.slice(-3);
+    var last3 = digits.slice(-3);
     var sum = 0;
-    for (var i = 0; i < lastThree.length; i++) sum += parseInt(lastThree.charAt(i), 10);
-    return sum === 21;
+    for (var i = 0; i < last3.length; i++) sum += parseInt(last3.charAt(i), 10);
+    return sum === target;
 }
 
 function applyWaitlistUI() {
     var phoneEl = document.getElementById('phone');
-    var lucky = phoneEl ? isLuckyPhone(phoneEl.value) : false;
+    var dateEl = document.getElementById('date');
+    var dateVal = dateEl ? dateEl.value : TODAY;
+    var lucky = phoneEl ? isLuckyPhone(phoneEl.value, dateVal) : false;
     var container = document.getElementById('slot-container');
     if (container) container.classList.toggle('lucky-active', lucky);
     var notice = document.getElementById('waitlist-notice');
-    if (notice) notice.style.display = lucky ? '' : 'none';
+    if (notice) {
+        if (lucky) {
+            notice.innerHTML = 'Lucky number! You can grab an already-booked slot as a <strong>WAITLIST</strong> — you\'ll be first in line if the slot opens up.';
+            notice.style.display = '';
+        } else {
+            notice.style.display = 'none';
+        }
+    }
     document.querySelectorAll('.slot-chip.taken[data-booked="1"]').forEach(function(c) {
         c.classList.toggle('waitlistable', lucky);
         if (!lucky && c.classList.contains('selected')) {
@@ -613,6 +638,10 @@ function closeSimBlockModal(event) {
         hideModal('sim-block-modal');
     }
 }
+function guardThen(cb) {
+    if (!checkSimGuard()) return;
+    cb();
+}
 function requirePw(actionOrCallback, guardSim) {
     if (guardSim !== false && !checkSimGuard()) return;
     if (typeof actionOrCallback === 'function') {
@@ -640,6 +669,44 @@ function openPwModal() {
     document.getElementById('pw-error').style.display = 'none';
     document.getElementById('pw-modal').classList.remove('hidden');
     document.getElementById('admin-pw-input').focus();
+}
+function confirmLock() {
+    var pw = document.getElementById('lock-pw-input').value;
+    var btn = document.querySelector('#lock-overlay .btn-pink');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+    function restoreBtn() { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; } }
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        restoreBtn();
+        try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('lock-pw-error').textContent = 'Invalid server response.'; document.getElementById('lock-pw-error').style.display = 'block'; return; }
+        if (resp.success) {
+            var lo = document.getElementById('lock-overlay');
+            if (lo) lo.style.display = 'none';
+        } else {
+            document.getElementById('lock-pw-error').style.display = 'block';
+            document.getElementById('lock-pw-input').focus();
+        }
+    };
+    xhr.onerror = function() {
+        restoreBtn();
+        document.getElementById('lock-pw-error').textContent = 'Network error. Try again.';
+        document.getElementById('lock-pw-error').style.display = 'block';
+    };
+    xhr.onloadend = restoreBtn;
+    xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
+}
+function toggleLockPwVisibility() {
+    var input = document.getElementById('lock-pw-input');
+    var btn = document.getElementById('lock-pw-toggle');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<img src="images/doodles/eye-open.svg" alt="Hide password" style="display:block;">';
+    } else {
+        input.type = 'password';
+        btn.innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
+    }
 }
 function togglePwVisibility() {
     var input = document.getElementById('admin-pw-input');
@@ -731,12 +798,6 @@ function toggleOverrides() {
 }
 /* === MECHANIC MODAL === */
 
-function lockStepperFields() {
-    ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
-        var f = document.getElementById(id);
-        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
-    });
-}
 function clearVacationDates() {
     ['vac-start', 'vac-end'].forEach(function(id) {
         var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
@@ -745,7 +806,6 @@ function clearVacationDates() {
 }
 
 function openMechModal(btn) {
-    lockStepperFields();
     document.getElementById('modal-mech-id').value = btn.dataset.mid;
     document.getElementById('modal-mech-name').value = btn.dataset.mname;
     document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
@@ -760,7 +820,6 @@ function openMechModal(btn) {
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function openMechModalById(id, name, nickname, quote, specialties, experience) {
-    lockStepperFields();
     document.getElementById('modal-mech-id').value = id;
     document.getElementById('modal-mech-name').value = name;
     document.getElementById('modal-mech-nickname').value = nickname;
@@ -776,7 +835,6 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
 }
 function closeMechModal(event) {
     if (!event || event.target === event.currentTarget) {
-        lockStepperFields();
         hideModal('mech-modal');
         if (window._newHireName) {
             var n = window._newHireName;
@@ -916,7 +974,7 @@ function showBurstOver(el) {
 
 function showCancelModal(id) {
     document.getElementById('cancel-modal').classList.remove('hidden');
-    document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); requirePw(function(){ cancelAppointmentAjax(id); }, false); };
+    document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); guardThen(function(){ cancelAppointmentAjax(id); }); };
 }
 function closeCancelModal(event) { if (!event || event.target === event.currentTarget) hideModal('cancel-modal'); }
 function showFireModal(id, name, count) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; var el = document.getElementById('fire-modal-cancel-count'); if (count > 0) { el.textContent = count + ' booking' + (count > 1 ? 's' : '') + ' will be cancelled.'; el.style.display = 'block'; } else { el.style.display = 'none'; } document.getElementById('fire-modal').classList.remove('hidden'); }
@@ -1109,7 +1167,7 @@ function removeVacation(btn) {
 }
 
 function rehireMechanic(id, name, el) {
-    requirePw(function() {
+    guardThen(function() {
         ajaxGet('?restore=' + id, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
@@ -1150,7 +1208,7 @@ function rehireMechanic(id, name, el) {
             showModal(d.msg, 'error');
         }
         });
-    }, false);
+    });
 }
 
 function removeMechanicAjax(id) {
@@ -1399,7 +1457,7 @@ function rebookCheck(btn, id) {
             return;
         }
     }
-    requirePw(function() { rebookAppointmentAjax(id); }, false);
+    guardThen(function() { rebookAppointmentAjax(id); });
 }
 
 function rebookAppointmentAjax(id) {
@@ -1826,6 +1884,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('date').addEventListener('change', function() {
             var dateVal = document.getElementById('date').value;
             if (!dateVal || dateVal >= TODAY) hidePastDateMsg();
+            fetchAvailability();
         });
     }
 

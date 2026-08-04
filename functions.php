@@ -10,6 +10,20 @@ function handleVerifyPw(): void {
     exit;
 }
 
+/* === ADMIN AUTH GUARDS === */
+
+function requireAdminSession(): void {
+    if (empty($_SESSION['admin_verified'])) {
+        ajaxFlash('Admin session required — log in first.', 'error');
+    }
+}
+
+function requireAdminReauth(): void {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) {
+        ajaxFlash('Admin session expired — re-enter your password.', 'error');
+    }
+}
+
 /* === FORMATTING HELPERS === */
 
 function fmtDate(string $date): string {
@@ -39,11 +53,32 @@ function normalizePhone(string $phone): string {
     return preg_replace('/[^\d]/', '', $phone);
 }
 
-function isLuckyPhone(string $phone): bool {
+function luckyRuleForDate(string $date = ''): array {
+    global $LUCKY_RULES;
+    if ($date === '') $date = date('Y-m-d');
+    $dow = (int)date('w', strtotime($date));
+    return $LUCKY_RULES[$dow] ?? ['op' => 'sum3', 'target' => 21, 'label' => 'Last 3 digits add up to 21'];
+}
+
+function isLuckyPhone(string $phone, string $date = ''): bool {
+    $rule = luckyRuleForDate($date);
+    $op = $rule['op'];
+    $target = (int)$rule['target'];
     $digits = normalizePhone($phone);
+    if (strlen($digits) < 1) return false;
+    if ($op === 'prod3') {
+        if (strlen($digits) < 3) return false;
+        $lastThree = substr($digits, -3);
+        return array_product(str_split($lastThree)) === $target;
+    }
+    if ($op === 'edge') {
+        $first = (int)$digits[0];
+        $last  = (int)substr($digits, -1);
+        return ($first + $last) === $target;
+    }
     if (strlen($digits) < 3) return false;
     $lastThree = substr($digits, -3);
-    return array_sum(str_split($lastThree)) === 21;
+    return array_sum(str_split($lastThree)) === $target;
 }
 
 function isSlotTakenByBooking(int $mechanicId, string $date, int $slotIndex): bool {
@@ -659,8 +694,7 @@ function saveBackupIfSim(int $appointmentId): void {
 /* === ACTION HANDLERS === */
 
 function handleRemoveAllCancelled(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_CANCELLED . "'");
@@ -669,8 +703,7 @@ function handleRemoveAllCancelled(): never {
 }
 
 function handleRemoveAllCompleted(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE status = '" . STATUS_COMPLETED . "'");
@@ -679,8 +712,7 @@ function handleRemoveAllCompleted(): never {
 }
 
 function handleRemove(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM appointments WHERE id = ? AND status = '" . STATUS_CANCELLED . "'");
@@ -690,8 +722,7 @@ function handleRemove(): never {
 }
 
 function handleCancel(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminSession();
     $id = (int)$_GET['cancel'];
     saveBackupIfSim($id);
     $promoted = cancelAppointment($id);
@@ -708,28 +739,37 @@ function handleCancel(): never {
         }
         flashAndRedirect('Appointment cancelled.' . ($bumpedIn ? ' A waitlisted client was bumped into the slot.' : ''));
     } else {
-        ajaxFlash('Could not cancel — appointment may already be in progress or completed.', 'error');
+        ajaxFlash('No can do — that appointment\'s already in motion or wrapped up.', 'error');
     }
 }
 
 function handlePromoteWaiting(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminSession();
     $id = (int)$_GET['promote_waiting'];
     $db = getDB();
     $stmt = $db->prepare("SELECT mechanic_id, appointment_date, slot_index FROM appointments WHERE id = ? AND status = '" . STATUS_WAITING . "'");
     $stmt->execute([$id]);
     $appt = $stmt->fetch();
-    if (!$appt) ajaxFlash('Waiting appointment not found.', 'error');
-    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status IN ('" . STATUS_SCHEDULED . "', '" . STATUS_IN_PROGRESS . "')");
+    if (!$appt) ajaxFlash('Nope — that waitlisted appointment vanished into thin air!', 'error');
+    $stmt = $db->prepare("SELECT status FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status IN ('" . STATUS_SCHEDULED . "', '" . STATUS_IN_PROGRESS . "', '" . STATUS_COMPLETED . "')");
     $stmt->execute([(int)$appt['mechanic_id'], $appt['appointment_date'], (int)$appt['slot_index']]);
-    if ($stmt->fetchColumn() > 0) ajaxFlash('That slot is still taken — cancel or complete the booking there first.', 'error');
+    $existing = $stmt->fetch();
+    if ($existing) {
+        if ($existing['status'] === STATUS_COMPLETED) {
+            ajaxFlash('That slot\'s already in the history books — can\'t rewrite the ending!', 'error');
+        } elseif ($existing['status'] === STATUS_IN_PROGRESS) {
+            ajaxFlash('That mechanic\'s elbow-deep in grease right now — you can\'t cut in mid-service!', 'error');
+        } else {
+            ajaxFlash('Somebody\'s already locked and loaded for that slot — cancel them first!', 'error');
+        }
+    }
     saveBackupIfSim($id);
     $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ?")->execute([$id]);
-    ajaxFlash('Waitlisted appointment promoted to scheduled.');
+    ajaxFlash('Boom! Waitlisted client just got bumped up — they\'re in!');
 }
 
 function handleReBook(): never {
+    requireAdminSession();
     $id = (int)$_GET['rebook'];
     $db = getDB();
     $stmt = $db->prepare("SELECT a.appointment_date, a.slot_index, a.mechanic_id, m.is_active FROM appointments a JOIN mechanics m ON m.id = a.mechanic_id WHERE a.id = ? AND a.status = '" . STATUS_CANCELLED . "'");
@@ -790,6 +830,7 @@ function handleReBook(): never {
 }
 
 function handleReBookConfirm(): never {
+    requireAdminSession();
     $id = (int)$_GET['rebook_confirm'];
     $newMech = (int)$_GET['new_mech'];
     $db = getDB();
@@ -809,8 +850,7 @@ function handleReBookConfirm(): never {
 }
 
 function handleFire(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminSession();
     $db = getDB();
     $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['fire']]);
@@ -820,8 +860,7 @@ function handleFire(): never {
 }
 
 function handleRestore(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminSession();
     $db = getDB();
     $stmt = $db->prepare("SELECT name, nickname, quote, specialties, years_experience AS experience FROM mechanics WHERE id = ?");
     $stmt->execute([(int)$_GET['restore']]);
@@ -836,8 +875,7 @@ function handleRestore(): never {
 }
 
 function handleRemoveMechanic(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     guardAgainstSim();
     $db = getDB();
     $stmt = $db->prepare("SELECT name FROM mechanics WHERE id = ?");
@@ -848,8 +886,7 @@ function handleRemoveMechanic(): never {
 }
 
 function handleUnblock(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     $db = getDB();
     $stmt = $db->prepare("DELETE FROM mechanic_overrides WHERE id = ?");
     $stmt->execute([(int)$_GET['unblock']]);
@@ -858,8 +895,7 @@ function handleUnblock(): never {
 }
 
 function handleRemoveVacation(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminReauth();
     guardAgainstSim();
     $vacId = (int)$_GET['remove_vacation'];
     $stmt = getDB()->prepare("SELECT mechanic_id, start_date, end_date FROM mechanic_vacations WHERE id = ?");
@@ -881,8 +917,7 @@ function handleRemoveVacation(): never {
 }
 
 function handleUpdateAppointment(): never {
-    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) flashAndRedirect('Session expired. Re-authenticate.', 'error');
-    unset($_SESSION['admin_verified']);
+    requireAdminSession();
     $id = (int)($_POST['appointment_id'] ?? 0);
     saveBackupIfSim($id);
     $newDate = $_POST['new_date'] ?? '';
@@ -978,6 +1013,7 @@ function restoreBackupData(): void {
 }
 
 function handleSimToggle(): never {
+    requireAdminSession();
     $db = getDB();
     $wasSim = (bool)$db->query("SELECT use_simulated_time FROM sim_config WHERE id = 1")->fetchColumn();
     $useSim = (int)(isset($_POST['use_sim']));
@@ -990,6 +1026,7 @@ function handleSimToggle(): never {
 }
 
 function handleToggleSim(): never {
+    requireAdminSession();
     $db = getDB();
     $simDt = $_POST['sim_datetime'] ?? null;
     if ($simDt) {
@@ -1004,6 +1041,7 @@ function handleToggleSim(): never {
 }
 
 function handleAddMechanic(): never {
+    requireAdminReauth();
     guardAgainstSim();
     $name = trim($_POST['mech_name'] ?? '');
     $nickname = trim($_POST['mech_nickname'] ?? '') ?: null;
@@ -1019,6 +1057,7 @@ function handleAddMechanic(): never {
 }
 
 function handleUpdateMechanicInfo(): never {
+    requireAdminSession();
     guardAgainstSim();
     $id = (int)($_POST['mech_id'] ?? 0);
     $name = trim($_POST['mech_name'] ?? '');
@@ -1040,6 +1079,7 @@ function handleUpdateMechanicInfo(): never {
 }
 
 function handleUpdateSchedule(): never {
+    requireAdminSession();
     guardAgainstSim();
     $mechId = (int)($_POST['mech_id'] ?? 0);
     $schedule = [];
@@ -1072,6 +1112,7 @@ function handleUpdateSchedule(): never {
 }
 
 function handleAddVacation(): never {
+    requireAdminSession();
     guardAgainstSim();
     $mechId = (int)($_POST['vac_mech_id'] ?? 0);
     $start = $_POST['vac_start'] ?? '';
@@ -1123,6 +1164,7 @@ function handleAddVacation(): never {
 }
 
 function handleOverrideSlot(): never {
+    requireAdminReauth();
     guardAgainstSim();
     $db = getDB();
     $mechId = (int)($_POST['override_mechanic'] ?? 0);
