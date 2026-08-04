@@ -81,7 +81,7 @@ CREATE TABLE appointments (
     mechanic_id INT NOT NULL,
     appointment_date DATE NOT NULL,
     slot_index TINYINT NOT NULL COMMENT '0=10:00, 1=12:00, 2=14:00, 3=16:00',
-    status ENUM('scheduled','in_progress','completed','cancelled') DEFAULT 'scheduled',
+    status ENUM('scheduled','in_progress','completed','cancelled','waiting') DEFAULT 'scheduled',
     cancelled_at DATETIME DEFAULT NULL,
     admin_notes TEXT DEFAULT NULL,
     backup_data TEXT DEFAULT NULL,

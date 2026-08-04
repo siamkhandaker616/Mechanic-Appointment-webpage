@@ -108,12 +108,17 @@ if (!$mechanic) {
 }
 
 $slotAvailability = getMechanicSlotsAvailability($mechanicId, $date);
+$bookedStmt = getDB()->prepare("SELECT slot_index FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
+$bookedStmt->execute([$mechanicId, $date]);
+$bookedSlots = [];
+foreach ($bookedStmt->fetchAll() as $r) $bookedSlots[(int)$r['slot_index']] = true;
 $slots = [];
 for ($i = 0; $i < SLOT_COUNT; $i++) {
     $slots[] = [
         'index' => $i,
         'label' => $SLOT_LABELS[$i] ?? "Slot " . ($i + 1),
         'available' => $slotAvailability[$i],
+        'booked' => isset($bookedSlots[$i]),
     ];
 }
 

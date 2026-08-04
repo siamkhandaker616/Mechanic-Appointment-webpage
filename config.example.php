@@ -14,6 +14,7 @@ define('STATUS_SCHEDULED', 'scheduled');
 define('STATUS_CANCELLED', 'cancelled');
 define('STATUS_IN_PROGRESS', 'in_progress');
 define('STATUS_COMPLETED', 'completed');
+define('STATUS_WAITING', 'waiting');
 
 $DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 $DAY_NAMES_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

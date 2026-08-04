@@ -1041,6 +1041,39 @@ textarea {
     transform: translate(-1px, -1px);
 }
 
+.slot-chip.taken.waitlistable {
+    opacity: 1;
+    border-style: dashed;
+    border-color: var(--pink);
+}
+.slot-chip.taken.waitlistable:hover {
+    opacity: 1;
+    background: var(--teal);
+    color: var(--gold);
+}
+.slot-chip.taken.selected {
+    opacity: 1;
+    background: var(--pink);
+    color: var(--gold);
+    border-style: dashed;
+}
+.slot-chip.taken.selected:hover {
+    opacity: 1;
+    background: var(--pink);
+    color: var(--gold);
+    transform: translate(-1px, -1px);
+}
+
+.waitlist-notice {
+    flex: 1 1 100%;
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: var(--gold);
+    border: 2px dashed var(--ink);
+    font-family: var(--font-hand);
+    font-size: 0.85rem;
+}
+
 .slot-tooltip {
     position: fixed;
     z-index: 9999;
@@ -1286,6 +1319,7 @@ tr:last-child td {
     transform: rotate(-1deg);
 }
 .status-cancelled { background: var(--amber); color: var(--ink); }
+.status-waiting { background: var(--gold); color: var(--rust); border-style: dashed; }
 
 /* === SIM BAR === */
 
@@ -2682,6 +2716,7 @@ body.no-anim *::after {
 }
 .counter-scheduled { background: #e3d6b1; color: #a58a31; }
 .counter-inprogress { background: #ffa7cc; color: #85045c; }
+.counter-waiting { background: #f7e08b; color: #7a5c00; border-style: dashed; }
 .counter-completed { background: #a8e6cf; color: #155724; }
 .counter-cancelled { background: #f1afaf; color: #721c24; }
 

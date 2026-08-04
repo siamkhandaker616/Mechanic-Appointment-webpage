@@ -34,8 +34,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (isCarBookedOnDate($carId, $_POST['date'])) {
             $errors[] = 'This car already has an appointment on this date.';
-        } elseif (!isSlotAvailable((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
+        } elseif (isSlotTakenByBooking((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
+            if (isLuckyPhone($phone)) {
+                $apptId = createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'], STATUS_WAITING);
+                $_SESSION['confirmed'] = [
+                    'date' => $_POST['date'],
+                    'slot_index' => (int)$_POST['slot_index'],
+                    'mechanic_id' => (int)$_POST['mechanic_id'],
+                    'appointment_id' => $apptId,
+                    'waitlist' => true,
+                ];
+                header('Location: index.php?confirmed=1&waitlist=1');
+                exit;
+            }
             $errors[] = 'Sorry, that slot was just taken. Pick another slot or mechanic above.';
+        } elseif (!isSlotAvailable((int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index'])) {
+            $errors[] = 'Sorry, that slot isn\'t available — the mechanic is off, on vacation, or it\'s blocked. Pick another slot or mechanic above.';
         } else {
             $apptId = createAppointment($clientId, $carId, (int)$_POST['mechanic_id'], $_POST['date'], (int)$_POST['slot_index']);
             $_SESSION['confirmed'] = [
@@ -102,6 +116,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <?php if ($confirmed && $appt): ?>
 <!-- === RECEIPT === -->
 <?php $letters = ['A', 'B', 'C', 'D']; $dispId = $letters[(int)$appt['slot_index']] . $appt['id']; ?>
+<?php $isWaitlist = !empty($confirmed['waitlist']); ?>
 <div class="panel receipt-carbon-stack">
     <div class="receipt-copy-layer receipt-blue-copy"></div>
     <div class="receipt-order">
@@ -113,7 +128,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
         <div class="receipt-meta">
             <span>#<?= htmlspecialchars($dispId) ?></span>
             <span><?= htmlspecialchars(fmtDate($appt['appointment_date'])) ?></span>
-            <span>Status: <strong style="color:var(--jade);"><?= htmlspecialchars(ucfirst($appt['status'])) ?></strong></span>
+            <span>Status: <strong style="color:<?= $isWaitlist ? 'var(--rust)' : 'var(--jade)' ?>;"><?= $isWaitlist ? 'Waiting' : htmlspecialchars(ucfirst($appt['status'])) ?></strong></span>
         </div>
         <div class="receipt-fields">
             <div class="receipt-field-row">
@@ -146,9 +161,15 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             </div>
         </div>
         <div class="receipt-important">
+            <?php if ($isWaitlist): ?>
+            <strong>⚠ WAITLIST</strong><br>
+            Your lucky number got you on the <strong>waitlist</strong> — we'll bump you in automatically if someone cancels.<br>
+            <span class="receipt-cb-indicator"><img src="images/icons/gear-check.svg" width="30" height="30" style="position:absolute;top:-10px;left:-10px;" alt="?"></span> Hold tight
+            <?php else: ?>
             <strong>⚠ IMPORTANT</strong><br>
             Bring this order on arrival &bull; Present to service desk<br>
             <span class="receipt-cb-indicator"><img src="images/icons/gear-check.svg" width="30" height="30" style="position:absolute;top:-10px;left:-10px;" alt="✓"></span> Appointment confirmed
+            <?php endif; ?>
         </div>
         <div class="receipt-footer">
             Mayhem Mobility &bull; Auto Repair &bull; Downtown &bull; Est. 1947
@@ -163,12 +184,20 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
 <!-- === CONFIRMATION (fallback) === -->
 <div class="panel confirm-box">
     <img src="images/icons/pow.svg" alt="POW!" class="pow-burst">
-    <h2>APPOINTMENT CONFIRMED!</h2>
+    <h2><?= !empty($confirmed['waitlist']) ? 'YOU\'RE ON THE WAITLIST!' : 'APPOINTMENT CONFIRMED!' ?></h2>
     <div class="bubble">
+        <?php if (!empty($confirmed['waitlist'])): ?>
+        Your lucky number grabbed a spot in line for
+        <strong><?= htmlspecialchars(fmtDate($confirmed['date'])) ?></strong>,
+        slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$confirmed['slot_index']] ?? '') ?></strong>
+        with <strong><?= htmlspecialchars((getMechanicById((int)$confirmed['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
+        We'll bump you in automatically if someone cancels.
+        <?php else: ?>
         Your car is in good hands. We'll see you at
         <strong><?= htmlspecialchars(fmtDate($confirmed['date'])) ?></strong>,
         slot <strong><?= htmlspecialchars($SLOT_LABELS[(int)$confirmed['slot_index']] ?? '') ?></strong>
         with <strong><?= htmlspecialchars((getMechanicById((int)$confirmed['mechanic_id']) ?? [])['name'] ?? '') ?></strong>.
+        <?php endif; ?>
     </div>
     <a href="index.php" class="btn btn-pink">Book Another</a>
 </div>
@@ -192,7 +221,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
                 </div>
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="Enter phone number carefully" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Valid phone #s only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>">
+                    <input type="tel" id="phone" name="phone" placeholder="Enter phone number carefully" data-validate="required|phone" data-err-required="Phone is required." data-err-phone="Valid phone #s only." value="<?= htmlspecialchars($savedPost['phone'] ?? '') ?>" oninput="applyWaitlistUI()">
                 </div>
                 <div class="form-group">
                     <label for="address">Address</label>

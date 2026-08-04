@@ -241,21 +241,29 @@ function fetchAvailability() {
         var html = '';
         data.slots.forEach(function(slot) {
             var taken = slot.available ? '' : 'taken';
-            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
+            var booked = slot.booked ? '1' : '0';
+            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '" data-booked="' + booked + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
         });
+        html += '<div class="waitlist-notice" id="waitlist-notice" style="display:none;">Lucky number! You can grab an already-booked slot as a <strong>WAITLIST</strong> — you\'ll get bumped in automatically if someone cancels.</div>';
         container.innerHTML = html;
         container.querySelectorAll('.slot-chip').forEach(function(chip) {
             if (chip.classList.contains('taken')) {
                 chip.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    var t = document.getElementById('slot-tooltip');
-                    if (t && !t.classList.contains('hidden') && t._target === chip) { hideTooltip(); }
-                    else { showTooltip(chip); }
+                    var phoneEl = document.getElementById('phone');
+                    if (phoneEl && this.dataset.booked === '1' && isLuckyPhone(phoneEl.value)) {
+                        selectSlot(this, parseInt(this.dataset.slot));
+                    } else {
+                        var t = document.getElementById('slot-tooltip');
+                        if (t && !t.classList.contains('hidden') && t._target === this) { hideTooltip(); }
+                        else { showTooltip(this); }
+                    }
                 });
             } else {
                 chip.addEventListener('click', function() { selectSlot(this, parseInt(this.dataset.slot)); });
             }
         });
+        applyWaitlistUI();
     }).catch(function() { if (reqId === _fetchId) container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>'; });
 }
 
@@ -263,6 +271,32 @@ function selectSlot(el, index) {
     document.querySelectorAll('.slot-chip').forEach(function(c) { c.classList.remove('selected'); });
     el.classList.add('selected');
     document.getElementById('slot_index').value = index;
+}
+
+function isLuckyPhone(phone) {
+    var digits = (phone || '').replace(/\D/g, '');
+    if (digits.length < 3) return false;
+    var lastThree = digits.slice(-3);
+    var sum = 0;
+    for (var i = 0; i < lastThree.length; i++) sum += parseInt(lastThree.charAt(i), 10);
+    return sum === 21;
+}
+
+function applyWaitlistUI() {
+    var phoneEl = document.getElementById('phone');
+    var lucky = phoneEl ? isLuckyPhone(phoneEl.value) : false;
+    var container = document.getElementById('slot-container');
+    if (container) container.classList.toggle('lucky-active', lucky);
+    var notice = document.getElementById('waitlist-notice');
+    if (notice) notice.style.display = lucky ? '' : 'none';
+    document.querySelectorAll('.slot-chip.taken[data-booked="1"]').forEach(function(c) {
+        c.classList.toggle('waitlistable', lucky);
+        if (!lucky && c.classList.contains('selected')) {
+            c.classList.remove('selected');
+            var si = document.getElementById('slot_index');
+            if (si && si.value === c.dataset.slot) si.value = '';
+        }
+    });
 }
 
 function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
@@ -978,10 +1012,9 @@ function addVacation() {
         }
     }
     var conflictCount = 0;
-    var mechName = document.getElementById('modal-mech-name') ? document.getElementById('modal-mech-name').value.toLowerCase() : '';
     document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
         if (tr.dataset.status === 'scheduled' || tr.dataset.status === 'in_progress') {
-            if (mechName && (tr.dataset.mechanic || '') === mechName && tr.dataset.date >= start && tr.dataset.date <= end) conflictCount++;
+            if (tr.dataset.mechId == id && tr.dataset.date >= start && tr.dataset.date <= end) conflictCount++;
         }
     });
     if (conflictCount > 0) {
@@ -1146,7 +1179,7 @@ function updateStatusCounters() {
             counts[s] = (counts[s] || 0) + 1; total++;
         }
     });
-    ['scheduled', 'in_progress', 'completed', 'cancelled'].forEach(function(s) {
+    ['scheduled', 'in_progress', 'waiting', 'completed', 'cancelled'].forEach(function(s) {
         var n = counts[s] || 0;
         var badge = document.getElementById('counter-' + s);
         var num = document.getElementById('count-' + s);
@@ -1251,6 +1284,7 @@ function cancelAppointmentAjax(id) {
     ajaxGet('?cancel=' + id, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
+            if (d.reload) { setTimeout(function() { window.location.reload(); }, 1600); return; }
             var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
             if (tr) {
                 var tdActions = tr.querySelectorAll('td')[7];
@@ -1258,6 +1292,25 @@ function cancelAppointmentAjax(id) {
                 var tdStatus = tr.querySelector('.status-badge');
                 if (tdStatus) { tdStatus.className = 'status-badge status-cancelled'; tdStatus.textContent = 'cancelled'; }
                 tr.dataset.status = 'cancelled';
+            }
+            updateStatusCounters();
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function promoteWaitingAjax(id) {
+    ajaxGet('?promote_waiting=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
+            if (tr) {
+                var tdActions = tr.querySelectorAll('td')[7];
+                tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
+                var tdStatus = tr.querySelector('.status-badge');
+                if (tdStatus) { tdStatus.className = 'status-badge status-scheduled'; tdStatus.textContent = 'scheduled'; }
+                tr.dataset.status = 'scheduled';
             }
             updateStatusCounters();
         } else {

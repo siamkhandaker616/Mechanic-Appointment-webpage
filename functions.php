@@ -39,6 +39,19 @@ function normalizePhone(string $phone): string {
     return preg_replace('/[^\d]/', '', $phone);
 }
 
+function isLuckyPhone(string $phone): bool {
+    $digits = normalizePhone($phone);
+    if (strlen($digits) < 3) return false;
+    $lastThree = substr($digits, -3);
+    return array_sum(str_split($lastThree)) === 21;
+}
+
+function isSlotTakenByBooking(int $mechanicId, string $date, int $slotIndex): bool {
+    $stmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status != '" . STATUS_CANCELLED . "'");
+    $stmt->execute([$mechanicId, $date, $slotIndex]);
+    return $stmt->fetchColumn() > 0;
+}
+
 /* === MECHANIC QUERIES === */
 
 function getMechanics(): array {
@@ -224,10 +237,10 @@ function findOrCreateCar(int $clientId, string $licenseNo, string $engineNo, str
     return (int)$db->lastInsertId();
 }
 
-function createAppointment(int $clientId, int $carId, int $mechanicId, string $date, int $slotIndex): int {
+function createAppointment(int $clientId, int $carId, int $mechanicId, string $date, int $slotIndex, string $status = STATUS_SCHEDULED): int {
     $db = getDB();
-    $stmt = $db->prepare("INSERT INTO appointments (client_id, car_id, mechanic_id, appointment_date, slot_index) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$clientId, $carId, $mechanicId, $date, $slotIndex]);
+    $stmt = $db->prepare("INSERT INTO appointments (client_id, car_id, mechanic_id, appointment_date, slot_index, status) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$clientId, $carId, $mechanicId, $date, $slotIndex, $status]);
     return (int)$db->lastInsertId();
 }
 
@@ -446,10 +459,30 @@ function validateSlotAssignment(int $mechanicId, string $date, int $slotIndex, ?
 
 /* === APPOINTMENT MUTATIONS === */
 
-function cancelAppointment(int $appointmentId): bool {
-    $stmt = getDB()->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE id = ? AND status = '" . STATUS_SCHEDULED . "'");
+function promoteWaitingAppointment(int $mechanicId, string $date, int $slotIndex): ?int {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status = '" . STATUS_WAITING . "' ORDER BY id ASC LIMIT 1");
+    $stmt->execute([$mechanicId, $date, $slotIndex]);
+    $id = $stmt->fetchColumn();
+    if (!$id) return null;
+    $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ?")->execute([$id]);
+    return (int)$id;
+}
+
+function cancelAppointment(int $appointmentId): int {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT mechanic_id, appointment_date, slot_index, status FROM appointments WHERE id = ? AND status IN ('" . STATUS_SCHEDULED . "', '" . STATUS_WAITING . "')");
     $stmt->execute([$appointmentId]);
-    return $stmt->rowCount() > 0;
+    $appt = $stmt->fetch();
+    if (!$appt) return 0;
+    $stmt = $db->prepare("UPDATE appointments SET status = '" . STATUS_CANCELLED . "', cancelled_at = NOW() WHERE id = ?");
+    $stmt->execute([$appointmentId]);
+    if ($stmt->rowCount() === 0) return 0;
+    /*if ($appt['status'] === STATUS_SCHEDULED) {
+        $promotedId = promoteWaitingAppointment((int)$appt['mechanic_id'], $appt['appointment_date'], (int)$appt['slot_index']);
+        return $promotedId !== null ? $promotedId : 1;
+    }*/
+    return 1;
 }
 
 /* === INPUT VALIDATION === */
@@ -661,11 +694,39 @@ function handleCancel(): never {
     unset($_SESSION['admin_verified']);
     $id = (int)$_GET['cancel'];
     saveBackupIfSim($id);
-    if (cancelAppointment($id)) {
-        ajaxFlash('Appointment cancelled.');
+    $promoted = cancelAppointment($id);
+    if ($promoted) {
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        $bumpedIn = $promoted > 1;
+        if ($isAjax) {
+            echo json_encode([
+                'ok' => true,
+                'msg' => 'Appointment cancelled.' . ($bumpedIn ? ' A waitlisted client was bumped into the slot.' : ''),
+                'reload' => $bumpedIn,
+            ]);
+            exit;
+        }
+        flashAndRedirect('Appointment cancelled.' . ($bumpedIn ? ' A waitlisted client was bumped into the slot.' : ''));
     } else {
         ajaxFlash('Could not cancel — appointment may already be in progress or completed.', 'error');
     }
+}
+
+function handlePromoteWaiting(): never {
+    if (($_SESSION['admin_verified'] ?? 0) < time() - 60) ajaxFlash('Session expired. Re-authenticate.', 'error');
+    unset($_SESSION['admin_verified']);
+    $id = (int)$_GET['promote_waiting'];
+    $db = getDB();
+    $stmt = $db->prepare("SELECT mechanic_id, appointment_date, slot_index FROM appointments WHERE id = ? AND status = '" . STATUS_WAITING . "'");
+    $stmt->execute([$id]);
+    $appt = $stmt->fetch();
+    if (!$appt) ajaxFlash('Waiting appointment not found.', 'error');
+    $stmt = $db->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND slot_index = ? AND status IN ('" . STATUS_SCHEDULED . "', '" . STATUS_IN_PROGRESS . "')");
+    $stmt->execute([(int)$appt['mechanic_id'], $appt['appointment_date'], (int)$appt['slot_index']]);
+    if ($stmt->fetchColumn() > 0) ajaxFlash('That slot is still taken — cancel or complete the booking there first.', 'error');
+    saveBackupIfSim($id);
+    $db->prepare("UPDATE appointments SET status = '" . STATUS_SCHEDULED . "' WHERE id = ?")->execute([$id]);
+    ajaxFlash('Waitlisted appointment promoted to scheduled.');
 }
 
 function handleReBook(): never {

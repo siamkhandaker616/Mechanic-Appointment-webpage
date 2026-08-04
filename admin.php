@@ -14,6 +14,7 @@ if (isset($_GET['rebook_confirm']))      handleReBookConfirm();
 if (isset($_GET['remove_all_completed'])) handleRemoveAllCompleted();
 if (isset($_GET['remove']))             handleRemove();
 if (isset($_GET['cancel']))             handleCancel();
+if (isset($_GET['promote_waiting']))    handlePromoteWaiting();
 if (isset($_GET['fire']))               handleFire();
 if (isset($_GET['restore']))            handleRestore();
 if (isset($_GET['remove_mechanic']))    handleRemoveMechanic();
@@ -54,11 +55,13 @@ $scheduledCount = 0;
 $inProgressCount = 0;
 $cancelledCount = 0;
 $completedCount = 0;
+$waitingCount = 0;
 foreach ($appointments as $appt) {
     if ($appt['status'] === STATUS_SCHEDULED) $scheduledCount++;
     if ($appt['status'] === STATUS_IN_PROGRESS) $inProgressCount++;
     if ($appt['status'] === STATUS_CANCELLED) $cancelledCount++;
     if ($appt['status'] === STATUS_COMPLETED) $completedCount++;
+    if ($appt['status'] === STATUS_WAITING) $waitingCount++;
 }
 $mechanics = getMechanics();
 $mechanicsForSelect = getMechanicsForSelect();
@@ -165,6 +168,7 @@ $effectiveTime = getEffectiveTime();
         <div class="filter-count" id="filter-count"></div>
         <span class="status-counter counter-scheduled" id="counter-scheduled" style="<?= $scheduledCount > 0 ? '' : 'display:none' ?>">Scheduled <span class="count-num" id="count-scheduled"><?= $scheduledCount ?></span></span>
         <span class="status-counter counter-inprogress" id="counter-in_progress" style="<?= $inProgressCount > 0 ? '' : 'display:none' ?>">In Progress <span class="count-num" id="count-in_progress"><?= $inProgressCount ?></span></span>
+        <span class="status-counter counter-waiting" id="counter-waiting" style="<?= $waitingCount > 0 ? '' : 'display:none' ?>">Waiting <span class="count-num" id="count-waiting"><?= $waitingCount ?></span></span>
         <span class="status-counter counter-completed" id="counter-completed" style="<?= $completedCount > 0 ? '' : 'display:none' ?>">Completed <span class="count-num" id="count-completed"><?= $completedCount ?></span></span>
         <span class="status-counter counter-cancelled" id="counter-cancelled" style="<?= $cancelledCount > 0 ? '' : 'display:none' ?>">Cancelled <span class="count-num" id="count-cancelled"><?= $cancelledCount ?></span></span>
     </div>
@@ -195,6 +199,7 @@ $effectiveTime = getEffectiveTime();
                 data-phone="<?= htmlspecialchars($a['phone']) ?>"
                 data-car="<?= htmlspecialchars(strtolower($a['license_no'] . ' ' . ($a['model'] ?? ''))) ?>"
                 data-status="<?= $a['status'] ?>"
+                data-mech-id="<?= (int)$a['mechanic_id'] ?>"
                 data-mechanic="<?= htmlspecialchars(strtolower($a['mechanic_name'])) ?>"
                 data-date="<?= $a['appointment_date'] ?>"
                 data-slot="<?= (int)$a['slot_index'] ?>">
@@ -208,6 +213,9 @@ $effectiveTime = getEffectiveTime();
                 <td class="td-nowrap">
                     <?php if ($a['status'] === STATUS_SCHEDULED): ?>
                     <button class="btn btn-sm btn-outline" onclick="toggleEdit(<?= $a['id'] ?>, this)">Edit</button>
+                    <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
+                    <?php elseif ($a['status'] === STATUS_WAITING): ?>
+                    <button type="button" class="btn btn-sm btn-jade" onclick="requirePw(function(){promoteWaitingAjax(<?= $a['id'] ?>);})">Promote</button>
                     <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(<?= $a['id'] ?>)">Cancel</button>
                     <?php elseif ($a['status'] === STATUS_CANCELLED): ?>
                     <button type="button" class="btn btn-sm btn-jade" onclick="rebookCheck(this, <?= $a['id'] ?>)">Rebook</button>
@@ -718,6 +726,7 @@ $effectiveTime = getEffectiveTime();
                     <option value="">All Status</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="in_progress">In Progress</option>
+                    <option value="waiting">Waiting</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                 </select>
