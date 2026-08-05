@@ -20,6 +20,18 @@ if (isset($_GET['restore']))            handleRestore();
 if (isset($_GET['remove_mechanic']))    handleRemoveMechanic();
 if (isset($_GET['unblock']))            handleUnblock();
 if (isset($_GET['remove_vacation']))    handleRemoveVacation();
+if (isset($_GET['mech_reviews'])) {
+    requireAdminSession();
+    header('Content-Type: application/json');
+    $mechId = (int)$_GET['mech_reviews'];
+    $reviews = getMechanicReviews($mechId);
+    $results = [];
+    foreach ($reviews as $r) {
+        $results[] = ['rating' => (int)$r['rating'], 'comment' => $r['comment'] ?? '', 'date' => $r['created_at'], 'client' => $r['client_name'] ?? ''];
+    }
+    echo json_encode(['ok' => true, 'reviews' => $results]);
+    exit;
+}
 if (isset($_GET['hire_closed'])) {
     $name = $_GET['name'] ?? '';
     $_SESSION['flash_msg'] = $name ? htmlspecialchars($name) . ' has been hired!' : 'New mechanic added.';
@@ -81,6 +93,7 @@ $vacationData = [];
 foreach ($allMechanics as $m) {
     $vacationData[$m['id']] = getMechanicVacations((int)$m['id']);
 }
+$mechReviewStats = getMechanicReviewStats();
 
 $overrides = getDB()->query(
     "SELECT mo.id, mo.mechanic_id, mo.override_date, mo.slot_1, mo.slot_2, mo.slot_3, mo.slot_4, mo.reason, m.name AS mechanic_name
@@ -111,8 +124,7 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
 <div class="omg omg-right">ZOWIE</div>
 <div class="omg omg-bot">BAM</div>
 
-<?php if (!$adminAuthed): ?>
-<div id="lock-overlay">
+<div id="lock-overlay" class="hidden">
     <div class="lock-content" onclick="event.stopPropagation()">
         <div class="burst burst-right" style="font-size:0.7rem;">LOCKED!</div>
         <h2>Mayhem Mobility</h2>
@@ -122,12 +134,11 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
             <button type="button" id="lock-pw-toggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;line-height:1;" onclick="toggleLockPwVisibility()">
                 <img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">
             </button>
+            <p id="lock-pw-error" style="color:var(--gold);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;">Incorrect password.</p>
         </div>
-        <p id="lock-pw-error" style="color:var(--gold);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
         <button type="button" class="btn btn-sm btn-pink" onclick="confirmLock()" style="margin-top:14px;">Unlock</button>
     </div>
 </div>
-<?php endif; ?>
 
 <header>
     <h1>Mayhem Mobility <img src="https://cdn.statically.io/gh/siamkhandaker616/Mechanic-Appointment-webpage/main/images/icons/tagline.png?v=3" alt="Mayhem Mobility Tagline" class="tagline"></h1>
@@ -386,6 +397,7 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
                 <th>Name</th>
                 <th>Nickname</th>
                 <th>Specialties</th>
+                <th class="th-center">Rating</th>
                 <th>Exp</th>
                 <th class="th-center">Status</th>
                 <th class="th-center">Actions</th>
@@ -396,14 +408,26 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
             <?php $_cancelCountStmt = getDB()->prepare("SELECT COUNT(*) FROM appointments WHERE mechanic_id = ? AND status = 'scheduled'"); ?>
             <?php foreach ($allMechanics as $m): $mRowNum++; ?>
             <?php $onLeave = $m['is_active'] && isMechanicOnVacation((int)$m['id'], $effectiveTime->format('Y-m-d')); ?>
+            <?php $mStats = $mechReviewStats[(int)$m['id']] ?? null; ?>
+            <?php $mSpecs = array_slice(array_map('trim', explode(',', $m['specialties'] ?? '')), 0, 2); ?>
             <tr class="<?= $mRowNum % 2 === 0 ? 'stripe-even' : '' ?>" data-mech-id="<?= $m['id'] ?>">
                 <td><strong><?= fmtNameTwoLines($m['name']) ?></strong></td>
                 <td><?= htmlspecialchars($m['nickname'] ?? '—') ?></td>
-                <td><?= htmlspecialchars($m['specialties'] ?? '—') ?></td>
+                <td><?= htmlspecialchars(implode(', ', $mSpecs) ?: '—') ?></td>
+                <td style="text-align:center;">
+                    <?php if ($mStats): ?>
+                        <a href="#" class="mech-rating-link" onclick="openReviewsModal(<?= (int)$m['id'] ?>, '<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>');return false;">
+                            <span class="mech-rating-score"><?= number_format($mStats['avg'], 1) ?> <img src="images/doodles/star.svg" style="width:14px;height:14px;vertical-align:middle;"></span>
+                            <span class="mech-rating-count">(<?= $mStats['count'] ?> review<?= $mStats['count'] !== 1 ? 's' : '' ?>)</span>
+                        </a>
+                    <?php else: ?>
+                        —
+                    <?php endif; ?>
+                </td>
                 <td><?= (int)$m['experience'] ?></td>
                 <td>
                     <?php if ($onLeave): ?>
-                    <span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>
+                    <span class="status-badge" style="background:var(--paper);color:var(--ink);white-space:nowrap;">On Leave</span>
                     <?php else: ?>
                     <span class="status-badge <?= $m['is_active'] ? 'status-scheduled' : 'status-cancelled' ?>"><?= $m['is_active'] ? 'Active' : 'Inactive' ?></span>
                     <?php endif; ?>
@@ -457,8 +481,8 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Mechanic</h2>
         <div style="display:flex;gap:28px;align-items:stretch;">
-            <div class="flex-1">
-                <form method="post" id="mech-modal-form" onsubmit="return checkSimGuard()">
+            <div class="flex-1" style="display:flex;flex-direction:column;">
+                <form method="post" id="mech-modal-form" onsubmit="return checkSimGuard()" style="flex:1;display:flex;flex-direction:column;">
                     <input type="hidden" name="mech_id" id="modal-mech-id">
             <input type="hidden" name="_new_hire_name" value="<?= htmlspecialchars($_GET['hire_name'] ?? '', ENT_QUOTES) ?>">
             <input type="hidden" name="update_schedule" value="1">
@@ -478,21 +502,23 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
                     </div>
                     <div class="form-group">
                         <label>Specialties</label>
-                        <input type="text" name="mech_specialties" id="modal-mech-specialties" placeholder="Engine, Transmission">
+                        <textarea name="mech_specialties" id="modal-mech-specialties" rows="2" placeholder="Engine, Transmission" style="width:100%;font-family:var(--font-hand);font-size:0.85rem;resize:none;border:2px solid var(--ink);padding:6px;background:var(--cyan);box-sizing:border-box;"></textarea>
                     </div>
-                    <div class="form-group" style="display:flex;align-items:center;gap:10px;">
-                        <label>Experience</label>
-                        <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;" data-stepper="edit">
-                        <button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;font-size:0.8rem;padding:6px 14px;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
+                    <div style="flex:1;display:flex;align-items:center;">
+                        <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+                            <label>Experience</label>
+                            <input type="number" name="mech_years" id="modal-mech-exp" style="width:65px;" data-stepper="edit">
+                            <button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;font-size:0.8rem;padding:6px 14px;" onclick="openScheduleModal(document.getElementById('modal-mech-id').value, document.getElementById('modal-mech-name').value)">Schedule</button>
+                        </div>
                     </div>
-                    <div style="display:flex;justify-content:space-between;margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-top:auto;padding-top:8px;">
                         <button type="submit" name="update_mechanic_info" class="btn btn-sm">Save</button>
                         <button type="button" class="btn btn-sm btn-rust" onclick="closeMechModal(event)">Cancel</button>
                     </div>
                 </form>
             </div>
             <div style="border-left:2px dashed var(--teal);align-self:stretch;"></div>
-            <div class="flex-1">
+            <div class="flex-1" style="display:flex;flex-direction:column;">
                 <h3 style="font-family:var(--font-sub);font-size:0.9rem;text-transform:uppercase;margin-bottom:8px;">Vacations</h3>
                 <div id="vacation-list" style="margin-bottom:10px;"></div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
@@ -504,12 +530,12 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
                         <label class="vac-label">End</label>
                         <input type="date" id="vac-end" data-placement="top" style="width:auto;font-size:0.8rem;">
                     </div>
-                    <div>
+                    <div style="margin-top:10px;">
                         <label class="vac-label">Reason (Optional)</label>
                         <textarea id="vac-reason" placeholder="Outside commitments" rows="1" style="width:200px;font-size:0.8rem;resize:none;"></textarea>
                     </div>
-                    <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;">Send On Vacation</button>
                 </div>
+                <button type="button" class="btn btn-sm btn-pink" onclick="addVacation()" style="font-size:0.8rem;padding:6px 14px;margin-top:auto;align-self:flex-start;">Send On Vacation</button>
             </div>
         </div>
     </div>
@@ -717,8 +743,8 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
             <button type="button" id="pw-toggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;line-height:1;" onclick="togglePwVisibility()">
                 <img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">
             </button>
+            <p id="pw-error" style="color:var(--rust);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;">Incorrect password.</p>
         </div>
-        <p id="pw-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="confirmPw()">Confirm</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="closePwModal()">Cancel</button>
@@ -733,6 +759,26 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
         <div class="msg-content" id="msg-modal-content"></div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="hideModal('msg-modal')">OK</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay hidden" id="reviews-modal" onclick="if(event.target===this)hideModal('reviews-modal')">
+    <div class="modal-box" style="max-width:450px;" onclick="event.stopPropagation()">
+        <button type="button" class="modal-close" onclick="hideModal('reviews-modal')">&times;</button>
+        <div class="burst burst-right" style="font-size:0.7rem;">STARS!</div>
+        <h2 id="reviews-modal-title" style="font-family:var(--font-sub);font-size:1rem;">Reviews</h2>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:8px 0 4px;">
+            <label for="reviews-sort" style="font-family:var(--font-sub);font-size:0.7rem;text-transform:uppercase;font-weight:normal;">Sort:</label>
+            <select id="reviews-sort" class="custom-select" style="font-size:0.8rem;" onchange="sortReviews()">
+                <option value="oldest">Oldest First</option>
+                <option value="newest">Newest First</option>
+                <option value="rating_high">Highest Rated</option>
+                <option value="rating_low">Lowest Rated</option>
+            </select>
+        </div>
+        <div id="reviews-modal-list" style="max-height:350px;overflow-y:auto;margin:12px 0;"></div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('reviews-modal')">Close</button>
         </div>
     </div>
 </div>
@@ -827,14 +873,18 @@ var SIM_MODE_ACTIVE = <?= json_encode($useSim) ?>;
 var EFFECTIVE_TIME = '<?= getEffectiveTime()->format('Y-m-d H:i:s') ?>';
 var DAY_NAMES = <?= json_encode($GLOBALS['DAY_NAMES_FULL']) ?>;
 var ADMIN_AUTHED = <?= json_encode($adminAuthed) ?>;
-if (!ADMIN_AUTHED) {
+var ADMIN_UNLOCKED = false;
+try { ADMIN_UNLOCKED = sessionStorage.getItem('admin_unlocked') === '1'; } catch(e) {}
+if (!ADMIN_UNLOCKED) {
+    var lockOverlay = document.getElementById('lock-overlay');
+    if (lockOverlay) lockOverlay.classList.remove('hidden');
     window.addEventListener('DOMContentLoaded', function() {
         var inp = document.getElementById('lock-pw-input');
         if (inp) inp.focus();
     });
 }
 </script>
-<script src="script.js?v=2"></script>
+<script src="script.js?v=<?= filemtime(__DIR__ . '/script.js') ?>"></script>
 <script src="datepicker.js?v=2"></script>
 <?php if ($msg): ?><script>showModal(<?= json_encode($msg) ?>, <?= json_encode($msgType) ?>);</script><?php endif; ?>
 <div id="display-overlay"></div>

@@ -25,6 +25,13 @@ $confirmed = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['edit_booking'])) handleEditBooking();
+    if (isset($_POST['action_client_cancel']) && isset($_POST['cancel_id']) && isset($_POST['lookup_phone'])) {
+        $cancelled = clientCancelAppointment((int)$_POST['cancel_id'], $_POST['lookup_phone']);
+        $_SESSION['flash_msg'] = $cancelled ? 'Appointment cancelled.' : 'Could not cancel — appointment may already be in progress.';
+        $_SESSION['flash_type'] = $cancelled ? 'success' : 'error';
+        header('Location: index.php');
+        exit;
+    }
     $errors = validateAppointmentInput($_POST);
 
     if (empty($errors)) {
@@ -238,7 +245,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
                     <input type="text" id="engine_no" name="engine_no" placeholder="8NR-TS2021" data-validate="required|alphanumeric" data-err-required="Engine number is required." data-err-alphanumeric="Alphanumeric and hyphens only." value="<?= htmlspecialchars($savedPost['engine_no'] ?? '') ?>">
                 </div>
                 <div class="form-group">
-                    <label for="car_model">Car Model <span style="font-weight:normal;">(optional)</span></label>
+                    <label for="car_model">Car Model (optional)</label>
                     <input type="text" id="car_model" name="car_model" placeholder="Ford Mustang" value="<?= htmlspecialchars($savedPost['car_model'] ?? '') ?>">
                 </div>
             </div>
@@ -289,11 +296,21 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
             <button type="submit" class="btn btn-pink">Book Appointment</button>
             <a href="#" class="btn btn-sm btn-outline" onclick="confirmUnsaved(function(){requirePwNewTab('admin.php');});return false;">Admin Panel</a>
         </div>
-        <div style="margin-top:4px;">
-            <span style="display:inline-flex;align-items:center;gap:4px;">
-                <span>Made an error earlier? You can </span>
-                <button type="button" class="btn btn-sm btn-jade" onclick="confirmUnsaved(function(){openEditBooking();})" style="margin:0;">Fix It!</button>
-            </span>
+    </form>
+</div>
+
+<div class="panel my-bookings-panel">
+    <div class="burst burst-right">TRACK!</div>
+    <h2>My Appointments</h2>
+    <p>Want to track your appointments? We got you covered!</p>
+    <form action="#" method="get" autocomplete="off" onsubmit="return false;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex-grow:1;max-width:300px;position:relative;">
+                <label for="lookup-phone">Phone Number</label>
+                <input type="tel" id="lookup-phone" name="lookup_<?= mt_rand(1000, 9999) ?>" placeholder="Number you've previously used" autocomplete="new-password" style="width:100%;">
+                <p id="lookup-phone-error" style="color:var(--rust);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;"></p>
+            </div>
+            <button type="button" class="btn btn-sm" style="margin-bottom:6px;" onclick="lookupMyBookings()">Look Up</button>
         </div>
     </form>
 </div>
@@ -307,7 +324,7 @@ $selectedSlot = $savedPost['slot_index'] ?? ($confirmed['slot_index'] ?? '');
     </details>
     <details>
         <summary>Can I edit my booking after making it?</summary>
-        <p>Yes! Click <strong>Fix It</strong> below the form, enter the phone number you used when booking, select the appointment you want to change, and update your name, address, or car details. The date, time slot, and mechanic stay the same.</p>
+        <p>Yes! Look up your appointments in the <strong>My Appointments</strong> panel, then hit <strong>Fix It!</strong> on any scheduled booking to update your name, address, or car details.</p>
     </details>
     <details>
         <summary>How many cars can I book per day?</summary>
@@ -351,7 +368,7 @@ var LUCKY_RULES = <?= json_encode($GLOBALS['LUCKY_RULES']) ?>;
 var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
 </script>
 <script src="spotlight.js?v=2"></script>
-<script src="script.js?v=2"></script>
+<script src="script.js?v=<?= filemtime(__DIR__ . '/script.js') ?>"></script>
 <script src="datepicker.js?v=2"></script>
 
 <div class="modal-overlay hidden" id="pw-modal" onclick="closePwModal(event)">
@@ -364,8 +381,8 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
             <button type="button" id="pw-toggle" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;line-height:1;" onclick="togglePwVisibility()">
                 <img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">
             </button>
+            <p id="pw-error" style="color:var(--rust);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;">Incorrect password.</p>
         </div>
-        <p id="pw-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;">Incorrect password.</p>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="confirmPw()">Confirm</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="closePwModal()">Cancel</button>
@@ -377,8 +394,10 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
         <div class="burst burst-right">PHONE!</div>
         <h2>Quick Book</h2>
         <p style="margin:8px 0 16px;">Enter your phone number to pull up your last booking.</p>
-        <input type="tel" id="qb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
-        <p id="qb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
+        <div style="position:relative;">
+            <input type="tel" id="qb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
+            <p id="qb-phone-error" style="color:var(--rust);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;"></p>
+        </div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="lookupQuickBook()">Look Up</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('qb-phone-modal').classList.add('hidden')">Cancel</button>
@@ -404,8 +423,10 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
         <div class="burst burst-right">EDIT!</div>
         <h2>Edit Booking</h2>
         <p style="margin:8px 0 16px;">Enter your phone number to find your booking.</p>
-        <input type="tel" id="eb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
-        <p id="eb-phone-error" style="color:var(--rust);font-size:0.8rem;margin-top:6px;display:none;"></p>
+        <div style="position:relative;">
+            <input type="tel" id="eb-phone-input" placeholder="09123456789" style="width:100%;font-size:1rem;">
+            <p id="eb-phone-error" style="color:var(--rust);font-size:0.8rem;display:none;position:absolute;top:100%;left:0;"></p>
+        </div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink" onclick="lookupEditBooking()">Look Up</button>
             <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('eb-phone-modal').classList.add('hidden')">Cancel</button>
@@ -425,7 +446,7 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
     </div>
 </div>
 
-<div class="modal-overlay hidden" id="eb-edit-modal" onclick="if (event.target===event.currentTarget) hideModal('eb-edit-modal')">
+<div class="modal-overlay hidden" id="eb-edit-modal" onclick="if (event.target===event.currentTarget) closeEditModal()">
     <div class="modal-box" style="max-width:620px;" onclick="event.stopPropagation()">
         <div class="burst burst-right">FIX!</div>
         <h2>Edit Your Booking</h2>
@@ -458,7 +479,7 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
                         <input type="text" id="eb-engine" name="engine_no" placeholder="8NR-TS2021">
                     </div>
                     <div class="form-group">
-                        <label>Car Model <span style="font-weight:normal;">(optional)</span></label>
+                        <label>Car Model (optional)</label>
                         <input type="text" id="eb-model" name="car_model" placeholder="Ford Mustang">
                     </div>
                     <div style="margin-top:8px;padding:6px 8px;background:var(--cream);border-radius:6px;font-size:0.85rem;">
@@ -472,7 +493,7 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
             </div>
             <div class="modal-btn-row" style="margin-top:16px;">
                 <button type="submit" class="btn btn-sm btn-pink">Save Changes</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('eb-edit-modal')">Cancel</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="closeEditModal()">Cancel</button>
             </div>
         </form>
     </div>
@@ -506,17 +527,67 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
     </div>
 </div>
 
-<?php if ($flashMsg): ?>
-<div class="modal-overlay" id="msg-modal" onclick="closeMsgModal(event)">
-    <div class="modal-box msg-box msg-<?= htmlspecialchars($flashType) ?>">
+<div class="modal-overlay hidden" id="my-bookings-modal" onclick="if(event.target===this)hideModal('my-bookings-modal')">
+    <div class="modal-box" style="max-width:600px;" onclick="event.stopPropagation()">
+        <button type="button" class="modal-close" onclick="hideModal('my-bookings-modal')">&times;</button>
+        <div class="burst burst-right">FIND!</div>
+        <h2>My Appointments</h2>
+        <div id="my-bookings-results" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('my-bookings-modal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="review-modal" onclick="if(event.target===this)hideModal('review-modal')">
+    <div class="modal-box msg-box" onclick="event.stopPropagation()" style="max-width:380px;">
+        <button type="button" class="modal-close" onclick="hideModal('review-modal')">&times;</button>
+        <div class="burst burst-left" style="font-size:0.7rem;">SCORE!</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h2 class="modal-h2" id="review-modal-heading">How Was the Service?</h2>
+            <button type="button" class="btn btn-sm btn-rust btn-outline" id="delete-review-btn" style="display:none;margin-top:20px;" onclick="deleteModalReview()">Delete</button>
+        </div>
+        <p class="modal-body-p" id="review-modal-mechanic" style="margin-bottom:6px;"></p>
+        <div class="star-rating" id="modal-star-rating" data-rating="0" style="justify-content:center;margin:16px 0;">
+            <img src="images/doodles/star-outline.svg" data-star="1" class="star-btn" onclick="setModalRating(1)">
+            <img src="images/doodles/star-outline.svg" data-star="2" class="star-btn" onclick="setModalRating(2)">
+            <img src="images/doodles/star-outline.svg" data-star="3" class="star-btn" onclick="setModalRating(3)">
+            <img src="images/doodles/star-outline.svg" data-star="4" class="star-btn" onclick="setModalRating(4)">
+            <img src="images/doodles/star-outline.svg" data-star="5" class="star-btn" onclick="setModalRating(5)">
+        </div>
+        <textarea id="modal-review-comment" rows="3" placeholder="Tell us about your experience..." style="width:100%;font-family:var(--font-hand);font-size:0.85rem;resize:none;border:2px solid var(--ink);padding:8px;background:var(--cyan);box-sizing:border-box;"></textarea>
+        <div class="modal-btn-row" style="margin-top:12px;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="closeReviewModal()">Forget it</button>
+            <button type="button" class="btn btn-sm" onclick="submitModalReview()">Submit</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="cancel-confirm-modal" onclick="if(event.target===this)hideModal('cancel-confirm-modal')">
+    <div class="modal-box msg-box msg-error" onclick="event.stopPropagation()">
+        <button type="button" class="modal-close" onclick="hideModal('cancel-confirm-modal')">&times;</button>
+        <div class="burst burst-left">NOPE!</div>
+        <h2 class="modal-h2">Cancel Appointment?</h2>
+        <p class="modal-body-p" id="cancel-confirm-msg">Are you sure you want to cancel this booking? This can't be undone.</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn btn-sm btn-rust" id="cancel-confirm-btn">Yes, Cancel</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="hideModal('cancel-confirm-modal')">Keep It</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="msg-modal" onclick="closeMsgModal(event)">
+    <div class="modal-box msg-box msg-success">
         <button type="button" class="modal-close" onclick="hideModal('msg-modal')">&times;</button>
-        <div class="msg-content"><?= htmlspecialchars($flashMsg) ?></div>
+        <div class="burst burst-left hidden" id="msg-modal-burst">NOPE!</div>
+        <div class="msg-content" id="msg-modal-content"></div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="hideModal('msg-modal')">OK</button>
         </div>
     </div>
 </div>
-<?php endif; ?>
+
+<?php if ($flashMsg): ?><script>showModal(<?= json_encode($flashMsg) ?>, <?= json_encode($flashType) ?>);</script><?php endif; ?>
 
 <div id="display-overlay"></div>
 </body>

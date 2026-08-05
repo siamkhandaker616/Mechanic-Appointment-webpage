@@ -683,7 +683,8 @@ function confirmLock() {
         try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('lock-pw-error').textContent = 'Invalid server response.'; document.getElementById('lock-pw-error').style.display = 'block'; return; }
         if (resp.success) {
             var lo = document.getElementById('lock-overlay');
-            if (lo) lo.style.display = 'none';
+            if (lo) { lo.classList.add('hidden'); }
+            try { sessionStorage.setItem('admin_unlocked', '1'); } catch(e) {}
         } else {
             document.getElementById('lock-pw-error').style.display = 'block';
             document.getElementById('lock-pw-input').focus();
@@ -732,6 +733,7 @@ function confirmPw() {
         try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('pw-error').textContent = 'Invalid server response.'; document.getElementById('pw-error').style.display = 'block'; return; }
         if (resp.success) {
             document.getElementById('pw-modal').classList.add('hidden');
+            try { sessionStorage.setItem('admin_unlocked', '1'); } catch(e) {}
             if (_pendingField) {
                 ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
                     var f = document.getElementById(id);
@@ -1022,6 +1024,8 @@ function addVacation() {
         err = document.createElement('div');
         err.id = 'vac-error';
         err.className = 'field-error';
+        err.style.cssText = 'position:absolute;top:100%;left:0;margin-top:4px;white-space:nowrap;font-size:0.7rem;';
+        document.getElementById('vac-end').parentNode.style.position = 'relative';
         document.getElementById('vac-end').parentNode.appendChild(err);
     }
     if (!start || !end) {
@@ -1487,6 +1491,332 @@ function updateApptRowScheduled(id) {
     if (tdActions) {
         tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
     }
+}
+
+/* === MY BOOKINGS === */
+
+function lookupMyBookings() {
+    var phone = document.getElementById('lookup-phone').value.trim();
+    var err = document.getElementById('lookup-phone-error');
+    if (!phone) {
+        err.textContent = 'Please enter a phone number.';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    fetch('availability.php?action=my_bookings&phone=' + encodeURIComponent(phone))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.found) {
+                document.getElementById('qb-fail-msg').textContent = data.message || 'That number ain\'t in our grease-stained ledger, pal. First time? Fill out the form.';
+                document.getElementById('qb-fail-modal').classList.remove('hidden');
+                return;
+            }
+            renderMyBookingsModal(data.appointments, phone);
+            document.getElementById('my-bookings-modal').classList.remove('hidden');
+        })
+        .catch(function() {
+            document.getElementById('qb-fail-msg').textContent = 'Could not reach server. Try again.';
+            document.getElementById('qb-fail-modal').classList.remove('hidden');
+        });
+}
+
+function renderMyBookingsModal(appts, phone) {
+    var results = document.getElementById('my-bookings-results');
+    if (!appts || appts.length === 0) {
+        results.innerHTML = '<p style="font-family:var(--font-hand);color:var(--rust);font-weight:bold;">No appointments found.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < appts.length; i++) {
+        var a = appts[i];
+        var statusLabel = a.status.replace('_', ' ');
+        var dateFormatted = formatDateStr(a.appointment_date);
+        var slotLabel = SLOT_LABELS[a.slot_index] || ('Slot ' + a.slot_index);
+        html += '<div class="my-bookings-card" data-status="' + a.status + '">';
+        if (a.status === 'completed' && a.review) {
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            html += '<span style="display:flex;gap:2px;">' + renderStars(a.review.rating) + '</span>';
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+            html += '</div>';
+        } else if (a.status === 'scheduled') {
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            html += '<span class="countdown-clock" id="countdown-' + a.id + '" style="font-family:var(--font-action);font-size:0.8rem;color:var(--ink);"></span>';
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+            html += '</div>';
+        } else {
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+        }
+        html += '<div class="card-info"><strong>Date:</strong> ' + dateFormatted + '</div>';
+        html += '<div class="card-info"><strong>Time:</strong> ' + slotLabel + '</div>';
+        html += '<div class="card-info"><strong>Mechanic:</strong> ' + htmlspecialchars(a.mechanic_name) + (a.nickname ? ' (' + htmlspecialchars(a.nickname) + ')' : '') + '</div>';
+        html += '<div class="card-info"><strong>Car:</strong> ' + htmlspecialchars(a.license_no) + (a.model ? ' — ' + htmlspecialchars(a.model) : '') + '</div>';
+        html += '<div class="card-actions">';
+        if (a.status === 'scheduled') {
+            html += '<button type="button" class="btn btn-sm btn-rust" onclick="confirmClientCancel(' + a.id + ', \'' + htmlspecialchars(phone) + '\')">Cancel</button>';
+            html += '<button type="button" class="btn btn-sm btn-jade" style="margin-left:auto;" onclick=\'openEditFromBooking(' + JSON.stringify(a).replace(/'/g, "&#39;") + ')\'>Edit</button>';
+        } else if (a.status === 'completed') {
+            if (a.review) {
+                html += '<button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;" onclick=\'openReviewModal(' + a.id + ', ' + JSON.stringify(a.mechanic_name).replace(/'/g, "&#39;") + ', ' + a.review.rating + ', ' + JSON.stringify(a.review.comment || '').replace(/'/g, "&#39;") + ')\'>Edit Review</button>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-pink" style="margin-left:auto;" onclick=\'openReviewModal(' + a.id + ', ' + JSON.stringify(a.mechanic_name).replace(/'/g, "&#39;") + ')\'>Leave a Review</button>';
+            }
+        } else if (a.status === 'cancelled') {
+            html += '<span style="font-family:var(--font-hand);color:var(--rust);font-style:italic;">Cancelled</span>';
+        } else if (a.status === 'waiting') {
+            html += '<span style="font-family:var(--font-hand);color:var(--gold);font-style:italic;">Waiting for slot</span>';
+        }
+        html += '</div>';
+        html += '</div>';
+    }
+    results.innerHTML = html;
+    startAllCountdowns(appts);
+}
+
+var _countdownInterval = null;
+var SLOT_START_HOURS = [10, 12, 14, 16];
+
+function startAllCountdowns(appts) {
+    if (_countdownInterval) clearInterval(_countdownInterval);
+    function tick() {
+        var now = new Date();
+        for (var i = 0; i < appts.length; i++) {
+            var a = appts[i];
+            if (a.status !== 'scheduled') continue;
+            var el = document.getElementById('countdown-' + a.id);
+            if (!el) continue;
+            var hour = SLOT_START_HOURS[a.slot_index] || 10;
+            var target = new Date(a.appointment_date + 'T' + String(hour).padStart(2, '0') + ':00:00');
+            var diff = target - now;
+            if (diff <= 0) {
+                el.textContent = 'Starting soon';
+                el.style.color = 'var(--rust)';
+                continue;
+            }
+            var d = Math.floor(diff / 86400000);
+            var h = Math.floor((diff % 86400000) / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            var s = Math.floor((diff % 60000) / 1000);
+            var parts = [];
+            if (d > 0) parts.push('<span style="margin-right:12px;">' + d + 'd</span>');
+            parts.push('<span style="margin-right:12px;">' + h + 'h</span>');
+            parts.push('<span style="margin-right:12px;">' + String(m).padStart(2, '0') + 'm</span>');
+            parts.push(String(s).padStart(2, '0') + 's');
+            el.innerHTML = parts.join('');
+            el.style.color = d === 0 && h < 4 ? 'var(--rust)' : 'var(--violet)';
+        }
+    }
+    tick();
+    _countdownInterval = setInterval(tick, 1000);
+}
+
+function renderStars(rating) {
+    var html = '';
+    for (var i = 1; i <= 5; i++) {
+        html += '<img src="images/doodles/' + (i <= rating ? 'star.svg' : 'star-outline.svg') + '" style="width:20px;height:20px;vertical-align:middle;">';
+    }
+    return html;
+}
+
+var _reviewApptId = null;
+var _reviewIsEdit = false;
+
+function closeReviewModal() {
+    hideModal('review-modal');
+    document.getElementById('my-bookings-modal').classList.remove('hidden');
+}
+
+function openReviewModal(apptId, mechanicName, existingRating, existingComment) {
+    _reviewApptId = apptId;
+    _reviewIsEdit = !!existingRating;
+    document.getElementById('review-modal-heading').textContent = _reviewIsEdit ? 'Edit Review' : 'How Was the Service?';
+    document.getElementById('review-modal-mechanic').textContent = (_reviewIsEdit ? 'Edit your review for ' : 'Review your appointment with ') + mechanicName;
+    document.getElementById('modal-review-comment').value = existingComment || '';
+    var rating = existingRating || 0;
+    var stars = document.getElementById('modal-star-rating');
+    stars.dataset.rating = rating;
+    var imgs = stars.querySelectorAll('.star-btn');
+    for (var i = 0; i < imgs.length; i++) {
+        imgs[i].src = (i + 1) <= rating ? 'images/doodles/star.svg' : 'images/doodles/star-outline.svg';
+    }
+    document.getElementById('delete-review-btn').style.display = _reviewIsEdit ? '' : 'none';
+    hideModal('my-bookings-modal');
+    document.getElementById('review-modal').classList.remove('hidden');
+}
+
+function setModalRating(rating) {
+    var container = document.getElementById('modal-star-rating');
+    container.dataset.rating = rating;
+    var imgs = container.querySelectorAll('.star-btn');
+    for (var i = 0; i < imgs.length; i++) {
+        imgs[i].src = (i + 1) <= rating ? 'images/doodles/star.svg' : 'images/doodles/star-outline.svg';
+    }
+}
+
+function submitModalReview() {
+    if (!_reviewApptId) return;
+    var container = document.getElementById('modal-star-rating');
+    var rating = parseInt(container.dataset.rating) || 0;
+    var comment = document.getElementById('modal-review-comment').value;
+    if (rating < 1) {
+        showModal('Pick a star rating first!', 'error');
+        return;
+    }
+    var body = 'appointment_id=' + _reviewApptId + '&rating=' + rating + '&comment=' + encodeURIComponent(comment);
+    fetch('availability.php?action=submit_review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        closeReviewModal();
+        if (d.success) {
+            var wasEdit = _reviewIsEdit;
+            _reviewApptId = null;
+            _reviewIsEdit = false;
+            var phone = document.getElementById('lookup-phone') ? document.getElementById('lookup-phone').value : '';
+            if (phone) lookupMyBookings();
+            showModal(wasEdit ? 'Review updated!' : 'Review submitted!', 'success');
+        } else {
+            showModal(d.message, 'error');
+        }
+    })
+    .catch(function() {
+        closeReviewModal();
+        showModal('Could not reach server. Try again.', 'error');
+    });
+}
+
+function deleteModalReview() {
+    if (!_reviewApptId) return;
+    var body = 'appointment_id=' + _reviewApptId;
+    fetch('availability.php?action=delete_review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        closeReviewModal();
+        if (d.success) {
+            _reviewApptId = null;
+            _reviewIsEdit = false;
+            var phone = document.getElementById('lookup-phone') ? document.getElementById('lookup-phone').value : '';
+            if (phone) lookupMyBookings();
+            showModal(d.message, 'success');
+        } else {
+            showModal(d.message, 'error');
+        }
+    })
+    .catch(function() {
+        closeReviewModal();
+        showModal('Could not reach server. Try again.', 'error');
+    });
+}
+
+var _currentReviews = [];
+
+function openReviewsModal(mechId, mechName) {
+    document.getElementById('reviews-modal-title').textContent = mechName + ' — Reviews';
+    var list = document.getElementById('reviews-modal-list');
+    list.innerHTML = '<p style="font-family:var(--font-hand);opacity:0.6;">Loading...</p>';
+    document.getElementById('reviews-modal').classList.remove('hidden');
+    fetch('admin.php?mech_reviews=' + mechId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok || !d.reviews || d.reviews.length === 0) {
+                _currentReviews = [];
+                list.innerHTML = '<p style="font-family:var(--font-hand);opacity:0.6;">No reviews yet.</p>';
+                return;
+            }
+            _currentReviews = d.reviews;
+            var sortEl = document.getElementById('reviews-sort');
+            if (sortEl) sortEl.value = 'oldest';
+            renderReviewsList();
+        })
+        .catch(function() {
+            list.innerHTML = '<p style="font-family:var(--font-hand);color:var(--rust);">Could not load reviews.</p>';
+        });
+}
+
+function sortReviews() {
+    renderReviewsList();
+}
+
+function renderReviewsList() {
+    var list = document.getElementById('reviews-modal-list');
+    if (!list || _currentReviews.length === 0) return;
+    var sort = document.getElementById('reviews-sort') ? document.getElementById('reviews-sort').value : 'oldest';
+    var arr = _currentReviews.slice();
+    if (sort === 'newest') {
+        arr.sort(function(a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : 0; });
+    } else if (sort === 'rating_high') {
+        arr.sort(function(a, b) { return b.rating - a.rating; });
+    } else if (sort === 'rating_low') {
+        arr.sort(function(a, b) { return a.rating - b.rating; });
+    } else {
+        arr.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    }
+    var html = '';
+    for (var i = 0; i < arr.length; i++) {
+        var rv = arr[i];
+        html += '<div class="review-card">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '<span>' + renderStars(rv.rating) + '</span>';
+        html += '<span style="font-family:var(--font-hand);font-size:0.75rem;opacity:0.6;">' + fmtDate(rv.date.split(' ')[0]) + '</span>';
+        html += '</div>';
+        if (rv.comment) html += '<p style="font-family:var(--font-hand);font-size:0.85rem;margin:6px 0 2px;">' + htmlspecialchars(rv.comment) + '</p>';
+        html += '<div style="font-family:var(--font-hand);font-size:0.75rem;opacity:0.7;">— ' + htmlspecialchars(rv.client) + '</div>';
+        html += '</div>';
+    }
+    list.innerHTML = html;
+}
+
+function openEditFromBooking(a) {
+    document.getElementById('eb-appt-id').value = a.id;
+    document.getElementById('eb-name').value = a.client_name;
+    document.getElementById('eb-address').value = a.address;
+    document.getElementById('eb-license').value = a.license_no;
+    document.getElementById('eb-engine').value = a.engine_no;
+    document.getElementById('eb-model').value = a.model || '';
+    document.getElementById('eb-display-phone').value = a.phone;
+    document.getElementById('eb-display-date').textContent = formatDateStr(a.appointment_date);
+    document.getElementById('eb-display-slot').textContent = SLOT_LABELS[a.slot_index] || ('Slot ' + a.slot_index);
+    document.getElementById('eb-display-mechanic').textContent = a.mechanic_name + (a.nickname ? ' (' + a.nickname + ')' : '');
+    _editFromMyBookings = true;
+    hideModal('my-bookings-modal');
+    document.getElementById('eb-edit-modal').classList.remove('hidden');
+}
+
+var _editFromMyBookings = false;
+
+function closeEditModal() {
+    hideModal('eb-edit-modal');
+    if (_editFromMyBookings) {
+        _editFromMyBookings = false;
+        document.getElementById('my-bookings-modal').classList.remove('hidden');
+    }
+}
+
+function confirmClientCancel(id, phone) {
+    var modal = document.getElementById('cancel-confirm-modal');
+    modal.classList.remove('hidden');
+    document.getElementById('cancel-confirm-btn').onclick = function() {
+        hideModal('cancel-confirm-modal');
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = '<input type="hidden" name="action_client_cancel" value="1"><input type="hidden" name="cancel_id" value="' + id + '"><input type="hidden" name="lookup_phone" value="' + htmlspecialchars(phone) + '">';
+        document.body.appendChild(form);
+        form.submit();
+    };
+}
+
+function formatDateStr(dateStr) {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
 }
 
 /* === QUICK BOOK === */

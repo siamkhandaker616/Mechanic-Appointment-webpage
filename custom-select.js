@@ -92,6 +92,7 @@
         buildOptions();
 
         selectEl.parentNode.insertBefore(wrap, selectEl);
+        if (selectEl.id) wrap.setAttribute('data-for', selectEl.id);
         wrap.appendChild(selectEl);
         wrap.appendChild(trigger);
         trigger.appendChild(inner);

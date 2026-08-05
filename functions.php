@@ -300,6 +300,79 @@ function getLastAppointmentByPhone(string $phone): ?array {
     return $row ?: null;
 }
 
+function getAppointmentsByPhone(string $phone): array {
+    $digits = normalizePhone($phone);
+    $db = getDB();
+    $stmt = $db->prepare("
+        SELECT a.id, a.appointment_date, a.slot_index, a.status,
+               m.name AS mechanic_name, m.nickname,
+               c.license_no, c.model, c.engine_no,
+               cl.name AS client_name, cl.phone, cl.address,
+               r.rating, r.comment AS review_comment
+        FROM appointments a
+        JOIN clients cl ON cl.id = a.client_id
+        JOIN cars c ON c.id = a.car_id
+        JOIN mechanics m ON m.id = a.mechanic_id
+        LEFT JOIN reviews r ON r.appointment_id = a.id
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cl.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') = ?
+        ORDER BY a.appointment_date ASC, a.slot_index ASC
+    ");
+    $stmt->execute([$digits]);
+    return $stmt->fetchAll();
+}
+
+function clientCancelAppointment(int $apptId, string $phone): bool {
+    $digits = normalizePhone($phone);
+    $db = getDB();
+    $stmt = $db->prepare("
+        UPDATE appointments a
+        JOIN clients cl ON cl.id = a.client_id
+        SET a.status = 'cancelled', a.cancelled_at = NOW()
+        WHERE a.id = ? AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cl.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') = ? AND a.status = 'scheduled'
+    ");
+    $stmt->execute([$apptId, $digits]);
+    return $stmt->rowCount() > 0;
+}
+
+function submitAppointmentReview(int $appointmentId, int $rating, string $comment): bool {
+    $rating = max(1, min(5, $rating));
+    $db = getDB();
+    $stmt = $db->prepare("SELECT a.mechanic_id, cl.name AS client_name FROM appointments a JOIN clients cl ON cl.id = a.client_id WHERE a.id = ? AND a.status = 'completed'");
+    $stmt->execute([$appointmentId]);
+    $appt = $stmt->fetch();
+    if (!$appt) return false;
+    $stmt = $db->prepare("INSERT INTO reviews (appointment_id, mechanic_id, client_name, rating, comment) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE mechanic_id = VALUES(mechanic_id), client_name = VALUES(client_name), rating = VALUES(rating), comment = VALUES(comment)");
+    $stmt->execute([$appointmentId, (int)$appt['mechanic_id'], $appt['client_name'], $rating, $comment ?: null]);
+    return true;
+}
+
+function deleteAppointmentReview(int $appointmentId): bool {
+    $db = getDB();
+    $stmt = $db->prepare("DELETE FROM reviews WHERE appointment_id = ?");
+    $stmt->execute([$appointmentId]);
+    return $stmt->rowCount() > 0;
+}
+
+function getMechanicReviewStats(): array {
+    $rows = getDB()->query("SELECT mechanic_id, AVG(rating) AS avg_rating, COUNT(id) AS review_count FROM reviews WHERE mechanic_id IS NOT NULL GROUP BY mechanic_id")->fetchAll();
+    $stats = [];
+    foreach ($rows as $r) {
+        $stats[(int)$r['mechanic_id']] = ['avg' => round((float)$r['avg_rating'], 1), 'count' => (int)$r['review_count']];
+    }
+    return $stats;
+}
+
+function getMechanicReviews(int $mechanicId): array {
+    $stmt = getDB()->prepare("
+        SELECT rating, comment, created_at, client_name
+        FROM reviews
+        WHERE mechanic_id = ?
+        ORDER BY created_at ASC
+    ");
+    $stmt->execute([$mechanicId]);
+    return $stmt->fetchAll();
+}
+
 function findNextAvailableSlot(?int $mechanicId = null, string $fromDate = ''): ?array {
     if (!$fromDate) {
         $fromDate = date('Y-m-d', strtotime('+1 day'));
