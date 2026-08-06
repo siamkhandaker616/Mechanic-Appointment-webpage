@@ -92,6 +92,7 @@
         buildOptions();
 
         selectEl.parentNode.insertBefore(wrap, selectEl);
+        if (selectEl.id) wrap.setAttribute('data-for', selectEl.id);
         wrap.appendChild(selectEl);
         wrap.appendChild(trigger);
         trigger.appendChild(inner);
@@ -310,7 +311,7 @@
         trigger.addEventListener('click', toggleDropdown);
 
         trigger.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Space') {
+            if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 toggleDropdown();
             } else if (e.key === 'Escape') {

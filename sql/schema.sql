@@ -81,7 +81,7 @@ CREATE TABLE appointments (
     mechanic_id INT NOT NULL,
     appointment_date DATE NOT NULL,
     slot_index TINYINT NOT NULL COMMENT '0=10:00, 1=12:00, 2=14:00, 3=16:00',
-    status ENUM('scheduled','in_progress','completed','cancelled') DEFAULT 'scheduled',
+    status ENUM('scheduled','in_progress','completed','cancelled','waiting') DEFAULT 'scheduled',
     cancelled_at DATETIME DEFAULT NULL,
     admin_notes TEXT DEFAULT NULL,
     backup_data TEXT DEFAULT NULL,
@@ -95,11 +95,12 @@ CREATE TABLE appointments (
 
 CREATE TABLE reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    appointment_id INT NOT NULL UNIQUE,
+    appointment_id INT NULL UNIQUE,
+    mechanic_id INT NULL,
+    client_name VARCHAR(191) NULL,
     rating TINYINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE sim_config (

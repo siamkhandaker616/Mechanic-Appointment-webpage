@@ -37,6 +37,21 @@ function repositionPastDateMsg() {
     }
 }
 
+/* === MODAL TRANSITIONS === */
+
+function hideModal(id) {
+    var el = document.getElementById(id);
+    if (!el || el.classList.contains('hidden')) return;
+    el.classList.add('modal-closing');
+    var done = function() {
+        el.removeEventListener('transitionend', done);
+        el.classList.add('hidden');
+        el.classList.remove('modal-closing');
+    };
+    el.addEventListener('transitionend', done);
+    setTimeout(done, 300);
+}
+
 function showPastDateMsg(msg) {
     var el = document.getElementById('past-date-msg');
     if (!el) {
@@ -226,21 +241,30 @@ function fetchAvailability() {
         var html = '';
         data.slots.forEach(function(slot) {
             var taken = slot.available ? '' : 'taken';
-            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
+            var booked = slot.booked ? '1' : '0';
+            html += '<div class="slot-chip ' + taken + '" data-slot="' + slot.index + '" data-booked="' + booked + '">' + SLOT_LABELS[slot.index] + '<br><small>' + SLOT_NAMES[slot.index] + '</small></div>';
         });
+        html += '<div class="waitlist-notice" id="waitlist-notice" style="display:none;"></div>';
         container.innerHTML = html;
         container.querySelectorAll('.slot-chip').forEach(function(chip) {
             if (chip.classList.contains('taken')) {
                 chip.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    var t = document.getElementById('slot-tooltip');
-                    if (t && !t.classList.contains('hidden') && t._target === chip) { hideTooltip(); }
-                    else { showTooltip(chip); }
+                    var phoneEl = document.getElementById('phone');
+                    var dateEl = document.getElementById('date');
+                    if (phoneEl && this.dataset.booked === '1' && isLuckyPhone(phoneEl.value, dateEl ? dateEl.value : TODAY)) {
+                        selectSlot(this, parseInt(this.dataset.slot));
+                    } else {
+                        var t = document.getElementById('slot-tooltip');
+                        if (t && !t.classList.contains('hidden') && t._target === this) { hideTooltip(); }
+                        else { showTooltip(this); }
+                    }
                 });
             } else {
                 chip.addEventListener('click', function() { selectSlot(this, parseInt(this.dataset.slot)); });
             }
         });
+        applyWaitlistUI();
     }).catch(function() { if (reqId === _fetchId) container.innerHTML = '<p style="color:var(--rust);font-weight:bold;">Could not load slots.</p>'; });
 }
 
@@ -248,6 +272,56 @@ function selectSlot(el, index) {
     document.querySelectorAll('.slot-chip').forEach(function(c) { c.classList.remove('selected'); });
     el.classList.add('selected');
     document.getElementById('slot_index').value = index;
+}
+
+function isLuckyPhone(phone, date) {
+    var digits = (phone || '').replace(/\D/g, '');
+    if (digits.length < 1) return false;
+    var rule = LUCKY_RULES[new Date(date || TODAY).getDay()];
+    if (!rule) rule = { op: 'sum3', target: 21 };
+    var target = parseInt(rule.target, 10);
+    if (rule.op === 'prod3') {
+        if (digits.length < 3) return false;
+        var last3 = digits.slice(-3);
+        var prod = parseInt(last3.charAt(0), 10) * parseInt(last3.charAt(1), 10) * parseInt(last3.charAt(2), 10);
+        return prod === target;
+    }
+    if (rule.op === 'edge') {
+        var first = parseInt(digits.charAt(0), 10);
+        var last  = parseInt(digits.charAt(digits.length - 1), 10);
+        return (first + last) === target;
+    }
+    if (digits.length < 3) return false;
+    var last3 = digits.slice(-3);
+    var sum = 0;
+    for (var i = 0; i < last3.length; i++) sum += parseInt(last3.charAt(i), 10);
+    return sum === target;
+}
+
+function applyWaitlistUI() {
+    var phoneEl = document.getElementById('phone');
+    var dateEl = document.getElementById('date');
+    var dateVal = dateEl ? dateEl.value : TODAY;
+    var lucky = phoneEl ? isLuckyPhone(phoneEl.value, dateVal) : false;
+    var container = document.getElementById('slot-container');
+    if (container) container.classList.toggle('lucky-active', lucky);
+    var notice = document.getElementById('waitlist-notice');
+    if (notice) {
+        if (lucky) {
+            notice.innerHTML = 'Lucky number! You can grab an already-booked slot as a <strong>WAITLIST</strong> — you\'ll be first in line if the slot opens up.';
+            notice.style.display = '';
+        } else {
+            notice.style.display = 'none';
+        }
+    }
+    document.querySelectorAll('.slot-chip.taken[data-booked="1"]').forEach(function(c) {
+        c.classList.toggle('waitlistable', lucky);
+        if (!lucky && c.classList.contains('selected')) {
+            c.classList.remove('selected');
+            var si = document.getElementById('slot_index');
+            if (si && si.value === c.dataset.slot) si.value = '';
+        }
+    });
 }
 
 function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
@@ -258,16 +332,7 @@ function fillSuggestion(mechId, date, slotIndex, scrollToCard) {
         var card = document.querySelector('.mechanic-card.selected');
         if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    (function pollSlot(slot, tries) {
-        var chips = document.querySelectorAll('.slot-chip');
-        if (chips.length > 0 || tries <= 0) {
-            chips.forEach(function(c) {
-                if (parseInt(c.dataset.slot) === slot && !c.classList.contains('taken')) selectSlot(c, slot);
-            });
-            return;
-        }
-        setTimeout(function() { pollSlot(slot, tries - 1); }, 100);
-    })(slotIndex, 30);
+    pollSlot(slotIndex, 30);
 }
 
 function pollSlot(slot, tries) {
@@ -292,7 +357,10 @@ function filterAppTable() {
     var dateFrom = document.getElementById('filter-date-from')?.value || '';
     var dateTo = document.getElementById('filter-date-to')?.value || '';
 
+    var total = 0;
+    var visible = 0;
     document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
+        total++;
         var show = true;
         if (name && (tr.dataset.name || '').indexOf(name) === -1) show = false;
         if (show && phone && (tr.dataset.phone || '').indexOf(phone) === -1) show = false;
@@ -301,11 +369,30 @@ function filterAppTable() {
         if (show && mechanic && (tr.dataset.mechanic || '').indexOf(mechanic) === -1) show = false;
         if (show && dateFrom && tr.dataset.date < dateFrom) show = false;
         if (show && dateTo && tr.dataset.date > dateTo) show = false;
+        if (show) visible++;
         tr.style.display = show ? '' : 'none';
         var editRow = tr.nextElementSibling;
         if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = show ? '' : 'none';
     });
+    var fc = document.getElementById('filter-count');
+    if (fc) {
+        var hasFilter = name || phone || car || status || mechanic || dateFrom || dateTo;
+        if (hasFilter && total > 0) {
+            fc.textContent = 'Showing ' + visible + ' of ' + total;
+        } else {
+            fc.textContent = '';
+        }
+    }
+    updateStatusCounters();
     saveFilterState();
+    var hasFilter = name || phone || car || status || mechanic || dateFrom || dateTo;
+    var btn = document.getElementById('show-more-btn');
+    if (hasFilter) {
+        if (btn) btn.style.display = 'none';
+        showMoreExpanded = false;
+    } else {
+        paginateAppTable();
+    }
 }
 
 function openSearchModal() {
@@ -314,7 +401,7 @@ function openSearchModal() {
 
 function closeSearchModal(event) {
     if (!event || event.target === event.currentTarget) {
-        document.getElementById('search-modal').classList.add('hidden');
+        hideModal('search-modal');
     }
 }
 
@@ -399,12 +486,12 @@ function confirmUnsaved(callback) {
     return false;
 }
 function confirmUnsavedGo() {
-    document.getElementById('unsaved-modal').classList.add('hidden');
+    hideModal('unsaved-modal');
     var cb = _unsavedCb; _unsavedCb = null;
     if (cb) cb();
 }
 function cancelUnsaved() {
-    document.getElementById('unsaved-modal').classList.add('hidden');
+    hideModal('unsaved-modal');
     _unsavedCb = null;
 }
 
@@ -548,8 +635,12 @@ function checkSimGuard() {
 }
 function closeSimBlockModal(event) {
     if (!event || event.target === event.currentTarget) {
-        document.getElementById('sim-block-modal').classList.add('hidden');
+        hideModal('sim-block-modal');
     }
+}
+function guardThen(cb) {
+    if (!checkSimGuard()) return;
+    cb();
 }
 function requirePw(actionOrCallback, guardSim) {
     if (guardSim !== false && !checkSimGuard()) return;
@@ -579,6 +670,45 @@ function openPwModal() {
     document.getElementById('pw-modal').classList.remove('hidden');
     document.getElementById('admin-pw-input').focus();
 }
+function confirmLock() {
+    var pw = document.getElementById('lock-pw-input').value;
+    var btn = document.querySelector('#lock-overlay .btn-pink');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+    function restoreBtn() { if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; } }
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        restoreBtn();
+        try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('lock-pw-error').textContent = 'Invalid server response.'; document.getElementById('lock-pw-error').style.display = 'block'; return; }
+        if (resp.success) {
+            var lo = document.getElementById('lock-overlay');
+            if (lo) { lo.classList.add('hidden'); }
+            try { sessionStorage.setItem('admin_unlocked', '1'); } catch(e) {}
+        } else {
+            document.getElementById('lock-pw-error').style.display = 'block';
+            document.getElementById('lock-pw-input').focus();
+        }
+    };
+    xhr.onerror = function() {
+        restoreBtn();
+        document.getElementById('lock-pw-error').textContent = 'Network error. Try again.';
+        document.getElementById('lock-pw-error').style.display = 'block';
+    };
+    xhr.onloadend = restoreBtn;
+    xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
+}
+function toggleLockPwVisibility() {
+    var input = document.getElementById('lock-pw-input');
+    var btn = document.getElementById('lock-pw-toggle');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<img src="images/doodles/eye-open.svg" alt="Hide password" style="display:block;">';
+    } else {
+        input.type = 'password';
+        btn.innerHTML = '<img src="images/doodles/eye-closed.svg" alt="Show password" style="display:block;">';
+    }
+}
 function togglePwVisibility() {
     var input = document.getElementById('admin-pw-input');
     var btn = document.getElementById('pw-toggle');
@@ -603,6 +733,7 @@ function confirmPw() {
         try { var resp = JSON.parse(xhr.responseText); } catch(e) { document.getElementById('pw-error').textContent = 'Invalid server response.'; document.getElementById('pw-error').style.display = 'block'; return; }
         if (resp.success) {
             document.getElementById('pw-modal').classList.add('hidden');
+            try { sessionStorage.setItem('admin_unlocked', '1'); } catch(e) {}
             if (_pendingField) {
                 ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
                     var f = document.getElementById(id);
@@ -649,7 +780,7 @@ function confirmPw() {
     xhr.send('verify_pw=1&admin_pw=' + encodeURIComponent(pw));
 }
 function closePwModal() {
-    document.getElementById('pw-modal').classList.add('hidden');
+    hideModal('pw-modal');
     _pendingAction = ''; _pendingForm = null; _pendingField = null; _pendingNewTab = false; _pendingCallback = null;
 }
 
@@ -669,12 +800,6 @@ function toggleOverrides() {
 }
 /* === MECHANIC MODAL === */
 
-function lockStepperFields() {
-    ['modal-mech-name', 'modal-mech-exp'].forEach(function(id) {
-        var f = document.getElementById(id);
-        if (f) { f.readOnly = true; f.style.cursor = 'pointer'; f.style.background = 'var(--paper)'; updateStepperBg(f); }
-    });
-}
 function clearVacationDates() {
     ['vac-start', 'vac-end'].forEach(function(id) {
         var picker = DatePicker.instances.find(function(p) { return p.input.id === id; });
@@ -683,7 +808,6 @@ function clearVacationDates() {
 }
 
 function openMechModal(btn) {
-    lockStepperFields();
     document.getElementById('modal-mech-id').value = btn.dataset.mid;
     document.getElementById('modal-mech-name').value = btn.dataset.mname;
     document.getElementById('modal-mech-nickname').value = btn.dataset.mnick;
@@ -698,7 +822,6 @@ function openMechModal(btn) {
     document.getElementById('mech-modal').classList.remove('hidden');
 }
 function openMechModalById(id, name, nickname, quote, specialties, experience) {
-    lockStepperFields();
     document.getElementById('modal-mech-id').value = id;
     document.getElementById('modal-mech-name').value = name;
     document.getElementById('modal-mech-nickname').value = nickname;
@@ -714,8 +837,7 @@ function openMechModalById(id, name, nickname, quote, specialties, experience) {
 }
 function closeMechModal(event) {
     if (!event || event.target === event.currentTarget) {
-        lockStepperFields();
-        document.getElementById('mech-modal').classList.add('hidden');
+        hideModal('mech-modal');
         if (window._newHireName) {
             var n = window._newHireName;
             window._newHireName = null;
@@ -748,6 +870,11 @@ function openScheduleModal(id, name) {
     var sched = SCHEDULE_DATA[id] || {};
     cbs.forEach(function(cb) { var dow = parseInt(cb.dataset.dow); var slot = parseInt(cb.dataset.slot); if (sched[dow] && sched[dow][slot]) cb.checked = true; });
     document.getElementById('schedule-modal').classList.remove('hidden');
+}
+function toggleDaySlots(dow) {
+    var cbs = document.querySelectorAll('#schedule-form .sched-cb[data-dow="' + dow + '"]');
+    var allChecked = Array.from(cbs).every(function(cb) { return cb.checked; });
+    cbs.forEach(function(cb) { cb.checked = !allChecked; });
 }
 function saveScheduleCheck() {
     if (!checkSimGuard()) return;
@@ -782,7 +909,7 @@ function toggleUpdateApptBtn(el) {
     btn.disabled = !changed;
     btn.classList.toggle('disabled', !changed);
 }
-function closeScheduleModal(event) { if (!event || event.target === event.currentTarget) { document.getElementById('schedule-modal').classList.add('hidden'); document.getElementById('mech-modal').classList.remove('hidden'); } }
+function closeScheduleModal(event) { if (!event || event.target === event.currentTarget) { hideModal('schedule-modal'); document.getElementById('mech-modal').classList.remove('hidden'); } }
 function validateOverrideForm() {
     if (!checkSimGuard()) return false;
     var err = document.getElementById('override-error');
@@ -849,22 +976,22 @@ function showBurstOver(el) {
 
 function showCancelModal(id) {
     document.getElementById('cancel-modal').classList.remove('hidden');
-    document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); requirePw(function(){ cancelAppointmentAjax(id); }, false); };
+    document.getElementById('cancel-confirm-btn').onclick = function() { document.getElementById('cancel-modal').classList.add('hidden'); guardThen(function(){ cancelAppointmentAjax(id); }); };
 }
-function closeCancelModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('cancel-modal').classList.add('hidden'); }
+function closeCancelModal(event) { if (!event || event.target === event.currentTarget) hideModal('cancel-modal'); }
 function showFireModal(id, name, count) { _pendingAction = '?fire=' + id; document.getElementById('fire-modal-title').textContent = 'Fire ' + name + '?'; var el = document.getElementById('fire-modal-cancel-count'); if (count > 0) { el.textContent = count + ' booking' + (count > 1 ? 's' : '') + ' will be cancelled.'; el.style.display = 'block'; } else { el.style.display = 'none'; } document.getElementById('fire-modal').classList.remove('hidden'); }
-function closeFireModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('fire-modal').classList.add('hidden'); }
+function closeFireModal(event) { if (!event || event.target === event.currentTarget) hideModal('fire-modal'); }
 function showRemoveModal(id) {
     document.getElementById('remove-modal').classList.remove('hidden');
     document.getElementById('remove-confirm-btn').onclick = function() { document.getElementById('remove-modal').classList.add('hidden'); requirePw(function(){ removeAppointmentAjax(id); }); };
 }
-function closeRemoveModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('remove-modal').classList.add('hidden'); }
+function closeRemoveModal(event) { if (!event || event.target === event.currentTarget) hideModal('remove-modal'); }
 function showUnblockModal(id, name, date) {
     document.getElementById('unblock-msg').textContent = 'Unblock ' + name + ' on ' + date + '?';
     document.getElementById('unblock-modal').classList.remove('hidden');
     document.getElementById('unblock-confirm-btn').onclick = function() { document.getElementById('unblock-modal').classList.add('hidden'); requirePw(function(){ unblockOverrideAjax(id); }); };
 }
-function closeUnblockModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('unblock-modal').classList.add('hidden'); }
+function closeUnblockModal(event) { if (!event || event.target === event.currentTarget) hideModal('unblock-modal'); }
 /* === VACATIONS === */
 
 function renderVacations(id, mechName) {
@@ -897,6 +1024,8 @@ function addVacation() {
         err = document.createElement('div');
         err.id = 'vac-error';
         err.className = 'field-error';
+        err.style.cssText = 'position:absolute;top:100%;left:0;margin-top:4px;white-space:nowrap;font-size:0.7rem;';
+        document.getElementById('vac-end').parentNode.style.position = 'relative';
         document.getElementById('vac-end').parentNode.appendChild(err);
     }
     if (!start || !end) {
@@ -944,6 +1073,19 @@ function addVacation() {
             return;
         }
     }
+    var conflictCount = 0;
+    document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
+        if (tr.dataset.status === 'scheduled' || tr.dataset.status === 'in_progress') {
+            if (tr.dataset.mechId == id && tr.dataset.date >= start && tr.dataset.date <= end) conflictCount++;
+        }
+    });
+    if (conflictCount > 0) {
+        var mechName = document.getElementById('modal-mech-name') ? document.getElementById('modal-mech-name').value : 'This mechanic';
+        document.getElementById('vac-limit-heading').textContent = 'Appointments Conflict!';
+        document.getElementById('vac-limit-msg').innerHTML = mechName + ' has <strong>' + conflictCount + ' upcoming appointment(s)</strong> during those dates — reschedule them first!';
+        document.getElementById('vac-limit-modal').classList.remove('hidden');
+        return;
+    }
     var reason = document.getElementById('vac-reason').value;
     var fd = new FormData();
     fd.set('add_vacation', '1');
@@ -963,6 +1105,13 @@ function addVacation() {
                 renderVacations(parseInt(id), document.getElementById('modal-mech-name').value);
                 clearVacationDates();
                 document.getElementById('vac-reason').value = '';
+                var mechRow = document.querySelector('tr[data-mech-id="' + id + '"]');
+                if (mechRow) {
+                    var statusCell = mechRow.querySelectorAll('td')[4];
+                    if (statusCell && start <= EFFECTIVE_DATE && end >= EFFECTIVE_DATE) {
+                        statusCell.innerHTML = '<span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>';
+                    }
+                }
                 showModal(d.msg, 'success');
             } else {
                 showModal(d.msg, 'error');
@@ -970,8 +1119,8 @@ function addVacation() {
         })
         .catch(function() { showModal('Could not reach server.', 'error'); });
 }
-function closeConflictModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('conflict-modal').classList.add('hidden'); }
-function closeMsgModal(event) { if (!event || event.target === event.currentTarget) document.getElementById('msg-modal').classList.add('hidden'); }
+function closeConflictModal(event) { if (!event || event.target === event.currentTarget) hideModal('conflict-modal'); }
+function closeMsgModal(event) { if (!event || event.target === event.currentTarget) hideModal('msg-modal'); }
 
 /* === AJAX ACTIONS === */
 
@@ -983,44 +1132,47 @@ function ajaxGet(url, cb) {
 }
 
 function removeVacation(btn) {
-    if (!checkSimGuard()) return;
     var id = parseInt(btn.dataset.vacId);
     var mechName = btn.dataset.mechName;
-    ajaxGet('?remove_vacation=' + id + '&mech_name=' + encodeURIComponent(mechName || ''), function(d) {
-        if (d.ok) {
-            var mechId = parseInt(document.getElementById('modal-mech-id').value);
-            var vacs = VACATION_DATA[mechId] || [];
-            for (var i = 0; i < vacs.length; i++) {
-                if (vacs[i].id === id) { vacs.splice(i, 1); break; }
-            }
-            renderVacations(mechId, document.getElementById('modal-mech-name').value);
-            var mechRow = document.querySelector('tr[data-mech-id="' + mechId + '"]');
-            if (mechRow) {
-                var statusCell = mechRow.querySelectorAll('td')[4];
-                if (statusCell && statusCell.textContent.trim() === 'On Leave') {
-                    var stillOnLeave = false;
-                    var today = EFFECTIVE_DATE;
-                    var remaining = VACATION_DATA[mechId] || [];
-                    for (var j = 0; j < remaining.length; j++) {
-                        if (remaining[j].start_date <= today && remaining[j].end_date >= today) {
-                            stillOnLeave = true;
-                            break;
+    requirePw(function() {
+        if (!checkSimGuard()) return;
+        ajaxGet('?remove_vacation=' + id + '&mech_name=' + encodeURIComponent(mechName || ''), function(d) {
+            if (d.ok) {
+                var mechId = parseInt(document.getElementById('modal-mech-id').value);
+                var vacs = VACATION_DATA[mechId] || [];
+                for (var i = 0; i < vacs.length; i++) {
+                    if (vacs[i].id === id) { vacs.splice(i, 1); break; }
+                }
+                renderVacations(mechId, document.getElementById('modal-mech-name').value);
+                var mechRow = document.querySelector('tr[data-mech-id="' + mechId + '"]');
+                if (mechRow) {
+                    var statusCell = mechRow.querySelectorAll('td')[4];
+                    if (statusCell && statusCell.textContent.trim() === 'On Leave') {
+                        var stillOnLeave = false;
+                        var today = EFFECTIVE_DATE;
+                        var remaining = VACATION_DATA[mechId] || [];
+                        for (var j = 0; j < remaining.length; j++) {
+                            if (remaining[j].start_date <= today && remaining[j].end_date >= today) {
+                                stillOnLeave = true;
+                                break;
+                            }
+                        }
+                        if (!stillOnLeave) {
+                            statusCell.innerHTML = '<span class="status-badge status-scheduled">Active</span>';
                         }
                     }
-                    if (!stillOnLeave) {
-                        statusCell.innerHTML = '<span class="status-badge status-scheduled">Active</span>';
-                    }
                 }
+                showModal(d.msg, 'success');
+            } else {
+                showModal(d.msg, 'error');
             }
-            showModal(d.msg, 'success');
-        } else {
-            showModal(d.msg, 'error');
-        }
-    });
+        });
+    }, false);
 }
 
 function rehireMechanic(id, name, el) {
-    ajaxGet('?restore=' + id, function(d) {
+    guardThen(function() {
+        ajaxGet('?restore=' + id, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
             var tr = el.closest('tr');
@@ -1040,9 +1192,26 @@ function rehireMechanic(id, name, el) {
             tdActions.innerHTML =
                 '<button class="btn btn-sm btn-outline" onclick="openMechModal(this)" data-mid="' + id + '" data-mname="' + htmlspecialchars(m.name || name) + '" data-mnick="' + htmlspecialchars(m.nickname || '') + '" data-mquote="' + htmlspecialchars(m.quote || '') + '" data-mspec="' + htmlspecialchars(m.specialties || '') + '" data-experience="' + m.experience + '">Edit</button> '
                 + '<button type="button" class="btn btn-sm btn-rust" data-bookings="' + booked + '" onclick="showFireModal(' + id + ', \'' + htmlspecialchars(name) + '\', this.dataset.bookings)">Fire</button>';
+            var overrideSel = document.querySelector('select[name="override_mechanic"]');
+            if (overrideSel && !overrideSel.querySelector('option[data-mech-id="' + id + '"]')) {
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.dataset.mechId = id;
+                opt.textContent = m.name || name;
+                overrideSel.appendChild(opt);
+            }
+            var filterSel = document.getElementById('filter-mechanic');
+            if (filterSel && !filterSel.querySelector('option[data-mech-id="' + id + '"]')) {
+                var opt2 = document.createElement('option');
+                opt2.value = m.name || name;
+                opt2.dataset.mechId = id;
+                opt2.textContent = m.name || name;
+                filterSel.appendChild(opt2);
+            }
         } else {
             showModal(d.msg, 'error');
         }
+        });
     });
 }
 
@@ -1052,16 +1221,132 @@ function removeMechanicAjax(id) {
             showModal(d.msg, 'success');
             var tr = document.querySelector('tr[data-mech-id="' + id + '"]');
             if (tr) tr.remove();
+            document.querySelectorAll('option[data-mech-id="' + id + '"]').forEach(function(o) { o.remove(); });
         } else {
             showModal(d.msg, 'error');
         }
     });
 }
 
+function updateStatusCounters() {
+    var counts = {};
+    var total = 0;
+    var anyFilterActive = isAnyFilterActive();
+    document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
+        var s = tr.dataset.status;
+        if (!s) return;
+        if (anyFilterActive) {
+            if (tr.style.display !== 'none') { counts[s] = (counts[s] || 0) + 1; total++; }
+        } else {
+            counts[s] = (counts[s] || 0) + 1; total++;
+        }
+    });
+    ['scheduled', 'in_progress', 'waiting', 'completed', 'cancelled'].forEach(function(s) {
+        var n = counts[s] || 0;
+        var badge = document.getElementById('counter-' + s);
+        var num = document.getElementById('count-' + s);
+        if (badge) {
+            if (num) num.textContent = n;
+            badge.style.display = n > 0 ? '' : 'none';
+        }
+    });
+    var ccBtn = document.getElementById('clear-cancelled-btn');
+    if (ccBtn) ccBtn.style.display = (counts.cancelled || 0) > 0 ? '' : 'none';
+    var acBtn = document.getElementById('archive-completed-btn');
+    if (acBtn) acBtn.style.display = (counts.completed || 0) > 0 ? '' : 'none';
+    var tbody = document.querySelector('#appt-table tbody');
+    var emptyRow = tbody ? tbody.querySelector('tr[data-empty]') : null;
+    if (total === 0 && tbody && !emptyRow) {
+        var er = document.createElement('tr');
+        er.setAttribute('data-empty', '');
+        er.innerHTML = '<td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td>';
+        tbody.appendChild(er);
+    } else if (total > 0 && emptyRow) {
+        emptyRow.remove();
+    }
+}
+
+var SHOW_MORE_LIMIT = 8;
+var showMoreExpanded = false;
+var showMoreStoredHeight = 0;
+
+function isAnyFilterActive() {
+    var name = (document.getElementById('filter-name')?.value || '');
+    var phone = (document.getElementById('filter-phone')?.value || '');
+    var car = (document.getElementById('filter-car')?.value || '');
+    var status = document.getElementById('filter-status')?.value || '';
+    var mechanic = document.getElementById('filter-mechanic')?.value || '';
+    var dateFrom = document.getElementById('filter-date-from')?.value || '';
+    var dateTo = document.getElementById('filter-date-to')?.value || '';
+    return !!(name || phone || car || status || mechanic || dateFrom || dateTo);
+}
+
+function paginateAppTable() {
+    var btn = document.getElementById('show-more-btn');
+    if (!btn) return;
+    var rows = document.querySelectorAll('#appt-table tbody tr[data-name]');
+    if (rows.length <= SHOW_MORE_LIMIT) { btn.style.display = 'none'; return; }
+    showMoreExpanded = false;
+    btn.textContent = '\u25BA Show more \u25C4';
+    rows.forEach(function(tr, i) {
+        var hidden = i >= SHOW_MORE_LIMIT;
+        tr.style.display = hidden ? 'none' : '';
+        var editRow = tr.nextElementSibling;
+        if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = hidden ? 'none' : '';
+    });
+    btn.style.display = '';
+    showMoreStoredHeight = btn.closest('.ov-scroll-x') ? btn.closest('.ov-scroll-x').scrollHeight : 0;
+}
+
+function toggleShowMore() {
+    var btn = document.getElementById('show-more-btn');
+    if (!btn) return;
+    var container = btn.closest('.ov-scroll-x');
+    var rows = document.querySelectorAll('#appt-table tbody tr[data-name]');
+    if (showMoreExpanded) {
+        btn.textContent = '\u25BA Show more \u25C4';
+        container.style.maxHeight = container.scrollHeight + 'px';
+        container.offsetHeight;
+        container.style.maxHeight = showMoreStoredHeight + 'px';
+        container.style.overflow = 'hidden';
+        container.addEventListener('transitionend', function handler() {
+            container.removeEventListener('transitionend', handler);
+            rows.forEach(function(tr, i) {
+                if (i >= SHOW_MORE_LIMIT) {
+                    tr.style.display = 'none';
+                    var editRow = tr.nextElementSibling;
+                    if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = 'none';
+                }
+            });
+            container.style.maxHeight = '';
+            container.style.overflow = '';
+        });
+        showMoreExpanded = false;
+    } else {
+        rows.forEach(function(tr) {
+            tr.style.display = '';
+            var editRow = tr.nextElementSibling;
+            if (editRow && editRow.classList.contains('edit-row')) editRow.style.display = '';
+        });
+        container.style.maxHeight = showMoreStoredHeight + 'px';
+        container.style.overflow = 'hidden';
+        container.offsetHeight;
+        container.style.maxHeight = container.scrollHeight + 'px';
+        container.addEventListener('transitionend', function handler() {
+            container.removeEventListener('transitionend', handler);
+            container.style.maxHeight = '';
+            container.style.overflow = '';
+        });
+        btn.textContent = '\u25BA Show less \u25C4';
+        showMoreExpanded = true;
+    }
+}
+
 function cancelAppointmentAjax(id) {
     ajaxGet('?cancel=' + id, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
+            if (d.reload) { setTimeout(function() { window.location.reload(); }, 1600); return; }
             var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
             if (tr) {
                 var tdActions = tr.querySelectorAll('td')[7];
@@ -1070,6 +1355,26 @@ function cancelAppointmentAjax(id) {
                 if (tdStatus) { tdStatus.className = 'status-badge status-cancelled'; tdStatus.textContent = 'cancelled'; }
                 tr.dataset.status = 'cancelled';
             }
+            updateStatusCounters();
+        } else {
+            showModal(d.msg, 'error');
+        }
+    });
+}
+
+function promoteWaitingAjax(id) {
+    ajaxGet('?promote_waiting=' + id, function(d) {
+        if (d.ok) {
+            showModal(d.msg, 'success');
+            var tr = document.querySelector('#appt-table tbody tr[data-appt-id="' + id + '"]');
+            if (tr) {
+                var tdActions = tr.querySelectorAll('td')[7];
+                tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
+                var tdStatus = tr.querySelector('.status-badge');
+                if (tdStatus) { tdStatus.className = 'status-badge status-scheduled'; tdStatus.textContent = 'scheduled'; }
+                tr.dataset.status = 'scheduled';
+            }
+            updateStatusCounters();
         } else {
             showModal(d.msg, 'error');
         }
@@ -1086,6 +1391,7 @@ function removeAppointmentAjax(id) {
                 if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
                 tr.remove();
             }
+            updateStatusCounters();
         } else {
             showModal(d.msg, 'error');
         }
@@ -1094,7 +1400,6 @@ function removeAppointmentAjax(id) {
 
 function removeAllByStatus(status) {
     var url = '?remove_all_' + status;
-    var btnIds = { cancelled: 'clear-cancelled-btn', completed: 'archive-completed-btn' };
     ajaxGet(url, function(d) {
         if (d.ok) {
             showModal(d.msg, 'success');
@@ -1104,8 +1409,7 @@ function removeAllByStatus(status) {
                 if (editRow && editRow.classList.contains('edit-row')) editRow.remove();
                 r.remove();
             });
-            var btn = document.getElementById(btnIds[status]);
-            if (btn) btn.style.display = 'none';
+            updateStatusCounters();
         } else {
             showModal(d.msg, 'error');
         }
@@ -1122,7 +1426,7 @@ function unblockOverrideAjax(id) {
             if (remaining === 0) {
                 document.getElementById('overrides-panel').style.display = 'none';
                 var toggle = document.getElementById('overrides-toggle');
-                if (toggle) { toggle.textContent = 'Show All Blocks'; }
+                if (toggle) toggle.style.display = 'none';
             }
         } else {
             showModal(d.msg, 'error');
@@ -1157,7 +1461,7 @@ function rebookCheck(btn, id) {
             return;
         }
     }
-    requirePw(function() { rebookAppointmentAjax(id); }, false);
+    guardThen(function() { rebookAppointmentAjax(id); });
 }
 
 function rebookAppointmentAjax(id) {
@@ -1166,6 +1470,7 @@ function rebookAppointmentAjax(id) {
             window.location.href = d.redirect;
         } else if (d.ok) {
             updateApptRowScheduled(id);
+            updateStatusCounters();
             showModal(d.msg, 'success');
         } else {
             showModal(d.msg, 'error');
@@ -1188,10 +1493,336 @@ function updateApptRowScheduled(id) {
     }
 }
 
+/* === MY BOOKINGS === */
+
+function lookupMyBookings() {
+    var phone = document.getElementById('lookup-phone').value.trim();
+    var err = document.getElementById('lookup-phone-error');
+    if (!phone) {
+        err.textContent = 'Please enter a phone number.';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    fetch('availability.php?action=my_bookings&phone=' + encodeURIComponent(phone))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.found) {
+                document.getElementById('qb-fail-msg').textContent = data.message || 'That number ain\'t in our grease-stained ledger, pal. First time? Fill out the form.';
+                document.getElementById('qb-fail-modal').classList.remove('hidden');
+                return;
+            }
+            renderMyBookingsModal(data.appointments, phone);
+            document.getElementById('my-bookings-modal').classList.remove('hidden');
+        })
+        .catch(function() {
+            document.getElementById('qb-fail-msg').textContent = 'Could not reach server. Try again.';
+            document.getElementById('qb-fail-modal').classList.remove('hidden');
+        });
+}
+
+function renderMyBookingsModal(appts, phone) {
+    var results = document.getElementById('my-bookings-results');
+    if (!appts || appts.length === 0) {
+        results.innerHTML = '<p style="font-family:var(--font-hand);color:var(--rust);font-weight:bold;">No appointments found.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < appts.length; i++) {
+        var a = appts[i];
+        var statusLabel = a.status.replace('_', ' ');
+        var dateFormatted = formatDateStr(a.appointment_date);
+        var slotLabel = SLOT_LABELS[a.slot_index] || ('Slot ' + a.slot_index);
+        html += '<div class="my-bookings-card" data-status="' + a.status + '">';
+        if (a.status === 'completed' && a.review) {
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            html += '<span style="display:flex;gap:2px;">' + renderStars(a.review.rating) + '</span>';
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+            html += '</div>';
+        } else if (a.status === 'scheduled') {
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            html += '<span class="countdown-clock" id="countdown-' + a.id + '" style="font-family:var(--font-action);font-size:0.8rem;color:var(--ink);"></span>';
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+            html += '</div>';
+        } else {
+            html += '<span class="status-badge status-' + a.status + '">' + statusLabel.toUpperCase() + '</span>';
+        }
+        html += '<div class="card-info"><strong>Date:</strong> ' + dateFormatted + '</div>';
+        html += '<div class="card-info"><strong>Time:</strong> ' + slotLabel + '</div>';
+        html += '<div class="card-info"><strong>Mechanic:</strong> ' + htmlspecialchars(a.mechanic_name) + (a.nickname ? ' (' + htmlspecialchars(a.nickname) + ')' : '') + '</div>';
+        html += '<div class="card-info"><strong>Car:</strong> ' + htmlspecialchars(a.license_no) + (a.model ? ' — ' + htmlspecialchars(a.model) : '') + '</div>';
+        html += '<div class="card-actions">';
+        if (a.status === 'scheduled') {
+            html += '<button type="button" class="btn btn-sm btn-rust" onclick="confirmClientCancel(' + a.id + ', \'' + htmlspecialchars(phone) + '\')">Cancel</button>';
+            html += '<button type="button" class="btn btn-sm btn-jade" style="margin-left:auto;" onclick=\'openEditFromBooking(' + JSON.stringify(a).replace(/'/g, "&#39;") + ')\'>Edit</button>';
+        } else if (a.status === 'completed') {
+            if (a.review) {
+                html += '<button type="button" class="btn btn-sm btn-outline" style="margin-left:auto;" onclick=\'openReviewModal(' + a.id + ', ' + JSON.stringify(a.mechanic_name).replace(/'/g, "&#39;") + ', ' + a.review.rating + ', ' + JSON.stringify(a.review.comment || '').replace(/'/g, "&#39;") + ')\'>Edit Review</button>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-pink" style="margin-left:auto;" onclick=\'openReviewModal(' + a.id + ', ' + JSON.stringify(a.mechanic_name).replace(/'/g, "&#39;") + ')\'>Leave a Review</button>';
+            }
+        } else if (a.status === 'cancelled') {
+            html += '<span style="font-family:var(--font-hand);color:var(--rust);font-style:italic;">Cancelled</span>';
+        } else if (a.status === 'waiting') {
+            html += '<span style="font-family:var(--font-hand);color:var(--gold);font-style:italic;">Waiting for slot</span>';
+        }
+        html += '</div>';
+        html += '</div>';
+    }
+    results.innerHTML = html;
+    startAllCountdowns(appts);
+}
+
+var _countdownInterval = null;
+var SLOT_START_HOURS = [10, 12, 14, 16];
+
+function startAllCountdowns(appts) {
+    if (_countdownInterval) clearInterval(_countdownInterval);
+    function tick() {
+        var now = new Date();
+        for (var i = 0; i < appts.length; i++) {
+            var a = appts[i];
+            if (a.status !== 'scheduled') continue;
+            var el = document.getElementById('countdown-' + a.id);
+            if (!el) continue;
+            var hour = SLOT_START_HOURS[a.slot_index] || 10;
+            var target = new Date(a.appointment_date + 'T' + String(hour).padStart(2, '0') + ':00:00');
+            var diff = target - now;
+            if (diff <= 0) {
+                el.textContent = 'Starting soon';
+                el.style.color = 'var(--rust)';
+                continue;
+            }
+            var d = Math.floor(diff / 86400000);
+            var h = Math.floor((diff % 86400000) / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            var s = Math.floor((diff % 60000) / 1000);
+            var parts = [];
+            if (d > 0) parts.push('<span style="margin-right:12px;">' + d + 'd</span>');
+            parts.push('<span style="margin-right:12px;">' + h + 'h</span>');
+            parts.push('<span style="margin-right:12px;">' + String(m).padStart(2, '0') + 'm</span>');
+            parts.push(String(s).padStart(2, '0') + 's');
+            el.innerHTML = parts.join('');
+            el.style.color = d === 0 && h < 4 ? 'var(--rust)' : 'var(--violet)';
+        }
+    }
+    tick();
+    _countdownInterval = setInterval(tick, 1000);
+}
+
+function renderStars(rating) {
+    var html = '';
+    for (var i = 1; i <= 5; i++) {
+        html += '<img src="images/doodles/' + (i <= rating ? 'star.svg' : 'star-outline.svg') + '" style="width:20px;height:20px;vertical-align:middle;">';
+    }
+    return html;
+}
+
+var _reviewApptId = null;
+var _reviewIsEdit = false;
+
+function closeReviewModal() {
+    hideModal('review-modal');
+    document.getElementById('my-bookings-modal').classList.remove('hidden');
+}
+
+function openReviewModal(apptId, mechanicName, existingRating, existingComment) {
+    _reviewApptId = apptId;
+    _reviewIsEdit = !!existingRating;
+    document.getElementById('review-modal-heading').textContent = _reviewIsEdit ? 'Edit Review' : 'How Was the Service?';
+    document.getElementById('review-modal-mechanic').textContent = (_reviewIsEdit ? 'Edit your review for ' : 'Review your appointment with ') + mechanicName;
+    document.getElementById('modal-review-comment').value = existingComment || '';
+    var rating = existingRating || 0;
+    var stars = document.getElementById('modal-star-rating');
+    stars.dataset.rating = rating;
+    var imgs = stars.querySelectorAll('.star-btn');
+    for (var i = 0; i < imgs.length; i++) {
+        imgs[i].src = (i + 1) <= rating ? 'images/doodles/star.svg' : 'images/doodles/star-outline.svg';
+    }
+    document.getElementById('delete-review-btn').style.display = _reviewIsEdit ? '' : 'none';
+    hideModal('my-bookings-modal');
+    document.getElementById('review-modal').classList.remove('hidden');
+}
+
+function setModalRating(rating) {
+    var container = document.getElementById('modal-star-rating');
+    container.dataset.rating = rating;
+    var imgs = container.querySelectorAll('.star-btn');
+    for (var i = 0; i < imgs.length; i++) {
+        imgs[i].src = (i + 1) <= rating ? 'images/doodles/star.svg' : 'images/doodles/star-outline.svg';
+    }
+}
+
+function submitModalReview() {
+    if (!_reviewApptId) return;
+    var container = document.getElementById('modal-star-rating');
+    var rating = parseInt(container.dataset.rating) || 0;
+    var comment = document.getElementById('modal-review-comment').value;
+    if (rating < 1) {
+        showModal('Pick a star rating first!', 'error');
+        return;
+    }
+    var body = 'appointment_id=' + _reviewApptId + '&rating=' + rating + '&comment=' + encodeURIComponent(comment);
+    fetch('availability.php?action=submit_review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        closeReviewModal();
+        if (d.success) {
+            var wasEdit = _reviewIsEdit;
+            _reviewApptId = null;
+            _reviewIsEdit = false;
+            var phone = document.getElementById('lookup-phone') ? document.getElementById('lookup-phone').value : '';
+            if (phone) lookupMyBookings();
+            showModal(wasEdit ? 'Review updated!' : 'Review submitted!', 'success');
+        } else {
+            showModal(d.message, 'error');
+        }
+    })
+    .catch(function() {
+        closeReviewModal();
+        showModal('Could not reach server. Try again.', 'error');
+    });
+}
+
+function deleteModalReview() {
+    if (!_reviewApptId) return;
+    var body = 'appointment_id=' + _reviewApptId;
+    fetch('availability.php?action=delete_review', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        closeReviewModal();
+        if (d.success) {
+            _reviewApptId = null;
+            _reviewIsEdit = false;
+            var phone = document.getElementById('lookup-phone') ? document.getElementById('lookup-phone').value : '';
+            if (phone) lookupMyBookings();
+            showModal(d.message, 'success');
+        } else {
+            showModal(d.message, 'error');
+        }
+    })
+    .catch(function() {
+        closeReviewModal();
+        showModal('Could not reach server. Try again.', 'error');
+    });
+}
+
+var _currentReviews = [];
+
+function openReviewsModal(mechId, mechName) {
+    document.getElementById('reviews-modal-title').textContent = mechName + ' — Reviews';
+    var list = document.getElementById('reviews-modal-list');
+    list.innerHTML = '<p style="font-family:var(--font-hand);opacity:0.6;">Loading...</p>';
+    document.getElementById('reviews-modal').classList.remove('hidden');
+    fetch('admin.php?mech_reviews=' + mechId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok || !d.reviews || d.reviews.length === 0) {
+                _currentReviews = [];
+                list.innerHTML = '<p style="font-family:var(--font-hand);opacity:0.6;">No reviews yet.</p>';
+                return;
+            }
+            _currentReviews = d.reviews;
+            var sortEl = document.getElementById('reviews-sort');
+            if (sortEl) sortEl.value = 'oldest';
+            renderReviewsList();
+        })
+        .catch(function() {
+            list.innerHTML = '<p style="font-family:var(--font-hand);color:var(--rust);">Could not load reviews.</p>';
+        });
+}
+
+function sortReviews() {
+    renderReviewsList();
+}
+
+function renderReviewsList() {
+    var list = document.getElementById('reviews-modal-list');
+    if (!list || _currentReviews.length === 0) return;
+    var sort = document.getElementById('reviews-sort') ? document.getElementById('reviews-sort').value : 'oldest';
+    var arr = _currentReviews.slice();
+    if (sort === 'newest') {
+        arr.sort(function(a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : 0; });
+    } else if (sort === 'rating_high') {
+        arr.sort(function(a, b) { return b.rating - a.rating; });
+    } else if (sort === 'rating_low') {
+        arr.sort(function(a, b) { return a.rating - b.rating; });
+    } else {
+        arr.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    }
+    var html = '';
+    for (var i = 0; i < arr.length; i++) {
+        var rv = arr[i];
+        html += '<div class="review-card">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '<span>' + renderStars(rv.rating) + '</span>';
+        html += '<span style="font-family:var(--font-hand);font-size:0.75rem;opacity:0.6;">' + fmtDate(rv.date.split(' ')[0]) + '</span>';
+        html += '</div>';
+        if (rv.comment) html += '<p style="font-family:var(--font-hand);font-size:0.85rem;margin:6px 0 2px;">' + htmlspecialchars(rv.comment) + '</p>';
+        html += '<div style="font-family:var(--font-hand);font-size:0.75rem;opacity:0.7;">— ' + htmlspecialchars(rv.client) + '</div>';
+        html += '</div>';
+    }
+    list.innerHTML = html;
+}
+
+function openEditFromBooking(a) {
+    document.getElementById('eb-appt-id').value = a.id;
+    document.getElementById('eb-name').value = a.client_name;
+    document.getElementById('eb-address').value = a.address;
+    document.getElementById('eb-license').value = a.license_no;
+    document.getElementById('eb-engine').value = a.engine_no;
+    document.getElementById('eb-model').value = a.model || '';
+    document.getElementById('eb-display-phone').value = a.phone;
+    document.getElementById('eb-display-date').textContent = formatDateStr(a.appointment_date);
+    document.getElementById('eb-display-slot').textContent = SLOT_LABELS[a.slot_index] || ('Slot ' + a.slot_index);
+    document.getElementById('eb-display-mechanic').textContent = a.mechanic_name + (a.nickname ? ' (' + a.nickname + ')' : '');
+    _editFromMyBookings = true;
+    hideModal('my-bookings-modal');
+    document.getElementById('eb-edit-modal').classList.remove('hidden');
+}
+
+var _editFromMyBookings = false;
+
+function closeEditModal() {
+    hideModal('eb-edit-modal');
+    if (_editFromMyBookings) {
+        _editFromMyBookings = false;
+        document.getElementById('my-bookings-modal').classList.remove('hidden');
+    }
+}
+
+function confirmClientCancel(id, phone) {
+    var modal = document.getElementById('cancel-confirm-modal');
+    modal.classList.remove('hidden');
+    document.getElementById('cancel-confirm-btn').onclick = function() {
+        hideModal('cancel-confirm-modal');
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = '<input type="hidden" name="action_client_cancel" value="1"><input type="hidden" name="cancel_id" value="' + id + '"><input type="hidden" name="lookup_phone" value="' + htmlspecialchars(phone) + '">';
+        document.body.appendChild(form);
+        form.submit();
+    };
+}
+
+function formatDateStr(dateStr) {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+
 /* === QUICK BOOK === */
 
 function closeQbFailModal(event) {
-    if (!event || event.target === event.currentTarget) document.getElementById('qb-fail-modal').classList.add('hidden');
+    if (!event || event.target === event.currentTarget) hideModal('qb-fail-modal');
 }
 
 function openQuickBook() {
@@ -1401,11 +2032,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         gearBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            dropdown.classList.toggle('hidden');
+            dropdown.classList.toggle('settings-open');
         });
         document.addEventListener('click', function(e) {
             if (!dropdown.contains(e.target) && e.target !== gearBtn) {
-                dropdown.classList.add('hidden');
+                dropdown.classList.remove('settings-open');
             }
         });
     }
@@ -1517,7 +2148,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var doneBtn = document.getElementById('spotlight-done-btn');
     if (doneBtn) {
         doneBtn.addEventListener('click', function() {
-            document.getElementById('thank-you-modal').classList.add('hidden');
+            hideModal('thank-you-modal');
             dismissSpotlight();
         });
     }
@@ -1583,6 +2214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('date').addEventListener('change', function() {
             var dateVal = document.getElementById('date').value;
             if (!dateVal || dateVal >= TODAY) hidePastDateMsg();
+            fetchAvailability();
         });
     }
 
@@ -1663,5 +2295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateFilterCross();
         } catch(e) {}
     }, 0);
+
+    paginateAppTable();
 
 });

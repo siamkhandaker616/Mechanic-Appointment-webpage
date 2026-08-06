@@ -56,7 +56,7 @@ if ($action === 'edit_lookup') {
         JOIN clients c ON c.id = a.client_id
         JOIN cars car ON car.id = a.car_id
         JOIN mechanics m ON m.id = a.mechanic_id
-        WHERE REPLACE(REPLACE(c.phone, '-', ''), ' ', '') = ?
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') = ?
           AND a.status = '" . STATUS_SCHEDULED . "'
         ORDER BY a.appointment_date ASC, a.slot_index ASC
     ");
@@ -91,6 +91,71 @@ if ($action === 'edit_lookup') {
     exit;
 }
 
+if ($action === 'my_bookings') {
+    $phone = normalizePhone($_GET['phone'] ?? '');
+    if (!$phone) {
+        echo json_encode(['found' => false, 'message' => 'Phone number is required.']);
+        exit;
+    }
+    $appts = getAppointmentsByPhone($phone);
+    if (empty($appts)) {
+        echo json_encode(['found' => false, 'message' => 'That number ain\'t in our grease-stained ledger, pal. First time? Fill out the form.']);
+        exit;
+    }
+    $results = [];
+    foreach ($appts as $a) {
+        $results[] = [
+            'id' => (int)$a['id'],
+            'appointment_date' => $a['appointment_date'],
+            'slot_index' => (int)$a['slot_index'],
+            'status' => $a['status'],
+            'mechanic_name' => $a['mechanic_name'],
+            'nickname' => $a['nickname'] ?? '',
+            'license_no' => $a['license_no'],
+            'model' => $a['model'] ?? '',
+            'engine_no' => $a['engine_no'] ?? '',
+            'client_name' => $a['client_name'],
+            'phone' => $a['phone'],
+            'address' => $a['address'] ?? '',
+            'review' => $a['rating'] ? ['rating' => (int)$a['rating'], 'comment' => $a['review_comment'] ?? ''] : null,
+        ];
+    }
+    echo json_encode(['found' => true, 'appointments' => $results]);
+    exit;
+}
+
+if ($action === 'submit_review') {
+    header('Content-Type: application/json');
+    $apptId = (int)($_POST['appointment_id'] ?? 0);
+    $rating = (int)($_POST['rating'] ?? 0);
+    $comment = trim($_POST['comment'] ?? '');
+    if (!$apptId || $rating < 1 || $rating > 5) {
+        echo json_encode(['success' => false, 'message' => 'Invalid review data.']);
+        exit;
+    }
+    if (submitAppointmentReview($apptId, $rating, $comment)) {
+        echo json_encode(['success' => true, 'message' => 'Thanks for your feedback!']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Could not submit review. Appointment may not be completed.']);
+    }
+    exit;
+}
+
+if ($action === 'delete_review') {
+    header('Content-Type: application/json');
+    $apptId = (int)($_POST['appointment_id'] ?? 0);
+    if (!$apptId) {
+        echo json_encode(['success' => false, 'message' => 'Invalid appointment.']);
+        exit;
+    }
+    if (deleteAppointmentReview($apptId)) {
+        echo json_encode(['success' => true, 'message' => 'Review deleted.']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'No review found to delete.']);
+    }
+    exit;
+}
+
 $mechanicId = (int)($_GET['mechanic_id'] ?? 0);
 $date = $_GET['date'] ?? '';
 
@@ -108,12 +173,17 @@ if (!$mechanic) {
 }
 
 $slotAvailability = getMechanicSlotsAvailability($mechanicId, $date);
+$bookedStmt = getDB()->prepare("SELECT slot_index FROM appointments WHERE mechanic_id = ? AND appointment_date = ? AND status != '" . STATUS_CANCELLED . "'");
+$bookedStmt->execute([$mechanicId, $date]);
+$bookedSlots = [];
+foreach ($bookedStmt->fetchAll() as $r) $bookedSlots[(int)$r['slot_index']] = true;
 $slots = [];
 for ($i = 0; $i < SLOT_COUNT; $i++) {
     $slots[] = [
         'index' => $i,
         'label' => $SLOT_LABELS[$i] ?? "Slot " . ($i + 1),
         'available' => $slotAvailability[$i],
+        'booked' => isset($bookedSlots[$i]),
     ];
 }
 
