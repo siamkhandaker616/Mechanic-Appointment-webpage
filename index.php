@@ -580,6 +580,7 @@ var DAY_NAMES_ABBR = <?= json_encode($DAY_NAMES_ABBR) ?>;
     <div class="modal-box msg-box msg-success">
         <button type="button" class="modal-close" onclick="hideModal('msg-modal')">&times;</button>
         <div class="burst burst-left hidden" id="msg-modal-burst">NOPE!</div>
+        <img src="images/bursts/thanks.svg" alt="THANKS!" class="msg-modal-burst-thanks" id="msg-modal-burst-thanks">
         <div class="msg-content" id="msg-modal-content"></div>
         <div class="modal-btn-row">
             <button type="button" class="btn btn-sm btn-pink btn-outline" onclick="hideModal('msg-modal')">OK</button>

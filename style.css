@@ -60,6 +60,7 @@
     --amber: #c07030;
     --pink-glow: rgba(214, 51, 132, 0.3);
     --gold: #f5c518;
+    --bronze: #c8a31c;
     --burst: #e524e2;
     --pop: #25a9f0;
     --cyan: #caeded;
@@ -156,7 +157,6 @@ body {
     background-position: 0 0, 0 0, 0 0, 10px 10px, center;
     background-repeat: no-repeat, repeat, repeat, repeat, no-repeat;
     background-attachment: scroll, scroll, scroll, scroll, fixed;
-    background-blend-mode: normal, normal, normal;
     color: var(--ink);
     line-height: 1.5;
     min-height: 100vh;
@@ -401,10 +401,6 @@ header::after {
     font-size: 0.6rem;
     color: var(--pink);
     opacity: 0.6;
-}
-
-.panel:first-of-type {
-    transform: rotate(-0.6deg);
 }
 
 /* === BURST DECORATION === */
@@ -893,18 +889,22 @@ textarea {
     margin-bottom: 10px;
     background: var(--cyan);
     cursor: pointer;
-    transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s, background 0.15s;
     position: relative;
     box-shadow: var(--shadow-sm);
 }
 
 .mechanic-card:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 5px 5px 0 var(--teal);
+    transform: translate(-3px, -3px) rotate(-0.6deg);
+    box-shadow: 6px 6px 0 var(--pink);
+}
+.mechanic-card:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 var(--ink);
 }
 .mechanic-card:focus-visible {
-    transform: translate(-2px, -2px);
-    box-shadow: 5px 5px 0 var(--teal);
+    transform: translate(-3px, -3px) rotate(-0.6deg);
+    box-shadow: 6px 6px 0 var(--pink);
     outline: 3px solid var(--pink);
     outline-offset: 2px;
 }
@@ -968,7 +968,17 @@ textarea {
     font-size: 0.65rem;
     padding: 5px 12px;
     letter-spacing: 1px;
+    font-family: var(--font-sub);
+    font-weight: bold;
+    text-transform: uppercase;
+    border: 2px solid var(--ink);
+    background: var(--jade);
+    color: var(--ink);
+    transform: none;
     animation: vacay-pop 1s infinite;
+}
+.status-badge.vacation-badge::after {
+    content: none;
 }
 
 .work-days {
@@ -1264,6 +1274,10 @@ textarea {
     outline: 3px solid var(--pink);
     outline-offset: 2px;
 }
+.suggestion-chip:active {
+    transform: translate(1px, 1px) scale(0.98);
+    box-shadow: 1px 1px 0 var(--ink);
+}
 
 .suggestion-chip .chip-label {
     display: block;
@@ -1312,6 +1326,39 @@ tr:last-child td {
     border-bottom: none;
 }
 
+/* D3 — comic zero-state for the admin appointments table */
+.appt-empty-comic {
+    position: relative;
+    width: 280px;
+    max-width: 100%;
+    margin: 24px auto;
+    border: var(--border);
+    background: var(--cream);
+    padding: 30px 16px;
+    text-align: center;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.appt-empty-comic .burst-tag {
+    position: absolute;
+    top: -14px;
+    right: -8px;
+    background: var(--pink);
+    color: var(--gold);
+    border: 2px solid var(--ink);
+    padding: 2px 10px;
+    font-size: 0.7rem;
+    font-family: var(--font-sub);
+    transform: rotate(6deg);
+}
+.appt-empty-comic .sub {
+    font-family: var(--font-hand);
+    font-size: 0.8rem;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
 #search-toggle {
     opacity: 0.8; cursor: pointer; transition: opacity 0.2s, transform 0.3s;
     width: 42px; height: 42px;
@@ -1352,8 +1399,59 @@ tr:last-child td {
     border: 2px solid var(--ink);
     transform: rotate(-1deg);
 }
-.status-cancelled { background: var(--amber); color: var(--ink); }
-.status-waiting { background: var(--gold); color: var(--rust); border-style: dashed; }
+
+/* Stamp statuses — cancelled, waiting, waitlist-promoted, on-leave (inactive mechanics reuse .status-cancelled) */
+.status-cancelled,
+.status-waiting,
+.status-scheduled.stamp-promoted,
+.status-leave {
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: normal;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: 3px double currentColor;
+    background: transparent;
+    font-family: var(--font-marker);
+    transform: rotate(-2deg);
+    position: relative;
+}
+.status-cancelled { color: var(--rust); transform: rotate(1.5deg); }
+.status-waiting { color: var(--pink); border-style: dashed; }
+.status-scheduled.stamp-promoted { color: var(--teal); }
+.status-leave { color: var(--ink); transform: rotate(-1.5deg); white-space: nowrap; }
+.status-cancelled::after,
+.status-waiting::after,
+.status-scheduled.stamp-promoted::after,
+.status-leave::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px dashed rgba(26, 26, 46, 0.25);
+    pointer-events: none;
+}
+
+#appt-table .status-cancelled,
+#appt-table .status-waiting,
+#appt-table .status-scheduled.stamp-promoted {
+    font-size: 0.7rem;
+    padding: 3px 10px;
+}
+
+/* G4 — admin table row flash + hover warm */
+.row-flash td {
+    animation: row-flash 1.2s ease;
+}
+@keyframes row-flash {
+    0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+    25% { box-shadow: inset 0 0 0 999px rgba(245, 197, 24, 0.4); }
+}
+#appt-table tbody tr[data-name] td {
+    transition: box-shadow 0.2s ease;
+}
+#appt-table tbody tr[data-name]:hover td {
+    box-shadow: inset 0 0 0 999px var(--pink-glow);
+}
 
 /* === SIM BAR === */
 
@@ -1621,6 +1719,24 @@ tr:last-child td {
     color: var(--gold);
 }
 
+.msg-box.msg-review-success {
+    background: var(--jade);
+    color: var(--cyan);
+}
+
+.msg-modal-burst-thanks {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 90px;
+    height: auto;
+    max-width: 100px;
+    z-index: 2;
+    pointer-events: none;
+    display: none;
+    animation: pow-pop 1.3s ease-out infinite alternate;
+}
+
 .msg-content {
     font-weight: normal;
     font-family: var(--font-sub);
@@ -1638,7 +1754,7 @@ tr:last-child td {
     border: none;
     font-size: 1.5rem;
     font-family: Bangers, sans-serif;
-    color: #40E0D0;
+    color: var(--teal-light);
     cursor: pointer;
     line-height: 1;
 }
@@ -2997,6 +3113,14 @@ body.no-anim *::after {
     #schedule-modal .modal-box {
         max-width: 95vw !important;
         overflow-x: auto;
+    }
+    .modal-overlay .modal-box {
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+    .slot-grid .slot-chip {
+        flex: 1 1 45%;
+        text-align: center;
     }
 }
 

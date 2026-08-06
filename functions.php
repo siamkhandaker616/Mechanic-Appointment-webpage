@@ -506,7 +506,7 @@ function getAppointments(?string $status = null): array {
         $sql .= " WHERE a.status = ?";
         $params[] = $status;
     }
-    $sql .= " ORDER BY a.appointment_date ASC, a.slot_index ASC";
+    $sql .= " ORDER BY (a.status = '" . STATUS_COMPLETED . "') ASC, a.appointment_date ASC, a.slot_index ASC";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();

@@ -1109,7 +1109,7 @@ function addVacation() {
                 if (mechRow) {
                     var statusCell = mechRow.querySelectorAll('td')[4];
                     if (statusCell && start <= EFFECTIVE_DATE && end >= EFFECTIVE_DATE) {
-                        statusCell.innerHTML = '<span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>';
+                        statusCell.innerHTML = '<span class="status-badge status-leave">On Leave</span>';
                     }
                 }
                 showModal(d.msg, 'success');
@@ -1185,7 +1185,7 @@ function rehireMechanic(id, name, el) {
             for (var j = 0; j < vacs.length; j++) {
                 if (vacs[j].start_date <= today && vacs[j].end_date >= today) { onLeave = true; break; }
             }
-            tdStatus.innerHTML = onLeave ? '<span class="status-badge" style="background:var(--gold);color:var(--ink);white-space:nowrap;">On Leave</span>' : '<span class="status-badge status-scheduled">Active</span>';
+            tdStatus.innerHTML = onLeave ? '<span class="status-badge status-leave">On Leave</span>' : '<span class="status-badge status-scheduled">Active</span>';
             var tdActions = tr.querySelectorAll('td')[5];
             var booked = d.mechanic ? d.mechanic.bookings : 0;
             var m = d.mechanic || {};
@@ -1231,10 +1231,12 @@ function removeMechanicAjax(id) {
 function updateStatusCounters() {
     var counts = {};
     var total = 0;
+    var allTotal = 0;
     var anyFilterActive = isAnyFilterActive();
     document.querySelectorAll('#appt-table tbody tr[data-name]').forEach(function(tr) {
         var s = tr.dataset.status;
         if (!s) return;
+        allTotal++;
         if (anyFilterActive) {
             if (tr.style.display !== 'none') { counts[s] = (counts[s] || 0) + 1; total++; }
         } else {
@@ -1254,16 +1256,10 @@ function updateStatusCounters() {
     if (ccBtn) ccBtn.style.display = (counts.cancelled || 0) > 0 ? '' : 'none';
     var acBtn = document.getElementById('archive-completed-btn');
     if (acBtn) acBtn.style.display = (counts.completed || 0) > 0 ? '' : 'none';
-    var tbody = document.querySelector('#appt-table tbody');
-    var emptyRow = tbody ? tbody.querySelector('tr[data-empty]') : null;
-    if (total === 0 && tbody && !emptyRow) {
-        var er = document.createElement('tr');
-        er.setAttribute('data-empty', '');
-        er.innerHTML = '<td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td>';
-        tbody.appendChild(er);
-    } else if (total > 0 && emptyRow) {
-        emptyRow.remove();
-    }
+    var table = document.getElementById('appt-table');
+    var comic = document.getElementById('appt-empty-comic');
+    if (comic) comic.classList.toggle('hidden', allTotal > 0);
+    if (table) table.style.display = allTotal === 0 ? 'none' : '';
 }
 
 var SHOW_MORE_LIMIT = 8;
@@ -1342,6 +1338,13 @@ function toggleShowMore() {
     }
 }
 
+function flashRow(tr) {
+    if (!tr) return;
+    tr.classList.remove('row-flash');
+    void tr.offsetWidth;
+    tr.classList.add('row-flash');
+}
+
 function cancelAppointmentAjax(id) {
     ajaxGet('?cancel=' + id, function(d) {
         if (d.ok) {
@@ -1354,6 +1357,7 @@ function cancelAppointmentAjax(id) {
                 var tdStatus = tr.querySelector('.status-badge');
                 if (tdStatus) { tdStatus.className = 'status-badge status-cancelled'; tdStatus.textContent = 'cancelled'; }
                 tr.dataset.status = 'cancelled';
+                flashRow(tr);
             }
             updateStatusCounters();
         } else {
@@ -1371,8 +1375,9 @@ function promoteWaitingAjax(id) {
                 var tdActions = tr.querySelectorAll('td')[7];
                 tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
                 var tdStatus = tr.querySelector('.status-badge');
-                if (tdStatus) { tdStatus.className = 'status-badge status-scheduled'; tdStatus.textContent = 'scheduled'; }
+                if (tdStatus) { tdStatus.className = 'status-badge status-scheduled stamp-promoted'; tdStatus.textContent = 'scheduled'; }
                 tr.dataset.status = 'scheduled';
+                flashRow(tr);
             }
             updateStatusCounters();
         } else {
@@ -1438,6 +1443,18 @@ function showModal(msg, type) {
     var m = document.getElementById('msg-modal');
     m.querySelector('.modal-box').className = 'modal-box msg-box msg-' + type;
     document.getElementById('msg-modal-burst').style.display = type === 'error' ? '' : 'none';
+    var thanks = document.getElementById('msg-modal-burst-thanks');
+    if (thanks) thanks.style.display = 'none';
+    document.getElementById('msg-modal-content').textContent = msg;
+    m.classList.remove('hidden');
+}
+
+function showReviewThanksModal(msg) {
+    var m = document.getElementById('msg-modal');
+    m.querySelector('.modal-box').className = 'modal-box msg-box msg-review-success';
+    document.getElementById('msg-modal-burst').style.display = 'none';
+    var thanks = document.getElementById('msg-modal-burst-thanks');
+    if (thanks) thanks.style.display = '';
     document.getElementById('msg-modal-content').textContent = msg;
     m.classList.remove('hidden');
 }
@@ -1491,6 +1508,7 @@ function updateApptRowScheduled(id) {
     if (tdActions) {
         tdActions.innerHTML = '<button class="btn btn-sm btn-outline" onclick="toggleEdit(' + id + ', this)">Edit</button> <button type="button" class="btn btn-sm btn-rust" onclick="showCancelModal(' + id + ')">Cancel</button>';
     }
+    flashRow(tr);
 }
 
 /* === MY BOOKINGS === */
@@ -1677,7 +1695,7 @@ function submitModalReview() {
             _reviewIsEdit = false;
             var phone = document.getElementById('lookup-phone') ? document.getElementById('lookup-phone').value : '';
             if (phone) lookupMyBookings();
-            showModal(wasEdit ? 'Review updated!' : 'Review submitted!', 'success');
+            showReviewThanksModal(wasEdit ? 'Review updated!' : 'Review submitted!');
         } else {
             showModal(d.message, 'error');
         }

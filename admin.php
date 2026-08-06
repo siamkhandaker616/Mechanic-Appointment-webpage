@@ -211,7 +211,11 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
     </div></div>
     <?php endif; ?>
     <div class="ov-scroll-x">
-    <table id="appt-table">
+    <div id="appt-empty-comic" class="appt-empty-comic<?= empty($appointments) ? '' : ' hidden' ?>">
+        <span class="burst-tag">ZERO!</span>
+        No bookings yet<br><span class="sub">the grease is fresh and the bays are empty</span>
+    </div>
+    <table id="appt-table"<?= empty($appointments) ? ' style="display:none;"' : '' ?>>
         <thead>
             <tr>
                 <th>Client</th>
@@ -225,9 +229,6 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
             </tr>
         </thead>
         <tbody>
-            <?php if (empty($appointments)): ?>
-            <tr><td colspan="8" style="text-align:center;font-style:italic;">No appointments yet.</td></tr>
-            <?php else: ?>
             <?php $aRowNum = 0; ?>
             <?php foreach ($appointments as $a): $aRowNum++; ?>
             <tr class="<?= $aRowNum % 2 === 0 ? 'stripe-even' : '' ?>"
@@ -284,7 +285,6 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
                 </td>
             </tr>
             <?php endforeach; ?>
-            <?php endif; ?>
         </tbody>
     </table>
     <?php if (count($appointments) > 8): ?>
@@ -396,7 +396,7 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
             <tr>
                 <th>Name</th>
                 <th>Nickname</th>
-                <th>Specialties</th>
+                <th class="th-center">Specialties</th>
                 <th class="th-center">Rating</th>
                 <th>Exp</th>
                 <th class="th-center">Status</th>
@@ -425,9 +425,9 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
                     <?php endif; ?>
                 </td>
                 <td><?= (int)$m['experience'] ?></td>
-                <td>
+                <td style="text-align:center;">
                     <?php if ($onLeave): ?>
-                    <span class="status-badge" style="background:var(--paper);color:var(--ink);white-space:nowrap;">On Leave</span>
+                    <span class="status-badge status-leave">On Leave</span>
                     <?php else: ?>
                     <span class="status-badge <?= $m['is_active'] ? 'status-scheduled' : 'status-cancelled' ?>"><?= $m['is_active'] ? 'Active' : 'Inactive' ?></span>
                     <?php endif; ?>
