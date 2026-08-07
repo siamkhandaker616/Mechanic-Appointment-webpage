@@ -2260,6 +2260,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 sb.src = 'images/doodles/' + bubbles[bi] + '.svg';
             }, 600);
         }
+        /* Click the bubble to toggle today's waitlist rule (off by default) */
+        var luckyRuleBar = document.getElementById('lucky-rule-bar');
+        if (luckyRuleBar) {
+            sb.addEventListener('click', function() {
+                var isHidden = luckyRuleBar.classList.toggle('hidden');
+                sb.classList.toggle('bubble-rule-on', !isHidden);
+            });
+        }
     }
 
     setTimeout(function() {

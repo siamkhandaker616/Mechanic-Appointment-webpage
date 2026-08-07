@@ -465,6 +465,11 @@ header::after {
     height: 48px;
     transform: rotate(-25deg);
     z-index: 10;
+    cursor: pointer;
+    pointer-events: auto;
+}
+.doodle-speech-appt.bubble-rule-on {
+    filter: drop-shadow(0 0 3px var(--gold)) drop-shadow(0 0 6px var(--gold));
 }
 
 .doodle-oil-help {

@@ -181,7 +181,7 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
 
 <!-- === ALL APPOINTMENTS === -->
 <div class="panel">
-    <img class="doodle doodle-speech-appt" id="speech-bubble" src="images/doodles/speech-bubble-1.svg" alt="">
+    <img class="doodle doodle-speech-appt" id="speech-bubble" src="images/doodles/speech-bubble-1.svg" alt="" title="Click to toggle today's waitlist rule">
     <div class="burst burst-right">GIGS!</div>
     <span style="display:inline-flex;align-items:center;">
         <h2 style="margin:0;">All Appointments</h2>
@@ -206,7 +206,7 @@ $adminAuthed = !empty($_SESSION['admin_verified']);
         $todayRule = luckyRuleForDate($effectiveTime->format('Y-m-d'));
         $dayName = $DAY_NAMES_FULL[(int)$effectiveTime->format('w')];
     ?>
-    <div style="text-align:right;"><div class="lucky-rule-bar">
+    <div style="text-align:right;"><div id="lucky-rule-bar" class="lucky-rule-bar hidden">
         <span class="lucky-rule-label">Today's Waitlist Rule (<?= $dayName ?>):</span> <?= htmlspecialchars($todayRule['label']) ?>
     </div></div>
     <?php endif; ?>
