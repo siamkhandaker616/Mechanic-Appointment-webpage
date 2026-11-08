@@ -55,6 +55,7 @@
     --jade: #126f20;
     --navy: #16213e;
     --pink: #d63384;
+    --pink-light: #ef50a0;
     --violet: #c22875;
     --dust: #dbc444;
     --amber: #c07030;
@@ -764,6 +765,11 @@ textarea {
     transform: translate(-3px, -3px);
     box-shadow: 8px 8px 0 var(--ink);
     background: var(--teal-light);
+    color: var(--cream);
+}
+
+.btn-pink:hover {
+    background: var(--pink-light);
 }
 
 .btn:active {
@@ -782,6 +788,10 @@ textarea {
     background: var(--gold);
     color: var(--ink);
     animation: none;
+}
+
+.btn-outline:hover {
+    color: var(--violet);
 }
 
 .btn-teal {
@@ -3137,4 +3147,18 @@ body.no-anim *::after {
     .custom-select-dropdown {
         scrollbar-color: var(--ink) transparent;
     }
+}
+
+/* === GOLD TEXT OUTLINE === */
+.btn:not(.btn-outline, .btn-sm),
+.modal-close:hover,
+.modal-close:focus-visible,
+.lock-content h2,
+.shame-banner,
+.receipt-stub-head {
+    -webkit-text-stroke: 0.05em var(--ink);
+}
+
+.shame-banner :not(#banner-sub, small) {
+    -webkit-text-stroke-width: 0.03em;
 }

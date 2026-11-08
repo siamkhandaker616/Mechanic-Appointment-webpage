@@ -28,6 +28,16 @@ $SLOT_LABELS = [
 
 $SLOT_NAMES = ['Morning', 'Noon', 'Afternoon', 'Evening'];
 
+$LUCKY_RULES = [
+    0 => ['op' => 'sum3',  'target' => 21, 'label' => 'Last 3 digits add up to 21'],
+    1 => ['op' => 'prod3', 'target' => 20, 'label' => 'Last 3 digits multiply to 20'],
+    2 => ['op' => 'edge',  'target' => 10, 'label' => 'First digit + last digit = 10'],
+    3 => ['op' => 'sum3',  'target' => 18, 'label' => 'Last 3 digits add up to 18'],
+    4 => ['op' => 'prod3', 'target' => 12, 'label' => 'Last 3 digits multiply to 12'],
+    5 => ['op' => 'edge',  'target' => 5,  'label' => 'First digit + last digit = 5'],
+    6 => ['op' => 'sum3',  'target' => 21, 'label' => 'Last 3 digits add up to 21'],
+];
+
 function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
